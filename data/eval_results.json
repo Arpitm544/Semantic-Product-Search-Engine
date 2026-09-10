@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-09-11 00:24:11",
+  "totalQueries": 15,
+  "k": 5,
+  "metrics": {
+    "keyword": {
+      "precision_at_5": 0.4,
+      "recall_at_5": 0.8,
+      "ndcg_at_5": 0.9415,
+      "mrr": 1.0,
+      "p50_latency_ms": 0.02,
+      "p95_latency_ms": 1.11
+    },
+    "semantic": {
+      "precision_at_5": 0.4533,
+      "recall_at_5": 0.8889,
+      "ndcg_at_5": 0.9805,
+      "mrr": 1.0,
+      "p50_latency_ms": 7.23,
+      "p95_latency_ms": 274.33
+    },
+    "hybrid": {
+      "precision_at_5": 0.4533,
+      "recall_at_5": 0.9,
+      "ndcg_at_5": 0.9604,
+      "mrr": 1.0,
+      "p50_latency_ms": 5.42,
+      "p95_latency_ms": 6.43
+    }
+  }
+}

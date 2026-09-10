@@ -1,0 +1,77 @@
+[
+  {
+    "query_id": "q1",
+    "query": "warm winter jacket for cold weather",
+    "relevant_doc_ids": ["prod_1", "prod_2", "prod_14"]
+  },
+  {
+    "query_id": "q2",
+    "query": "wireless bluetooth headphones for gym workouts",
+    "relevant_doc_ids": ["prod_3", "prod_4", "prod_15"]
+  },
+  {
+    "query_id": "q3",
+    "query": "laptop for software developer and programming",
+    "relevant_doc_ids": ["prod_5", "prod_6", "prod_39"]
+  },
+  {
+    "query_id": "q4",
+    "query": "ergonomic chair for long coding hours",
+    "relevant_doc_ids": ["prod_10", "prod_23", "prod_24"]
+  },
+  {
+    "query_id": "q5",
+    "query": "waterproof hiking boots for mountain trails",
+    "relevant_doc_ids": ["prod_9", "prod_8", "prod_21"]
+  },
+  {
+    "query_id": "q6",
+    "query": "smartwatch with heart rate monitor",
+    "relevant_doc_ids": ["prod_7", "prod_19", "prod_20"]
+  },
+  {
+    "query_id": "q7",
+    "query": "smart home outdoor security camera solar",
+    "relevant_doc_ids": ["prod_27", "prod_28"]
+  },
+  {
+    "query_id": "q8",
+    "query": "wireless mechanical gaming keyboard rgb",
+    "relevant_doc_ids": ["prod_30", "prod_31", "prod_50"]
+  },
+  {
+    "query_id": "q9",
+    "query": "automatic espresso coffee maker machine",
+    "relevant_doc_ids": ["prod_11", "prod_36"]
+  },
+  {
+    "query_id": "q10",
+    "query": "camping tent waterproof cold weather sleeping bag",
+    "relevant_doc_ids": ["prod_33", "prod_34", "prod_35"]
+  },
+  {
+    "query_id": "q11",
+    "query": "robot vacuum mop for home cleaning",
+    "relevant_doc_ids": ["prod_37", "prod_38"]
+  },
+  {
+    "query_id": "q12",
+    "query": "4k monitor with usb c laptop charging",
+    "relevant_doc_ids": ["prod_39", "prod_5"]
+  },
+  {
+    "query_id": "q13",
+    "query": "oil free digital air fryer for kitchen",
+    "relevant_doc_ids": ["prod_25", "prod_26"]
+  },
+  {
+    "query_id": "q14",
+    "query": "windproof rain coat for monsoon",
+    "relevant_doc_ids": ["prod_13", "prod_1"]
+  },
+  {
+    "query_id": "q15",
+    "query": "action camera waterproof for sports 4k",
+    "relevant_doc_ids": ["prod_47", "prod_15"]
+  }
+]

@@ -1,0 +1,452 @@
+[
+  {
+    "id": "prod_1",
+    "title": "ArcticShield Insulated Winter Parka",
+    "category": "Jackets & Outerwear",
+    "price": 4999,
+    "x": 5.0,
+    "y": 0.8598,
+    "z": -2.5866
+  },
+  {
+    "id": "prod_2",
+    "title": "NorthTrail Lightweight Fleece Jacket",
+    "category": "Jackets & Outerwear",
+    "price": 2499,
+    "x": 4.9519,
+    "y": -0.0691,
+    "z": -1.4505
+  },
+  {
+    "id": "prod_3",
+    "title": "AeroBeat Pro Wireless Noise-Canceling Headphones",
+    "category": "Audio & Electronics",
+    "price": 8999,
+    "x": -2.5845,
+    "y": 0.5002,
+    "z": 4.9938
+  },
+  {
+    "id": "prod_4",
+    "title": "PulseFit True Wireless Earbuds",
+    "category": "Audio & Electronics",
+    "price": 3499,
+    "x": -1.5766,
+    "y": 1.1101,
+    "z": 5.0
+  },
+  {
+    "id": "prod_5",
+    "title": "ZenithBook Pro 15 Laptop for Developers",
+    "category": "Laptops & Computers",
+    "price": 79999,
+    "x": -4.6808,
+    "y": 0.8242,
+    "z": -4.6991
+  },
+  {
+    "id": "prod_6",
+    "title": "SlimAir 13 Ultraportable Student Laptop",
+    "category": "Laptops & Computers",
+    "price": 42999,
+    "x": -3.821,
+    "y": 0.1881,
+    "z": -3.5325
+  },
+  {
+    "id": "prod_7",
+    "title": "ChronoSync Smartwatch HR",
+    "category": "Wearables",
+    "price": 5999,
+    "x": -3.0221,
+    "y": -0.2733,
+    "z": 0.8787
+  },
+  {
+    "id": "prod_8",
+    "title": "StrideMax Carbon Running Shoes",
+    "category": "Footwear",
+    "price": 6499,
+    "x": 1.1136,
+    "y": -2.9524,
+    "z": 0.7138
+  },
+  {
+    "id": "prod_9",
+    "title": "TrailGrip Waterproof Hiking Boots",
+    "category": "Footwear",
+    "price": 5299,
+    "x": 3.2626,
+    "y": -0.2198,
+    "z": -0.9102
+  },
+  {
+    "id": "prod_10",
+    "title": "ErgoFlex Mesh Ergonomic Office Chair",
+    "category": "Furniture",
+    "price": 11999,
+    "x": -3.002,
+    "y": -4.7162,
+    "z": -3.7935
+  },
+  {
+    "id": "prod_11",
+    "title": "BrewMaster Automatic Espresso Machine",
+    "category": "Home & Kitchen",
+    "price": 18499,
+    "x": -2.1232,
+    "y": -0.8024,
+    "z": -0.6078
+  },
+  {
+    "id": "prod_12",
+    "title": "HydraSteel Vacuum Insulated Water Bottle 1L",
+    "category": "Home & Kitchen",
+    "price": 1299,
+    "x": 1.8327,
+    "y": 0.3506,
+    "z": -0.683
+  },
+  {
+    "id": "prod_13",
+    "title": "StormDefender Windproof Raincoat",
+    "category": "Jackets & Outerwear",
+    "price": 3199,
+    "x": 4.3087,
+    "y": 2.0159,
+    "z": -2.273
+  },
+  {
+    "id": "prod_14",
+    "title": "AlpinePeak Thermal Down Puffer Jacket",
+    "category": "Jackets & Outerwear",
+    "price": 6999,
+    "x": 4.9166,
+    "y": -0.4946,
+    "z": -0.5656
+  },
+  {
+    "id": "prod_15",
+    "title": "SoundWave Mini Portable Bluetooth Speaker",
+    "category": "Audio & Electronics",
+    "price": 2199,
+    "x": -1.1326,
+    "y": 2.3865,
+    "z": 2.5439
+  },
+  {
+    "id": "prod_16",
+    "title": "StudioCraft Studio Reference Headphones",
+    "category": "Audio & Electronics",
+    "price": 12499,
+    "x": -3.7526,
+    "y": 0.6995,
+    "z": 3.1959
+  },
+  {
+    "id": "prod_17",
+    "title": "GameTitan RTX 4080 Gaming Laptop",
+    "category": "Laptops & Computers",
+    "price": 139999,
+    "x": -4.1596,
+    "y": 0.2392,
+    "z": -2.4201
+  },
+  {
+    "id": "prod_18",
+    "title": "CloudTab 11 IPS Graphics Tablet Laptop",
+    "category": "Laptops & Computers",
+    "price": 35999,
+    "x": -4.3888,
+    "y": 0.5711,
+    "z": -5.0
+  },
+  {
+    "id": "prod_19",
+    "title": "AuraBand Fitness Tracker Slim",
+    "category": "Wearables",
+    "price": 2799,
+    "x": -1.9788,
+    "y": 0.8216,
+    "z": 2.1921
+  },
+  {
+    "id": "prod_20",
+    "title": "TitaniumRugged Outdoor GPS Watch",
+    "category": "Wearables",
+    "price": 15999,
+    "x": -0.4643,
+    "y": 2.8318,
+    "z": -1.9889
+  },
+  {
+    "id": "prod_21",
+    "title": "VelocityX Lightweight Road Racing Shoes",
+    "category": "Footwear",
+    "price": 7299,
+    "x": 0.7631,
+    "y": -2.1352,
+    "z": 1.7505
+  },
+  {
+    "id": "prod_22",
+    "title": "UrbanFlex Casual Canvas Sneakers",
+    "category": "Footwear",
+    "price": 1899,
+    "x": 0.9622,
+    "y": -2.8767,
+    "z": 0.0948
+  },
+  {
+    "id": "prod_23",
+    "title": "ProDesk Electric Standing Desk 140x70",
+    "category": "Furniture",
+    "price": 22999,
+    "x": -4.491,
+    "y": -1.8583,
+    "z": -4.5717
+  },
+  {
+    "id": "prod_24",
+    "title": "ComfortRest Ergonomic Footrest Cushion",
+    "category": "Furniture",
+    "price": 1499,
+    "x": -3.155,
+    "y": -5.0,
+    "z": -2.9983
+  },
+  {
+    "id": "prod_25",
+    "title": "AirChef Digital Dual-Basket Air Fryer 8L",
+    "category": "Home & Kitchen",
+    "price": 8999,
+    "x": -2.4308,
+    "y": 1.9555,
+    "z": -2.4401
+  },
+  {
+    "id": "prod_26",
+    "title": "NutriBlend Pro High-Speed Countertop Blender",
+    "category": "Home & Kitchen",
+    "price": 4499,
+    "x": -3.7405,
+    "y": -0.5232,
+    "z": 0.0824
+  },
+  {
+    "id": "prod_27",
+    "title": "GuardianCam Outdoor Solar Security Camera",
+    "category": "Smart Home & Security",
+    "price": 5499,
+    "x": -1.2155,
+    "y": 5.0,
+    "z": -3.5779
+  },
+  {
+    "id": "prod_28",
+    "title": "SmartLock Pro Fingerprint Front Door Lock",
+    "category": "Smart Home & Security",
+    "price": 9999,
+    "x": -2.7956,
+    "y": 2.7459,
+    "z": -1.5653
+  },
+  {
+    "id": "prod_29",
+    "title": "LuminaGlow WiFi Smart LED Bulb 4-Pack",
+    "category": "Smart Home & Security",
+    "price": 1999,
+    "x": -4.1101,
+    "y": 1.7346,
+    "z": -3.3985
+  },
+  {
+    "id": "prod_30",
+    "title": "MechStrike Wireless RGB Mechanical Keyboard",
+    "category": "Gaming & Accessories",
+    "price": 5999,
+    "x": -3.4081,
+    "y": -0.2803,
+    "z": -1.4981
+  },
+  {
+    "id": "prod_31",
+    "title": "ViperClaw Ultra-Light Wireless Gaming Mouse",
+    "category": "Gaming & Accessories",
+    "price": 3899,
+    "x": -3.5215,
+    "y": 1.7844,
+    "z": -2.1548
+  },
+  {
+    "id": "prod_32",
+    "title": "HyperGrip XL Extended Gaming Mouse Pad",
+    "category": "Gaming & Accessories",
+    "price": 999,
+    "x": -2.1424,
+    "y": -3.0231,
+    "z": -4.0597
+  },
+  {
+    "id": "prod_33",
+    "title": "SummitTent 3-Person Waterproof Camping Tent",
+    "category": "Outdoor & Camping",
+    "price": 7499,
+    "x": 3.1012,
+    "y": 2.6803,
+    "z": -3.7476
+  },
+  {
+    "id": "prod_34",
+    "title": "ThermoRest Down Sleeping Bag -10C",
+    "category": "Outdoor & Camping",
+    "price": 4999,
+    "x": 3.8922,
+    "y": 0.0516,
+    "z": -2.5275
+  },
+  {
+    "id": "prod_35",
+    "title": "SolarVolt 20000mAh Rugged Power Bank",
+    "category": "Outdoor & Camping",
+    "price": 2799,
+    "x": -0.4245,
+    "y": 3.0853,
+    "z": -4.249
+  },
+  {
+    "id": "prod_36",
+    "title": "ThermalGlow Smart Coffee Mug 350ml",
+    "category": "Home & Kitchen",
+    "price": 3999,
+    "x": -1.8286,
+    "y": 0.5962,
+    "z": -1.435
+  },
+  {
+    "id": "prod_37",
+    "title": "RoboClean Laser Robot Vacuum & Mop",
+    "category": "Home & Kitchen",
+    "price": 24999,
+    "x": -2.1093,
+    "y": 0.3585,
+    "z": -3.6649
+  },
+  {
+    "id": "prod_38",
+    "title": "PureAir HEPA Room Air Purifier",
+    "category": "Home & Kitchen",
+    "price": 7999,
+    "x": -2.0807,
+    "y": 1.3009,
+    "z": -2.7955
+  },
+  {
+    "id": "prod_39",
+    "title": "ScreenClear 27-inch 4K USB-C Monitor",
+    "category": "Laptops & Computers",
+    "price": 28999,
+    "x": -5.0,
+    "y": 1.3202,
+    "z": -4.7599
+  },
+  {
+    "id": "prod_40",
+    "title": "StreamMic USB Condenser Studio Microphone",
+    "category": "Audio & Electronics",
+    "price": 4299,
+    "x": -2.7576,
+    "y": 1.4498,
+    "z": 2.4987
+  },
+  {
+    "id": "prod_41",
+    "title": "ActiveFlex Yoga Mat 6mm Non-Slip",
+    "category": "Footwear",
+    "price": 1199,
+    "x": -0.6623,
+    "y": -3.3497,
+    "z": -0.844
+  },
+  {
+    "id": "prod_42",
+    "title": "FlexiGrip Adjustable Dumbbell Set 24kg",
+    "category": "Wearables",
+    "price": 12999,
+    "x": -2.1359,
+    "y": -0.6016,
+    "z": -0.1114
+  },
+  {
+    "id": "prod_43",
+    "title": "DeskOrganizer Bamboo Cable Management Box",
+    "category": "Furniture",
+    "price": 999,
+    "x": -2.4965,
+    "y": -1.5616,
+    "z": -2.6538
+  },
+  {
+    "id": "prod_44",
+    "title": "UltraView HD Binoculars 10x42",
+    "category": "Outdoor & Camping",
+    "price": 3499,
+    "x": 0.3635,
+    "y": 2.818,
+    "z": -4.1898
+  },
+  {
+    "id": "prod_45",
+    "title": "TrailPack 40L Hiking Backpack",
+    "category": "Outdoor & Camping",
+    "price": 3899,
+    "x": 3.3766,
+    "y": -0.1137,
+    "z": -2.9967
+  },
+  {
+    "id": "prod_46",
+    "title": "SoundBar Pro 2.1 Channel TV Speaker 120W",
+    "category": "Audio & Electronics",
+    "price": 6499,
+    "x": -4.3368,
+    "y": 2.0934,
+    "z": 1.3259
+  },
+  {
+    "id": "prod_47",
+    "title": "ProCam 4K Action Camera Waterproof 30m",
+    "category": "Audio & Electronics",
+    "price": 5999,
+    "x": -2.211,
+    "y": 3.2045,
+    "z": -2.3224
+  },
+  {
+    "id": "prod_48",
+    "title": "LumbarSupport Car Seat Cushion",
+    "category": "Furniture",
+    "price": 1299,
+    "x": -1.9194,
+    "y": -4.6515,
+    "z": -3.0371
+  },
+  {
+    "id": "prod_49",
+    "title": "SmartPlug WiFi Socket with Energy Monitor 2-Pack",
+    "category": "Smart Home & Security",
+    "price": 1499,
+    "x": -4.3733,
+    "y": 2.2063,
+    "z": -0.4105
+  },
+  {
+    "id": "prod_50",
+    "title": "GamerHeadset 7.1 Surround Sound Headset",
+    "category": "Gaming & Accessories",
+    "price": 3299,
+    "x": -3.6504,
+    "y": 0.3081,
+    "z": 2.5074
+  }
+]

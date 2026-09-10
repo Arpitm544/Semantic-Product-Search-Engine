@@ -1,0 +1,702 @@
+[
+  {
+    "id": "prod_1",
+    "title": "ArcticShield Insulated Winter Parka",
+    "category": "Jackets & Outerwear",
+    "price": 4999,
+    "description": "Heavy-duty waterproof winter jacket with thermal fleece lining, detachable hood, and storm flaps designed for extreme cold weather and snow conditions.",
+    "attributes": [
+      "waterproof",
+      "insulated",
+      "fleece-lined",
+      "winter",
+      "cold weather"
+    ]
+  },
+  {
+    "id": "prod_2",
+    "title": "NorthTrail Lightweight Fleece Jacket",
+    "category": "Jackets & Outerwear",
+    "price": 2499,
+    "description": "Breathable full-zip fleece jacket ideal for moderate chill, autumn hiking, and layering under heavy winter coats.",
+    "attributes": [
+      "breathable",
+      "lightweight",
+      "fleece",
+      "hiking",
+      "layering"
+    ]
+  },
+  {
+    "id": "prod_3",
+    "title": "AeroBeat Pro Wireless Noise-Canceling Headphones",
+    "category": "Audio & Electronics",
+    "price": 8999,
+    "description": "Premium over-ear Bluetooth headphones with active noise cancellation, 40-hour battery life, and sweat resistance for intense gym workouts.",
+    "attributes": [
+      "wireless",
+      "bluetooth",
+      "noise canceling",
+      "gym",
+      "long battery"
+    ]
+  },
+  {
+    "id": "prod_4",
+    "title": "PulseFit True Wireless Earbuds",
+    "category": "Audio & Electronics",
+    "price": 3499,
+    "description": "Compact in-ear wireless sport earbuds with secure ear hooks, IPX7 water resistance, and punchy bass for running and cardio.",
+    "attributes": [
+      "wireless",
+      "earbuds",
+      "waterproof",
+      "running",
+      "sports"
+    ]
+  },
+  {
+    "id": "prod_5",
+    "title": "ZenithBook Pro 15 Laptop for Developers",
+    "category": "Laptops & Computers",
+    "price": 79999,
+    "description": "High-performance laptop featuring 32GB RAM, 1TB NVMe SSD, Octa-core CPU, and 4K display optimized for software engineering and video rendering.",
+    "attributes": [
+      "32gb ram",
+      "programming",
+      "developer",
+      "4k display",
+      "fast ssd"
+    ]
+  },
+  {
+    "id": "prod_6",
+    "title": "SlimAir 13 Ultraportable Student Laptop",
+    "category": "Laptops & Computers",
+    "price": 42999,
+    "description": "Featherlight 13-inch laptop with 18-hour battery, silent fanless cooling, and crisp Retina display for college students and remote office work.",
+    "attributes": [
+      "lightweight",
+      "student",
+      "long battery",
+      "office",
+      "portable"
+    ]
+  },
+  {
+    "id": "prod_7",
+    "title": "ChronoSync Smartwatch HR",
+    "category": "Wearables",
+    "price": 5999,
+    "description": "Advanced fitness tracker with continuous heart rate monitoring, GPS tracking, sleep score analysis, and AMOLED touch display.",
+    "attributes": [
+      "smartwatch",
+      "fitness",
+      "heart rate",
+      "gps",
+      "amoled"
+    ]
+  },
+  {
+    "id": "prod_8",
+    "title": "StrideMax Carbon Running Shoes",
+    "category": "Footwear",
+    "price": 6499,
+    "description": "Responsive marathons running shoes engineered with carbon fiber plate and super-foam cushioning for maximum energy return.",
+    "attributes": [
+      "running",
+      "marathon",
+      "cushioned",
+      "breathable",
+      "lightweight"
+    ]
+  },
+  {
+    "id": "prod_9",
+    "title": "TrailGrip Waterproof Hiking Boots",
+    "category": "Footwear",
+    "price": 5299,
+    "description": "Rugged high-top ankle boots with Vibram rubber outsole, Gore-Tex waterproofing, and deep lugs for rocky mountain trails.",
+    "attributes": [
+      "hiking",
+      "waterproof",
+      "boots",
+      "rugged",
+      "grip"
+    ]
+  },
+  {
+    "id": "prod_10",
+    "title": "ErgoFlex Mesh Ergonomic Office Chair",
+    "category": "Furniture",
+    "price": 11999,
+    "description": "Adjustable lumbar support ergonomic desk chair with breathable mesh backrest, 3D armrests, and dynamic recline for long coding sessions.",
+    "attributes": [
+      "ergonomic",
+      "mesh",
+      "office chair",
+      "lumbar support",
+      "coding"
+    ]
+  },
+  {
+    "id": "prod_11",
+    "title": "BrewMaster Automatic Espresso Machine",
+    "category": "Home & Kitchen",
+    "price": 18499,
+    "description": "Bean-to-cup automatic coffee maker with built-in conical burr grinder, milk steam wand, and customizable shot temperature.",
+    "attributes": [
+      "espresso",
+      "coffee maker",
+      "grinder",
+      "kitchen",
+      "automatic"
+    ]
+  },
+  {
+    "id": "prod_12",
+    "title": "HydraSteel Vacuum Insulated Water Bottle 1L",
+    "category": "Home & Kitchen",
+    "price": 1299,
+    "description": "Double-wall stainless steel thermal canteen keeping drinks ice cold for 24 hours or piping hot for 12 hours. Leakproof spout lid.",
+    "attributes": [
+      "stainless steel",
+      "insulated",
+      "water bottle",
+      "gym",
+      "hiking"
+    ]
+  },
+  {
+    "id": "prod_13",
+    "title": "StormDefender Windproof Raincoat",
+    "category": "Jackets & Outerwear",
+    "price": 3199,
+    "description": "Lightweight windproof and rainproof shell jacket with taped seams, adjustable hood, and reflective strips for stormy monsoon walking.",
+    "attributes": [
+      "raincoat",
+      "windproof",
+      "waterproof",
+      "monsoon",
+      "reflective"
+    ]
+  },
+  {
+    "id": "prod_14",
+    "title": "AlpinePeak Thermal Down Puffer Jacket",
+    "category": "Jackets & Outerwear",
+    "price": 6999,
+    "description": "Ultra-warm goose down puffer coat with packable pouch, wind-resistant outer shell, and high chin guard for sub-zero mountain expeditions.",
+    "attributes": [
+      "down jacket",
+      "puffer",
+      "ultra warm",
+      "winter",
+      "packable"
+    ]
+  },
+  {
+    "id": "prod_15",
+    "title": "SoundWave Mini Portable Bluetooth Speaker",
+    "category": "Audio & Electronics",
+    "price": 2199,
+    "description": "Rugged IPX7 waterproof outdoor Bluetooth speaker with 360-degree bass sound, carabiner strap, and 12-hour playtime.",
+    "attributes": [
+      "bluetooth speaker",
+      "waterproof",
+      "portable",
+      "outdoor",
+      "bass"
+    ]
+  },
+  {
+    "id": "prod_16",
+    "title": "StudioCraft Studio Reference Headphones",
+    "category": "Audio & Electronics",
+    "price": 12499,
+    "description": "Professional open-back wired studio monitor headphones with neutral frequency response, velvet ear pads, and detachable gold cable.",
+    "attributes": [
+      "studio monitor",
+      "wired",
+      "audiophile",
+      "music production",
+      "open back"
+    ]
+  },
+  {
+    "id": "prod_17",
+    "title": "GameTitan RTX 4080 Gaming Laptop",
+    "category": "Laptops & Computers",
+    "price": 139999,
+    "description": "Beast gaming laptop powered by Nvidia RTX 4080 GPU, Intel i9 CPU, 240Hz QHD display, and RGB mechanical keyboard.",
+    "attributes": [
+      "gaming laptop",
+      "rtx 4080",
+      "240hz",
+      "rgb keyboard",
+      "high performance"
+    ]
+  },
+  {
+    "id": "prod_18",
+    "title": "CloudTab 11 IPS Graphics Tablet Laptop",
+    "category": "Laptops & Computers",
+    "price": 35999,
+    "description": "2-in-1 touchscreen convertible laptop with stylus pen support, color-accurate IPS panel, and lightweight aluminum chassis for digital artists.",
+    "attributes": [
+      "2 in 1",
+      "touchscreen",
+      "stylus",
+      "drawing",
+      "convertible"
+    ]
+  },
+  {
+    "id": "prod_19",
+    "title": "AuraBand Fitness Tracker Slim",
+    "category": "Wearables",
+    "price": 2799,
+    "description": "Sleek lightweight smart wristband with SpO2 blood oxygen sensor, step tracking, stress monitor, and 14-day battery life.",
+    "attributes": [
+      "fitness band",
+      "spo2",
+      "step tracker",
+      "lightweight",
+      "long battery"
+    ]
+  },
+  {
+    "id": "prod_20",
+    "title": "TitaniumRugged Outdoor GPS Watch",
+    "category": "Wearables",
+    "price": 15999,
+    "description": "Military-grade titanium bezel smartwatch with offline topo maps, solar charging lens, altimeter, barometer, and compass.",
+    "attributes": [
+      "military grade",
+      "solar charging",
+      "gps",
+      "outdoor",
+      "barometer"
+    ]
+  },
+  {
+    "id": "prod_21",
+    "title": "VelocityX Lightweight Road Racing Shoes",
+    "category": "Footwear",
+    "price": 7299,
+    "description": "Featherweight road racing sneakers designed for marathon speed, featuring ultra-breathable mesh upper and high-grip rubber pod sole.",
+    "attributes": [
+      "road racing",
+      "sneakers",
+      "speed",
+      "breathable",
+      "lightweight"
+    ]
+  },
+  {
+    "id": "prod_22",
+    "title": "UrbanFlex Casual Canvas Sneakers",
+    "category": "Footwear",
+    "price": 1899,
+    "description": "Classic low-top canvas shoes with cushioned memory foam insoles for everyday casual walking and college campus wear.",
+    "attributes": [
+      "canvas",
+      "sneakers",
+      "casual",
+      "memory foam",
+      "daily wear"
+    ]
+  },
+  {
+    "id": "prod_23",
+    "title": "ProDesk Electric Standing Desk 140x70",
+    "category": "Furniture",
+    "price": 22999,
+    "description": "Dual-motor motorized height-adjustable sit-stand desk with solid walnut tabletop, 4 memory presets, and cable management tray.",
+    "attributes": [
+      "standing desk",
+      "electric",
+      "height adjustable",
+      "ergonomic",
+      "office"
+    ]
+  },
+  {
+    "id": "prod_24",
+    "title": "ComfortRest Ergonomic Footrest Cushion",
+    "category": "Furniture",
+    "price": 1499,
+    "description": "Under-desk high-density memory foam footrest cushion for relieving lower back strain and improving seating posture.",
+    "attributes": [
+      "footrest",
+      "under desk",
+      "memory foam",
+      "posture",
+      "ergonomic"
+    ]
+  },
+  {
+    "id": "prod_25",
+    "title": "AirChef Digital Dual-Basket Air Fryer 8L",
+    "category": "Home & Kitchen",
+    "price": 8999,
+    "description": "Large capacity 8-liter dual zone oil-free digital air fryer with 8 cooking presets, sync cook feature, and dishwasher-safe baskets.",
+    "attributes": [
+      "air fryer",
+      "kitchen",
+      "oil free",
+      "digital",
+      "dual zone"
+    ]
+  },
+  {
+    "id": "prod_26",
+    "title": "NutriBlend Pro High-Speed Countertop Blender",
+    "category": "Home & Kitchen",
+    "price": 4499,
+    "description": "1200W commercial-grade smoothie blender with stainless steel extraction blades, pulse mode, and BPA-free travel cups.",
+    "attributes": [
+      "blender",
+      "smoothie",
+      "1200w",
+      "kitchen",
+      "juicer"
+    ]
+  },
+  {
+    "id": "prod_27",
+    "title": "GuardianCam Outdoor Solar Security Camera",
+    "category": "Smart Home & Security",
+    "price": 5499,
+    "description": "100% wire-free 2K outdoor WiFi security camera with solar panel, color night vision, PIR motion detection, and two-way audio.",
+    "attributes": [
+      "security camera",
+      "solar",
+      "wifi",
+      "night vision",
+      "outdoor"
+    ]
+  },
+  {
+    "id": "prod_28",
+    "title": "SmartLock Pro Fingerprint Front Door Lock",
+    "category": "Smart Home & Security",
+    "price": 9999,
+    "description": "Keyless entry biometric fingerprint deadbolt lock with mobile app control, passcode keypad, emergency USB power, and auto-lock.",
+    "attributes": [
+      "smart lock",
+      "fingerprint",
+      "keyless",
+      "security",
+      "biometric"
+    ]
+  },
+  {
+    "id": "prod_29",
+    "title": "LuminaGlow WiFi Smart LED Bulb 4-Pack",
+    "category": "Smart Home & Security",
+    "price": 1999,
+    "description": "RGB multi-color dimmable smart light bulbs compatible with Alexa and Google Assistant, no hub required, schedule timers.",
+    "attributes": [
+      "smart bulb",
+      "rgb",
+      "alexa",
+      "google assistant",
+      "wifi"
+    ]
+  },
+  {
+    "id": "prod_30",
+    "title": "MechStrike Wireless RGB Mechanical Keyboard",
+    "category": "Gaming & Accessories",
+    "price": 5999,
+    "description": "Hot-swappable mechanical gaming keyboard with linear red switches, PBT keycaps, tri-mode wireless connection, and customizable RGB lighting.",
+    "attributes": [
+      "mechanical keyboard",
+      "gaming",
+      "hot swappable",
+      "wireless",
+      "rgb"
+    ]
+  },
+  {
+    "id": "prod_31",
+    "title": "ViperClaw Ultra-Light Wireless Gaming Mouse",
+    "category": "Gaming & Accessories",
+    "price": 3899,
+    "description": "49-gram lightweight esports wireless mouse with 26K DPI optical sensor, zero-delay wireless receiver, and PTFE skates.",
+    "attributes": [
+      "gaming mouse",
+      "lightweight",
+      "wireless",
+      "esports",
+      "26k dpi"
+    ]
+  },
+  {
+    "id": "prod_32",
+    "title": "HyperGrip XL Extended Gaming Mouse Pad",
+    "category": "Gaming & Accessories",
+    "price": 999,
+    "description": "Large desk pad mat 900x400mm with micro-woven cloth surface, anti-fray stitched edges, and non-slip rubber base.",
+    "attributes": [
+      "mouse pad",
+      "desk mat",
+      "xl",
+      "gaming",
+      "stitch edge"
+    ]
+  },
+  {
+    "id": "prod_33",
+    "title": "SummitTent 3-Person Waterproof Camping Tent",
+    "category": "Outdoor & Camping",
+    "price": 7499,
+    "description": "Double-layer 3-season dome camping tent with waterproof rainfly, aluminum poles, dual doors, and easy 5-minute setup.",
+    "attributes": [
+      "camping tent",
+      "waterproof",
+      "outdoor",
+      "3 person",
+      "backpacking"
+    ]
+  },
+  {
+    "id": "prod_34",
+    "title": "ThermoRest Down Sleeping Bag -10C",
+    "category": "Outdoor & Camping",
+    "price": 4999,
+    "description": "Mummy duck down sleeping bag rated for sub-zero mountain cold, ultralight compression sack included for trekking.",
+    "attributes": [
+      "sleeping bag",
+      "camping",
+      "cold weather",
+      "down insulation",
+      "trekking"
+    ]
+  },
+  {
+    "id": "prod_35",
+    "title": "SolarVolt 20000mAh Rugged Power Bank",
+    "category": "Outdoor & Camping",
+    "price": 2799,
+    "description": "Heavy-duty outdoor portable charger with built-in solar panel, bright LED flashlight, dual USB quick charge, and drop-proof casing.",
+    "attributes": [
+      "power bank",
+      "solar charger",
+      "20000mah",
+      "outdoor",
+      "flashlight"
+    ]
+  },
+  {
+    "id": "prod_36",
+    "title": "ThermalGlow Smart Coffee Mug 350ml",
+    "category": "Home & Kitchen",
+    "price": 3999,
+    "description": "App-controlled temperature regulating smart ceramic mug that keeps coffee or tea at your precise desired drinking temperature for 2 hours.",
+    "attributes": [
+      "smart mug",
+      "temperature control",
+      "coffee",
+      "kitchen",
+      "gadget"
+    ]
+  },
+  {
+    "id": "prod_37",
+    "title": "RoboClean Laser Robot Vacuum & Mop",
+    "category": "Home & Kitchen",
+    "price": 24999,
+    "description": "LiDAR navigation robotic vacuum cleaner with 4000Pa suction, automated carpet boost, smart app room mapping, and wet mopping function.",
+    "attributes": [
+      "robot vacuum",
+      "mop",
+      "lidar",
+      "smart home",
+      "cleaning"
+    ]
+  },
+  {
+    "id": "prod_38",
+    "title": "PureAir HEPA Room Air Purifier",
+    "category": "Home & Kitchen",
+    "price": 7999,
+    "description": "True HEPA filtration air cleaner removing 99.97% of dust, smoke, pet dander, and allergens with quiet sleep mode and air quality indicator.",
+    "attributes": [
+      "air purifier",
+      "hepa",
+      "allergens",
+      "home",
+      "quiet"
+    ]
+  },
+  {
+    "id": "prod_39",
+    "title": "ScreenClear 27-inch 4K USB-C Monitor",
+    "category": "Laptops & Computers",
+    "price": 28999,
+    "description": "Professional 27-inch 4K IPS monitor with 99% sRGB color space, 65W USB-C laptop charging, height-adjustable stand, and eye care tech.",
+    "attributes": [
+      "4k monitor",
+      "27 inch",
+      "usb-c",
+      "ips display",
+      "coding"
+    ]
+  },
+  {
+    "id": "prod_40",
+    "title": "StreamMic USB Condenser Studio Microphone",
+    "category": "Audio & Electronics",
+    "price": 4299,
+    "description": "Plug-and-play cardioid USB microphone with boom arm stand, pop filter, zero-latency headphone monitoring for podcasting and gaming.",
+    "attributes": [
+      "microphone",
+      "usb mic",
+      "podcasting",
+      "streaming",
+      "condenser"
+    ]
+  },
+  {
+    "id": "prod_41",
+    "title": "ActiveFlex Yoga Mat 6mm Non-Slip",
+    "category": "Footwear",
+    "price": 1199,
+    "description": "Eco-friendly TPE workout mat with alignment lines, extra thick 6mm cushioning, and carrying strap for Pilates and floor exercise.",
+    "attributes": [
+      "yoga mat",
+      "non slip",
+      "fitness",
+      "cushioning",
+      "workout"
+    ]
+  },
+  {
+    "id": "prod_42",
+    "title": "FlexiGrip Adjustable Dumbbell Set 24kg",
+    "category": "Wearables",
+    "price": 12999,
+    "description": "Compact home gym dial-adjustable dumbbell replacing 15 sets of weights from 2.5kg to 24kg with heavy-duty steel molding.",
+    "attributes": [
+      "dumbbell",
+      "adjustable weight",
+      "home gym",
+      "strength training",
+      "workout"
+    ]
+  },
+  {
+    "id": "prod_43",
+    "title": "DeskOrganizer Bamboo Cable Management Box",
+    "category": "Furniture",
+    "price": 999,
+    "description": "Natural wooden bamboo hideaway box for concealing power strips, cords, chargers, and surge protectors for clean office desk setup.",
+    "attributes": [
+      "cable management",
+      "bamboo",
+      "desk organizer",
+      "office",
+      "tidy"
+    ]
+  },
+  {
+    "id": "prod_44",
+    "title": "UltraView HD Binoculars 10x42",
+    "category": "Outdoor & Camping",
+    "price": 3499,
+    "description": "Waterproof fog-proof roof prism binoculars with FMC multicoated optics for bird watching, hunting, safari, and outdoor sports.",
+    "attributes": [
+      "binoculars",
+      "outdoor",
+      "bird watching",
+      "waterproof",
+      "optics"
+    ]
+  },
+  {
+    "id": "prod_45",
+    "title": "TrailPack 40L Hiking Backpack",
+    "category": "Outdoor & Camping",
+    "price": 3899,
+    "description": "Ergonomic 40-liter internal frame trekking rucksack with rain cover, hydration bladder sleeve, and ventilated mesh back panel.",
+    "attributes": [
+      "backpack",
+      "hiking",
+      "rucksack",
+      "outdoor",
+      "40l"
+    ]
+  },
+  {
+    "id": "prod_46",
+    "title": "SoundBar Pro 2.1 Channel TV Speaker 120W",
+    "category": "Audio & Electronics",
+    "price": 6499,
+    "description": "Cinematic home theater soundbar with wireless subwoofer, HDMI ARC connection, Bluetooth 5.3, and equalizer sound modes.",
+    "attributes": [
+      "soundbar",
+      "home theater",
+      "tv speaker",
+      "subwoofer",
+      "bluetooth"
+    ]
+  },
+  {
+    "id": "prod_47",
+    "title": "ProCam 4K Action Camera Waterproof 30m",
+    "category": "Audio & Electronics",
+    "price": 5999,
+    "description": "Action camera recording 4K 60fps video with EIS stabilization, dual screen displays, remote wrist control, and underwater housing.",
+    "attributes": [
+      "action camera",
+      "4k",
+      "waterproof",
+      "sports",
+      "underwater"
+    ]
+  },
+  {
+    "id": "prod_48",
+    "title": "LumbarSupport Car Seat Cushion",
+    "category": "Furniture",
+    "price": 1299,
+    "description": "Ergonomic memory foam lower back cushion for long car driving and office chairs with breathable mesh cover.",
+    "attributes": [
+      "car cushion",
+      "lumbar support",
+      "memory foam",
+      "back pain",
+      "ergonomic"
+    ]
+  },
+  {
+    "id": "prod_49",
+    "title": "SmartPlug WiFi Socket with Energy Monitor 2-Pack",
+    "category": "Smart Home & Security",
+    "price": 1499,
+    "description": "App-controlled smart plug outlet with real-time power consumption tracking, schedule timers, and voice control via Alexa.",
+    "attributes": [
+      "smart plug",
+      "energy monitor",
+      "wifi",
+      "alexa",
+      "automation"
+    ]
+  },
+  {
+    "id": "prod_50",
+    "title": "GamerHeadset 7.1 Surround Sound Headset",
+    "category": "Gaming & Accessories",
+    "price": 3299,
+    "description": "Over-ear gaming headphones with 7.1 virtual surround sound, noise-canceling mic, memory foam ear cups, and USB jack for PC/PS5.",
+    "attributes": [
+      "gaming headset",
+      "7.1 surround",
+      "microphone",
+      "pc gaming",
+      "ps5"
+    ]
+  }
+]
