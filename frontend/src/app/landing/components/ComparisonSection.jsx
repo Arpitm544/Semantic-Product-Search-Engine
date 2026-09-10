@@ -2,6 +2,7 @@
 import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import ScrollReveal from './ScrollReveal';
+import TiltCard from './TiltCard';
 
 export default function ComparisonSection() {
   const ref = useRef(null);
@@ -18,6 +19,7 @@ export default function ComparisonSection() {
       <div className="compare-grid">
         {/* Semantic Side */}
         <ScrollReveal delay={0.2} direction="left">
+          <TiltCard intensity={6}>
           <div className="compare-card semantic-card">
             <h3 className="c-title">Semantic Search</h3>
             <div className="c-query">Query: <span className="highlight">warm coat for snow</span></div>
@@ -53,12 +55,14 @@ export default function ComparisonSection() {
               <div className="r-score semantic-score">Score: 0.85</div>
             </div>
           </div>
+          </TiltCard>
         </ScrollReveal>
 
         <div className="compare-vs">VS</div>
 
         {/* BM25 Side */}
         <ScrollReveal delay={0.4} direction="right">
+          <TiltCard intensity={6}>
           <div className="compare-card bm25-card">
             <h3 className="c-title">BM25 (Keyword)</h3>
             <div className="c-query">Query: <span className="highlight">warm coat for snow</span></div>
@@ -80,6 +84,7 @@ export default function ComparisonSection() {
               <div className="r-score bm25-score">Score: 0.00</div>
             </div>
           </div>
+          </TiltCard>
         </ScrollReveal>
       </div>
     </section>
