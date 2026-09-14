@@ -45,6 +45,14 @@ export default function ComparisonSection() {
                   transition={{ delay: 1.2, type: 'spring' }}
                 >
                   "insulated parka"
+                  {isInView && (
+                    <motion.div
+                      style={{ position: 'absolute', inset: -4, borderRadius: 999, border: '1px solid #ea580c' }}
+                      initial={{ opacity: 0.8, scale: 1 }}
+                      animate={{ opacity: 0, scale: 1.5 }}
+                      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
+                    />
+                  )}
                 </motion.div>
               </div>
             </div>

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import ScrollReveal from './ScrollReveal';
 
 export default function PlaygroundSection() {
@@ -31,9 +32,9 @@ export default function PlaygroundSection() {
   return (
     <section className="lp-section" id="playground">
       <ScrollReveal>
-        <div className="section-badge">Interactive</div>
+        <div className="section-badge">Step 6 — Live Playground</div>
         <h2 className="section-title">Test the Pipeline</h2>
-        <p className="section-sub">Try the live FastAPI backend right here.</p>
+        <p className="section-sub">Try the real-time FastAPI backend. Adjust the weights to see how Hybrid Search impacts the final rankings.</p>
       </ScrollReveal>
 
       <div className="playground-container">
@@ -78,11 +79,29 @@ export default function PlaygroundSection() {
         {searched && (
           <div className="pg-results">
             {loading ? (
-              <div className="pg-loading">Querying Vector Index & BM25...</div>
+              <motion.div 
+                className="pg-loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <motion.div
+                  animate={{ opacity: [0.3, 1, 0.3], scale: [0.98, 1, 0.98] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  <span style={{ color: '#f97316' }}>■</span> Querying FAISS Index & BM25 Engine...
+                </motion.div>
+              </motion.div>
             ) : results.length > 0 ? (
               <div className="pg-result-list">
                 {results.slice(0, 3).map((r, i) => (
-                  <div key={r.id} className="pg-result-item" style={{ animationDelay: `${i * 0.1}s` }}>
+                  <motion.div 
+                    key={r.id} 
+                    className="pg-result-item"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.15, duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+                  >
                     <div className="r-meta">
                       <span className="r-id">#{i+1}</span>
                       <span className="r-cat">{r.category}</span>
@@ -93,11 +112,11 @@ export default function PlaygroundSection() {
                       <div className="score-pill bm25" style={{ opacity: mode === 'semantic' ? 0.3 : 1 }}>B: {r.bm25_score.toFixed(3)}</div>
                       {mode === 'hybrid' && <div className="score-pill combined">Total: {r.combined_score.toFixed(3)}</div>}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             ) : (
-              <div className="pg-no-results">No results found.</div>
+              <motion.div className="pg-no-results" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>No results found.</motion.div>
             )}
           </div>
         )}

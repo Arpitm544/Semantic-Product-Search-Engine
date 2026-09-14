@@ -21,11 +21,14 @@ export default function HybridFusionSection() {
             <div className="f-stream semantic-stream">
               <div className="stream-label">Semantic Score</div>
               <div className="stream-val">0.72</div>
-              <motion.div 
-                className="stream-particle s-particle"
-                animate={isInView ? { y: [0, 80] } : {}}
-                transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-              />
+              {[0, 1, 2].map(i => (
+                <motion.div 
+                  key={`s-${i}`}
+                  className="stream-particle s-particle"
+                  animate={isInView ? { y: [0, 80], opacity: [0, 1, 0] } : {}}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: 'linear', delay: i * 0.5 }}
+                />
+              ))}
             </div>
           </ScrollReveal>
           
@@ -33,20 +36,27 @@ export default function HybridFusionSection() {
             <div className="f-stream bm25-stream">
               <div className="stream-label">BM25 Score</div>
               <div className="stream-val">0.28</div>
-              <motion.div 
-                className="stream-particle b-particle"
-                animate={isInView ? { y: [0, 80] } : {}}
-                transition={{ duration: 1.5, repeat: Infinity, ease: 'linear', delay: 0.5 }}
-              />
+              {[0, 1, 2].map(i => (
+                <motion.div 
+                  key={`b-${i}`}
+                  className="stream-particle b-particle"
+                  animate={isInView ? { y: [0, 80], opacity: [0, 1, 0] } : {}}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: 'linear', delay: i * 0.5 }}
+                />
+              ))}
             </div>
           </ScrollReveal>
         </div>
 
         <ScrollReveal delay={0.5} direction="scale">
           <div className="f-engine">
-            <div className="engine-core">
+            <motion.div 
+              className="engine-core"
+              animate={isInView ? { boxShadow: ['0 0 30px rgba(249,115,22,0.06)', '0 0 50px rgba(249,115,22,0.15)', '0 0 30px rgba(249,115,22,0.06)'] } : {}}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            >
               FUSION<br/>ENGINE
-            </div>
+            </motion.div>
             <div className="engine-formula">
               Score = (α * Semantic) + ((1-α) * BM25)
             </div>
@@ -54,11 +64,14 @@ export default function HybridFusionSection() {
         </ScrollReveal>
 
         <div className="f-bottom">
-          <motion.div 
-            className="stream-particle combined-particle"
-            animate={isInView ? { y: [0, 60] } : {}}
-            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          />
+          {[0, 1, 2].map(i => (
+            <motion.div 
+              key={`c-${i}`}
+              className="stream-particle combined-particle"
+              animate={isInView ? { y: [0, 60], opacity: [0, 1, 0] } : {}}
+              transition={{ duration: 1.2, repeat: Infinity, ease: 'linear', delay: i * 0.4 }}
+            />
+          ))}
           <ScrollReveal delay={0.8} direction="up">
             <div className="ranked-results">
               <div className="r-item">

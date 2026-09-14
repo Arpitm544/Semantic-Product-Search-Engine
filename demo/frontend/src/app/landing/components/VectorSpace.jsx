@@ -1,6 +1,6 @@
 'use client';
-import { useRef, useState, useEffect } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { useRef, useState, useEffect, useMemo } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import ScrollReveal from './ScrollReveal';
@@ -14,10 +14,29 @@ const catColors = {
 };
 const defaultColor = "#a8a29e";
 
-function GlowSphere({ position, color, scale, isTop, label, category }) {
+// Category cluster offsets for better spatial separation
+const catOffsets = {
+  "Jackets & Outerwear": [1.5, 0.5, 0],
+  "Footwear": [-1.5, -0.8, 1],
+  "Camping & Hiking": [0, 1.2, -1.5],
+  "Electronics & Gadgets": [-1.8, 0.3, -0.5],
+  "Apparel": [1, -1, 1.2],
+};
+
+function GlowSphere({ position, color, scale, isTop, label, category, rank }) {
   const meshRef = useRef();
   const glowRef = useRef();
   const [hovered, setHovered] = useState(false);
+  const animStartRef = useRef(null);
+  const targetScale = useRef(scale);
+
+  // Animate scale transition when isTop changes
+  useEffect(() => {
+    targetScale.current = scale;
+    if (isTop) {
+      animStartRef.current = performance.now();
+    }
+  }, [isTop, scale]);
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -25,13 +44,18 @@ function GlowSphere({ position, color, scale, isTop, label, category }) {
       // Gentle floating motion
       meshRef.current.position.y = position[1] + Math.sin(t * 0.5 + position[0]) * 0.08;
       
+      // Smooth scale transition for NN results
+      const currentScale = meshRef.current.scale.x;
+      const newScale = THREE.MathUtils.lerp(currentScale, targetScale.current, 0.06);
+      meshRef.current.scale.setScalar(newScale);
+
       if (isTop) {
-        const pulse = 1 + Math.sin(t * 3) * 0.15;
-        meshRef.current.scale.setScalar(scale * pulse);
+        const pulse = 1 + Math.sin(t * 2.5) * 0.1;
+        meshRef.current.scale.setScalar(newScale * pulse);
       }
     }
     if (glowRef.current) {
-      glowRef.current.material.opacity = hovered ? 0.35 : (isTop ? 0.25 : 0.1);
+      glowRef.current.material.opacity = hovered ? 0.35 : (isTop ? 0.22 : 0.08);
     }
   });
 
@@ -45,26 +69,34 @@ function GlowSphere({ position, color, scale, isTop, label, category }) {
         onPointerOver={() => setHovered(true)}
         onPointerOut={() => setHovered(false)}
       >
-        <sphereGeometry args={[0.2, 32, 32]} />
-        <meshStandardMaterial
+        <sphereGeometry args={[0.2, isTop ? 48 : 32, isTop ? 48 : 32]} />
+        <meshPhysicalMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={isTop ? 1.5 : 0.6}
-          roughness={0.2}
-          metalness={0.8}
+          emissiveIntensity={isTop ? 1.5 : (hovered ? 0.8 : 0.4)}
+          roughness={0.1}
+          metalness={0.9}
+          clearcoat={1.0}
+          clearcoatRoughness={0.1}
+          transmission={0.4}
         />
       </mesh>
       
       {/* Outer glow sphere */}
-      <mesh ref={glowRef} position={position} scale={scale * 2}>
+      <mesh ref={glowRef} position={position} scale={scale * 2.2}>
         <sphereGeometry args={[0.2, 16, 16]} />
-        <meshBasicMaterial color={color} transparent opacity={isTop ? 0.2 : 0.08} />
+        <meshBasicMaterial color={color} transparent opacity={isTop ? 0.18 : 0.06} depthWrite={false} />
       </mesh>
 
       {/* Label on hover or if top result */}
       {(hovered || isTop) && (
         <Html position={position} distanceFactor={8} zIndexRange={[100, 0]}>
           <div className="three-tooltip" style={{ borderColor: color + '40' }}>
+            {isTop && rank !== undefined && (
+              <div style={{ fontSize: '0.58rem', color: '#fbbf24', fontWeight: 800, marginBottom: '0.1rem' }}>
+                #{rank + 1} NEAREST
+              </div>
+            )}
             <div className="tt-cat" style={{ color }}>{category}</div>
             <div className="tt-title">{label}</div>
           </div>
@@ -81,7 +113,7 @@ function QuerySphere({ position }) {
   useFrame((state) => {
     const t = state.clock.elapsedTime;
     if (meshRef.current) {
-      const s = 1 + Math.sin(t * 4) * 0.2;
+      const s = 1 + Math.sin(t * 3) * 0.15;
       meshRef.current.scale.setScalar(s);
     }
     if (ringRef.current) {
@@ -94,29 +126,30 @@ function QuerySphere({ position }) {
     <group position={position}>
       {/* Core */}
       <mesh ref={meshRef}>
-        <sphereGeometry args={[0.3, 32, 32]} />
-        <meshStandardMaterial
-          color="#fbbf24"
+        <sphereGeometry args={[0.25, 32, 32]} />
+        <meshPhysicalMaterial
+          color="#ffffff"
           emissive="#f97316"
-          emissiveIntensity={2}
+          emissiveIntensity={2.5}
           roughness={0.1}
-          metalness={0.9}
+          metalness={1.0}
+          clearcoat={1.0}
         />
       </mesh>
       
       {/* Rotating ring */}
       <mesh ref={ringRef}>
-        <torusGeometry args={[0.5, 0.02, 16, 64]} />
-        <meshBasicMaterial color="#fbbf24" transparent opacity={0.5} />
+        <torusGeometry args={[0.45, 0.015, 16, 64]} />
+        <meshBasicMaterial color="#fbbf24" transparent opacity={0.6} />
       </mesh>
 
-      {/* Glow */}
+      {/* Atmospheric Glow */}
       <mesh>
-        <sphereGeometry args={[0.6, 16, 16]} />
-        <meshBasicMaterial color="#f97316" transparent opacity={0.12} />
+        <sphereGeometry args={[0.8, 32, 32]} />
+        <meshBasicMaterial color="#ea580c" transparent opacity={0.15} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       
-      <pointLight color="#f97316" intensity={3} distance={8} />
+      <pointLight color="#f97316" intensity={2.5} distance={8} />
       
       <Html distanceFactor={8}>
         <div className="three-tooltip query-tooltip">🔍 Query Vector</div>
@@ -126,25 +159,40 @@ function QuerySphere({ position }) {
 }
 
 function SimilarityLines({ data, queryPos, topKIndices }) {
+  const materialRef = useRef();
+
+  useFrame((state) => {
+    if (materialRef.current) {
+      materialRef.current.dashOffset -= 0.02;
+    }
+  });
+
   if (!queryPos || topKIndices.length === 0) return null;
 
   return (
     <group>
-      {topKIndices.map((idx) => {
+      {topKIndices.map((idx, i) => {
         const item = data[idx];
         const points = [new THREE.Vector3(...queryPos), new THREE.Vector3(item.x, item.y, item.z)];
+        const dist = points[0].distanceTo(points[1]);
+        // Closer = brighter
+        const opacity = Math.max(0.4, 0.9 - (dist / 12));
         return (
           <Line
             key={`line-${idx}`}
             points={points}
             color="#fbbf24"
-            lineWidth={1.5}
+            lineWidth={2.5 - i * 0.3}
             dashed={true}
-            dashScale={40}
-            dashSize={0.8}
-            opacity={0.7}
+            dashScale={20}
+            dashSize={0.5}
+            dashOffset={0}
+            opacity={opacity}
             transparent
-          />
+            blending={THREE.AdditiveBlending}
+          >
+            <lineDashedMaterial ref={i === 0 ? materialRef : null} attach="material" color="#fbbf24" dashSize={0.5} gapSize={0.2} transparent opacity={opacity} />
+          </Line>
         );
       })}
     </group>
@@ -153,15 +201,15 @@ function SimilarityLines({ data, queryPos, topKIndices }) {
 
 function Stars() {
   const ref = useRef();
-  const positions = useRef(
+  const positions = useMemo(() =>
     new Float32Array(
-      Array.from({ length: 500 * 3 }, () => (Math.random() - 0.5) * 30)
-    )
-  ).current;
+      Array.from({ length: 400 * 3 }, () => (Math.random() - 0.5) * 30)
+    ),
+  []);
 
   useFrame((state) => {
     if (ref.current) {
-      ref.current.rotation.y = state.clock.elapsedTime * 0.015;
+      ref.current.rotation.y = state.clock.elapsedTime * 0.012;
     }
   });
 
@@ -171,12 +219,38 @@ function Stars() {
         <bufferAttribute
           attach="attributes-position"
           array={positions}
-          count={500}
+          count={400}
           itemSize={3}
         />
       </bufferGeometry>
-      <pointsMaterial color="#44403c" size={0.04} sizeAttenuation />
+      <pointsMaterial color="#3a3835" size={0.04} sizeAttenuation transparent opacity={0.7} depthWrite={false} />
     </points>
+  );
+}
+
+/* Camera controller: subtle auto-movement + zoom on query */
+function CameraController({ queryPos }) {
+  const { camera } = useThree();
+  const hasQuery = !!queryPos;
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    // Slow ambient Y rotation even when not autoRotating
+    if (!hasQuery) {
+      camera.position.x = Math.sin(t * 0.08) * 12;
+      camera.position.z = Math.cos(t * 0.08) * 12;
+    }
+  });
+
+  return null;
+}
+
+/* Grid with reduced prominence */
+function SubtleGrid() {
+  return (
+    <group position={[0, -5, 0]}>
+      <gridHelper args={[20, 20, '#1c1917', '#171412']} />
+    </group>
   );
 }
 
@@ -190,7 +264,19 @@ export default function VectorSpace() {
   useEffect(() => {
     fetch('/pca_embeddings.json')
       .then(res => res.json())
-      .then(d => setData(d))
+      .then(d => {
+        // Apply cluster offsets for better separation
+        const adjusted = d.map(item => {
+          const offset = catOffsets[item.category] || [0, 0, 0];
+          return {
+            ...item,
+            x: item.x + offset[0],
+            y: item.y + offset[1],
+            z: item.z + offset[2],
+          };
+        });
+        setData(adjusted);
+      })
       .catch(err => console.error("Error loading PCA data:", err));
   }, []);
 
@@ -246,7 +332,7 @@ export default function VectorSpace() {
           <div className="vs-legend">
             {Object.entries(catColors).map(([cat, color]) => (
               <div key={cat} className="vs-legend-item">
-                <span className="vs-legend-color" style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }} />
+                <span className="vs-legend-color" style={{ backgroundColor: color, boxShadow: `0 0 5px ${color}` }} />
                 <span className="vs-legend-label">{cat}</span>
               </div>
             ))}
@@ -254,36 +340,38 @@ export default function VectorSpace() {
         </div>
 
         <div className="vs-canvas-wrapper">
-          <Canvas camera={{ position: [0, 4, 12], fov: 50 }}>
-            <color attach="background" args={['#0a0a0a']} />
+          <Canvas camera={{ position: [0, 4, 12], fov: 50 }} dpr={[1, 1.5]} gl={{ alpha: true }}>
+            <fog attach="fog" args={['#050505', 10, 25]} />
 
-            <ambientLight intensity={0.4} />
-            <directionalLight position={[10, 10, 5]} intensity={0.8} />
-            <pointLight position={[-5, 5, -5]} color="#f97316" intensity={0.5} distance={20} />
-            <pointLight position={[5, -5, 5]} color="#b45309" intensity={0.5} distance={20} />
+            <ambientLight intensity={0.35} />
+            <directionalLight position={[10, 10, 5]} intensity={0.7} />
+            <pointLight position={[-5, 5, -5]} color="#f97316" intensity={0.4} distance={20} />
+            <pointLight position={[5, -5, 5]} color="#b45309" intensity={0.4} distance={20} />
 
             <OrbitControls
               enablePan={false}
               autoRotate={!queryPos}
-              autoRotateSpeed={0.4}
+              autoRotateSpeed={0.35}
               maxDistance={20}
               minDistance={5}
             />
 
+            <CameraController queryPos={queryPos} />
             <Stars />
-
-            <gridHelper args={[20, 20, '#292524', '#1c1917']} position={[0, -5, 0]} />
+            <SubtleGrid />
 
             {data.map((item, i) => {
               const isTop = topKIndices.includes(i);
+              const rank = isTop ? topKIndices.indexOf(i) : undefined;
               const color = catColors[item.category] || defaultColor;
               return (
                 <GlowSphere
                   key={item.id}
                   position={[item.x, item.y, item.z]}
                   color={color}
-                  scale={isTop ? 1.8 : 1}
+                  scale={isTop ? 2.0 : 1}
                   isTop={isTop}
+                  rank={rank}
                   label={item.title}
                   category={item.category}
                 />
@@ -293,7 +381,7 @@ export default function VectorSpace() {
             {queryPos && <QuerySphere position={queryPos} />}
             <SimilarityLines data={data} queryPos={queryPos} topKIndices={topKIndices} />
           </Canvas>
-          <div className="vs-hint">🖱️ Drag to rotate • Scroll to zoom • Hover for details</div>
+          <div className="vs-hint">🖱️ Drag to rotate · Scroll to zoom · Hover for details</div>
         </div>
       </div>
     </section>
