@@ -1,0 +1,77 @@
+[
+  {
+    "query_id": "q1",
+    "query": "luxury perfume for women fragrance",
+    "relevant_doc_ids": [6, 7, 8, 9, 10]
+  },
+  {
+    "query_id": "q2",
+    "query": "comfortable office chair for desk work",
+    "relevant_doc_ids": [14]
+  },
+  {
+    "query_id": "q3",
+    "query": "portable laptop for programming and work",
+    "relevant_doc_ids": [78, 79, 80, 81]
+  },
+  {
+    "query_id": "q4",
+    "query": "eye makeup mascara and cosmetics",
+    "relevant_doc_ids": [1, 2, 3, 4]
+  },
+  {
+    "query_id": "q5",
+    "query": "athletic sports sneakers and running shoes",
+    "relevant_doc_ids": [88, 89, 90, 91]
+  },
+  {
+    "query_id": "q6",
+    "query": "luxury automatic wrist watch timepiece",
+    "relevant_doc_ids": [93, 94, 95, 96]
+  },
+  {
+    "query_id": "q7",
+    "query": "protective sunglasses for bright sunny days",
+    "relevant_doc_ids": [154, 155, 156, 157]
+  },
+  {
+    "query_id": "q8",
+    "query": "kitchen cooking utensils and blender",
+    "relevant_doc_ids": [48, 49, 50, 51]
+  },
+  {
+    "query_id": "q9",
+    "query": "nutrition and meal food for pet cats",
+    "relevant_doc_ids": [18]
+  },
+  {
+    "query_id": "q10",
+    "query": "fresh beef steak and chicken meat groceries",
+    "relevant_doc_ids": [17, 19, 24]
+  },
+  {
+    "query_id": "q11",
+    "query": "moisturizing body lotion and skin care",
+    "relevant_doc_ids": [118, 119, 120]
+  },
+  {
+    "query_id": "q12",
+    "query": "bedroom furniture bed and nightstand table",
+    "relevant_doc_ids": [11, 12, 13]
+  },
+  {
+    "query_id": "q13",
+    "query": "fresh fruit healthy apple",
+    "relevant_doc_ids": [16]
+  },
+  {
+    "query_id": "q14",
+    "query": "pet food for dogs",
+    "relevant_doc_ids": [22]
+  },
+  {
+    "query_id": "q15",
+    "query": "red lipstick and nail polish cosmetic beauty",
+    "relevant_doc_ids": [4, 5]
+  }
+]
