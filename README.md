@@ -270,6 +270,10 @@ semantic-product-search/
 
 ## 5. Execution Guide & CLI Commands
 
+```bash
+cd semantic-product-search
+```
+
 ### 1. Ingest Raw Product Catalog
 ```bash
 # Ingests catalog from endpoint and persists to MongoDB / local raw cache
