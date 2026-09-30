@@ -91,20 +91,13 @@ def preprocess_catalog(
         except Exception as e:
             logger.warning(f"Could not persist processed products to MongoDB: {e}")
 
-    # Save to file
-    target_path = output_path or PROCESSED_DATA_PATH
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(target_path, "w", encoding="utf-8") as f:
-        json.dump(cleaned_products, f, indent=2, ensure_ascii=False)
-
-    print(f"Preprocessed {len(cleaned_products)} products -> {target_path}")
+    print(f"Preprocessed {len(cleaned_products)} products and saved to MongoDB.")
     return cleaned_products
 
 
 def main():
-    print("Loading raw products...")
-    raw = load_raw_products(RAW_DATA_PATH)
+    print("Loading raw products from MongoDB...")
+    raw = load_raw_products()
     is_valid, report = validate_catalog(raw)
     print("Validation status:", "PASSED" if is_valid else "FAILED")
     print("Validation summary:", report)

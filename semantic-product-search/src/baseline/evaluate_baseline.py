@@ -80,7 +80,7 @@ def evaluate_baseline(
     if BM25_INDEX_PATH.exists():
         bm25 = BM25Okapi.load(BM25_INDEX_PATH)
     else:
-        products = load_cleaned_products(PROCESSED_DATA_PATH)
+        products = load_cleaned_products()
         bm25 = BM25Okapi().fit(products)
         bm25.save(BM25_INDEX_PATH)
 

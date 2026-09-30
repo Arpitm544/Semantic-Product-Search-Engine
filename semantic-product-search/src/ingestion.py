@@ -24,13 +24,6 @@ def fetch_products(api_url: str = API_URL) -> List[Dict[str, Any]]:
     return products
 
 
-def save_to_file(products: List[Dict[str, Any]], path=RAW_DATA_PATH) -> None:
-    """Persists products to local JSON file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as file:
-        json.dump(products, file, indent=2, ensure_ascii=False)
-    logger.info(f"Saved {len(products)} products to file -> {path}")
-
 
 def save_to_mongo(products: List[Dict[str, Any]]) -> bool:
     """Saves products to MongoDB raw collection if server is reachable."""
@@ -52,10 +45,7 @@ def ingest():
     products = fetch_products()
     # Save to MongoDB
     save_to_mongo(products)
-    # Save to file backup
-    save_to_file(products)
     return products
-
 
 if __name__ == "__main__":
     ingest()

@@ -16,10 +16,14 @@ EVAL_SET_PATH = EVAL_DIR / "eval_set.json"
 
 INDEXES_DIR = PROJECT_ROOT / "indexes"
 BM25_INDEX_PATH = INDEXES_DIR / "bm25_index.pkl"
+FAISS_INDEX_PATH = INDEXES_DIR / "faiss_index.bin"
+FAISS_ID_MAP_PATH = INDEXES_DIR / "faiss_id_map.pkl"
+EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
 REPORTS_DIR = PROJECT_ROOT / "reports"
 EDA_REPORT_PATH = REPORTS_DIR / "eda_summary.md"
 BASELINE_METRICS_PATH = REPORTS_DIR / "baseline_metrics.json"
+DENSE_METRICS_PATH = REPORTS_DIR / "dense_metrics.json"
 
 # Ingestion API URL
 API_URL = "https://dummyjson.com/products?limit=0"

@@ -118,7 +118,7 @@ def generate_eda_report(products: List[Dict[str, Any]], output_path: Path = EDA_
 
 
 def main():
-    products = load_cleaned_products(PROCESSED_DATA_PATH)
+    products = load_cleaned_products()
     stats = generate_eda_report(products)
     print("EDA Complete. Catalog size:", stats["total_products"])
 

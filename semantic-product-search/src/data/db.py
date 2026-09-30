@@ -85,7 +85,7 @@ def save_raw_products(
     ]
     if operations:
         result = collection.bulk_write(operations, ordered=False)
-        total_upserted = (result.upserted_count or 0) + (result.modified_count or 0) + (result.matched_count or 0)
+        total_upserted = (result.upserted_count or 0) + (result.matched_count or 0)
         return total_upserted
     return 0
 
@@ -114,7 +114,7 @@ def save_processed_products(
     ]
     if operations:
         result = collection.bulk_write(operations, ordered=False)
-        total_upserted = (result.upserted_count or 0) + (result.modified_count or 0) + (result.matched_count or 0)
+        total_upserted = (result.upserted_count or 0) + (result.matched_count or 0)
         return total_upserted
     return 0
 

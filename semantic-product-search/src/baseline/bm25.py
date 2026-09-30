@@ -118,7 +118,7 @@ class BM25Okapi:
 
 
 def main():
-    products = load_cleaned_products(PROCESSED_DATA_PATH)
+    products = load_cleaned_products()
     bm25 = BM25Okapi()
     bm25.fit(products)
     bm25.save(BM25_INDEX_PATH)
