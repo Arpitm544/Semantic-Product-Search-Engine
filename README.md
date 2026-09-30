@@ -337,9 +337,3 @@ python -m unittest discover -s tests -p "test_*.py" -v
 
 ---
 
-## 8. Author Information
-
-- **Author:** Arpit Maurya
-- **MSU ID:** 240410700144
-- **Program / Track:** Advance Data Science
-- **Repository:** [Semantic-Product-Search-Engine](https://github.com/Arpitm544/Semantic-Product-Search-Engine)
