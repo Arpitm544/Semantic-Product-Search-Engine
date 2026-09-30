@@ -9,3 +9,10 @@ __pycache__/
 *.pyc
 venv/
 .venv/
+
+# Data files — MongoDB is the source of truth; no local data files in git
+semantic-product-search/data/processed/
+semantic-product-search/data/raw/
+
+# Generated reports (re-created by running evaluations)
+semantic-product-search/reports/

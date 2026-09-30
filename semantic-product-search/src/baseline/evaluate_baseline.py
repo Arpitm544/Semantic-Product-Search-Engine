@@ -64,6 +64,19 @@ def reciprocal_rank(retrieved_ids: List[Any], relevant_ids: Set[Any]) -> float:
     return 0.0
 
 
+def average_precision(retrieved_ids: List[Any], relevant_ids: Set[Any]) -> float:
+    """Calculate Average Precision (AP)."""
+    if not relevant_ids:
+        return 0.0
+    hits = 0
+    sum_precisions = 0.0
+    for idx, doc_id in enumerate(retrieved_ids):
+        if doc_id in relevant_ids:
+            hits += 1
+            sum_precisions += hits / (idx + 1.0)
+    return sum_precisions / len(relevant_ids)
+
+
 def evaluate_baseline(
     eval_set_path: Path = EVAL_SET_PATH,
     output_path: Path = BASELINE_METRICS_PATH,
@@ -86,6 +99,7 @@ def evaluate_baseline(
 
     results_by_k = {k: {"p": [], "r": [], "ndcg": []} for k in top_ks}
     mrr_list = []
+    ap_list = []
     latencies_ms = []
 
     for item in eval_queries:
@@ -110,6 +124,8 @@ def evaluate_baseline(
 
         rr = reciprocal_rank(retrieved_ids, relevant_ids)
         mrr_list.append(rr)
+        ap = average_precision(retrieved_ids, relevant_ids)
+        ap_list.append(ap)
 
     metrics_summary = {
         "model": "BM25Okapi (Keyword Baseline)",
@@ -121,6 +137,7 @@ def evaluate_baseline(
             "p95": float(np.percentile(latencies_ms, 95)),
         },
         "mrr": float(np.mean(mrr_list)),
+        "map": float(np.mean(ap_list)),
         "metrics": {},
     }
 
@@ -144,6 +161,7 @@ def main():
     print("\n--- BM25 Keyword Baseline Benchmark Results ---")
     print(f"Queries Evaluated: {metrics['total_queries']}")
     print(f"MRR: {metrics['mrr']:.4f}")
+    print(f"MAP: {metrics['map']:.4f}")
     print(f"Latency (p50 / p95): {metrics['latency_ms']['p50']:.2f}ms / {metrics['latency_ms']['p95']:.2f}ms")
     for k_key, vals in metrics["metrics"].items():
         print(f"{k_key}:")

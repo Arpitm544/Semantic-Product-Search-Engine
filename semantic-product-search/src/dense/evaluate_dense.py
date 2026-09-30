@@ -21,6 +21,7 @@ from src.baseline.evaluate_baseline import (
     recall_at_k,
     ndcg_at_k,
     reciprocal_rank,
+    average_precision,
 )
 
 
@@ -47,6 +48,7 @@ def evaluate_dense(
 
     results_by_k = {k: {"p": [], "r": [], "ndcg": []} for k in top_ks}
     mrr_list = []
+    ap_list = []
     latencies_ms = []
 
     for item in eval_queries:
@@ -71,6 +73,8 @@ def evaluate_dense(
 
         rr = reciprocal_rank(retrieved_ids, relevant_ids)
         mrr_list.append(rr)
+        ap = average_precision(retrieved_ids, relevant_ids)
+        ap_list.append(ap)
 
     metrics_summary = {
         "model": "Sentence-BERT + FAISS (Dense Semantic Search)",
@@ -82,6 +86,7 @@ def evaluate_dense(
             "p95": float(np.percentile(latencies_ms, 95)),
         },
         "mrr": float(np.mean(mrr_list)),
+        "map": float(np.mean(ap_list)),
         "metrics": {},
     }
 
@@ -105,6 +110,7 @@ def main():
     print("\n--- Dense Vector Search Benchmark Results ---")
     print(f"Queries Evaluated: {metrics['total_queries']}")
     print(f"MRR: {metrics['mrr']:.4f}")
+    print(f"MAP: {metrics['map']:.4f}")
     print(f"Latency (p50 / p95): {metrics['latency_ms']['p50']:.2f}ms / {metrics['latency_ms']['p95']:.2f}ms")
     for k_key, vals in metrics["metrics"].items():
         print(f"{k_key}:")

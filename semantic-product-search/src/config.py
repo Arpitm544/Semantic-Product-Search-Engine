@@ -24,6 +24,7 @@ REPORTS_DIR = PROJECT_ROOT / "reports"
 EDA_REPORT_PATH = REPORTS_DIR / "eda_summary.md"
 BASELINE_METRICS_PATH = REPORTS_DIR / "baseline_metrics.json"
 DENSE_METRICS_PATH = REPORTS_DIR / "dense_metrics.json"
+COMPARISON_REPORT_PATH = REPORTS_DIR / "comparison_report.md"
 
 # Ingestion API URL
 API_URL = "https://dummyjson.com/products?limit=0"

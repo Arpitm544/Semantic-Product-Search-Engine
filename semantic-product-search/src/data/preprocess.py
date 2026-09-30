@@ -58,11 +58,14 @@ def build_representation_text(item: Dict[str, Any]) -> str:
 def preprocess_catalog(
     products: List[Dict[str, Any]],
     output_path: Optional[Path] = None,
-    save_to_mongo: bool = True
+    save_to_mongo: bool = True,
+    save_json_backup: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Cleans raw catalog items and generates standardized fields.
-    Saves processed items to output_path and MongoDB (if available).
+
+    Primary store: MongoDB `products_processed` collection.
+    Fallback/backup: local JSON file at output_path (default: PROCESSED_DATA_PATH).
     """
     cleaned_products = []
 
@@ -83,29 +86,52 @@ def preprocess_catalog(
         }
         cleaned_products.append(cleaned_item)
 
-    # Save to MongoDB
-    if save_to_mongo and is_mongo_available():
-        try:
-            count = save_processed_products(cleaned_products)
-            logger.info(f"Saved/Upserted {count} cleaned products to MongoDB.")
-        except Exception as e:
-            logger.warning(f"Could not persist processed products to MongoDB: {e}")
+    # 1️⃣  Primary store: MongoDB
+    if save_to_mongo:
+        if is_mongo_available():
+            try:
+                count = save_processed_products(cleaned_products)
+                logger.info(f"Saved/Upserted {count} cleaned products to MongoDB.")
+                print(f"  ✅ MongoDB  → {count} products upserted into 'products_processed'.")
+            except Exception as e:
+                logger.warning(f"Could not persist processed products to MongoDB: {e}")
+                print(f"  ⚠️  MongoDB  → save failed: {e}")
+        else:
+            logger.warning("MongoDB not reachable; skipping MongoDB save.")
+            print("  ⚠️  MongoDB  → not reachable, skipped.")
 
-    print(f"Preprocessed {len(cleaned_products)} products and saved to MongoDB.")
+    # 2️⃣  Backup: local JSON file
+    if save_json_backup:
+        dest = output_path or PROCESSED_DATA_PATH
+        dest = Path(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with open(dest, "w", encoding="utf-8") as f:
+            json.dump(cleaned_products, f, indent=2, ensure_ascii=False)
+        logger.info(f"JSON backup written to {dest}.")
+        print(f"  📄 JSON backup → {dest}")
+
+    print(f"  Total preprocessed: {len(cleaned_products)} products.")
     return cleaned_products
 
 
 def main():
+    print("=" * 55)
+    print("  Preprocessing Pipeline")
+    print("=" * 55)
     print("Loading raw products from MongoDB...")
     raw = load_raw_products()
     is_valid, report = validate_catalog(raw)
-    print("Validation status:", "PASSED" if is_valid else "FAILED")
-    print("Validation summary:", report)
+    print(f"Validation: {'✅ PASSED' if is_valid else '❌ FAILED'}")
+    if not is_valid:
+        print("Validation report:", report)
 
+    print(f"\nCleaning {len(raw)} products and saving to stores...")
     cleaned = preprocess_catalog(raw)
-    print(f"Sample representation:\n{cleaned[0]['representation_text']}")
+    print(f"\nSample representation_text:\n  {cleaned[0]['representation_text']}")
+    print("=" * 55)
+    print("  ✅ Preprocessing complete.")
+    print("=" * 55)
 
 
 if __name__ == "__main__":
     main()
-
