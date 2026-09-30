@@ -16,3 +16,7 @@ semantic-product-search/data/raw/
 
 # Generated reports (re-created by running evaluations)
 semantic-product-search/reports/
+
+# Search indexes — generated artifacts, rebuilt from MongoDB via ingestion pipeline
+semantic-product-search/indexes/*.bin
+semantic-product-search/indexes/*.pkl

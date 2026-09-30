@@ -61,10 +61,30 @@ class TestMongoDBHelpers(unittest.TestCase):
 
     @patch("src.data.load_data.is_mongo_available", return_value=False)
     def test_load_data_fallback_to_file(self, mock_is_mongo):
-        # When mongo is not available, load_raw_products should load from file without crashing
-        data = load_raw_data()
-        self.assertTrue(len(data) > 0)
-        self.assertIn("title", data[0])
+        """When MongoDB is unreachable, load_raw_products falls back to a JSON file."""
+        import json
+        import tempfile
+        import os
+        from pathlib import Path
+
+        sample = [
+            {"id": 1, "title": "Fallback Product A", "price": 9.99},
+            {"id": 2, "title": "Fallback Product B", "price": 19.99},
+        ]
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as f:
+            json.dump(sample, f)
+            tmp_path = Path(f.name)
+
+        try:
+            data = load_raw_data(path=tmp_path, prefer_mongo=False)
+            self.assertEqual(len(data), 2)
+            self.assertIn("title", data[0])
+            self.assertEqual(data[0]["title"], "Fallback Product A")
+        finally:
+            os.unlink(tmp_path)
 
 
 if __name__ == "__main__":
