@@ -42,6 +42,19 @@ class TestBaseline(unittest.TestCase):
         # Deterministic scores across consecutive runs
         self.assertEqual(res1[0][1], res2[0][1])
 
+    def test_document_length_does_not_affect_bm25_score(self):
+        docs = [
+            {"id": 1, "representation_text": "jacket"},
+            {"id": 2, "representation_text": "jacket " + "extra " * 100},
+            {"id": 3, "representation_text": "unrelated item"},
+        ]
+
+        bm25 = BM25Okapi().fit(docs)
+        results = bm25.search("jacket", top_k=10)
+
+        self.assertEqual([product["id"] for product, _ in results], [1, 2])
+        self.assertEqual(results[0][1], results[1][1])
+
     def test_ir_metrics_calculation(self):
         retrieved = [10, 20, 30, 40, 50]
         relevant = {20, 30}

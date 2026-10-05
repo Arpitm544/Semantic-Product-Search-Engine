@@ -22,24 +22,19 @@ class BM25Okapi:
     BM25Okapi retrieval model implementation.
     Parameters:
         k1: Term frequency saturation parameter (default: 1.5)
-        b: Document length normalization parameter (default: 0.75)
     """
 
-    def __init__(self, k1: float = 1.5, b: float = 0.75):
+    def __init__(self, k1: float = 1.5):
         self.k1 = k1
-        self.b = b
         self.corpus_size = 0
-        self.avgdl = 0.0
         self.doc_freqs: List[Dict[str, int]] = []
         self.idf: Dict[str, float] = {}
-        self.doc_len: List[int] = []
         self.products: List[Dict[str, Any]] = []
 
     def fit(self, products: List[Dict[str, Any]]) -> "BM25Okapi":
         """Index the products using their canonical representation text."""
         self.products = products
         self.corpus_size = len(products)
-        self.doc_len = []
         self.doc_freqs = []
 
         df_counts: Dict[str, int] = {}
@@ -47,7 +42,6 @@ class BM25Okapi:
         for p in products:
             text = p.get("representation_text") or f"{p.get('title', '')} {p.get('description', '')}"
             tokens = tokenize(text)
-            self.doc_len.append(len(tokens))
 
             frequencies: Dict[str, int] = {}
             for token in tokens:
@@ -56,8 +50,6 @@ class BM25Okapi:
 
             for token in frequencies.keys():
                 df_counts[token] = df_counts.get(token, 0) + 1
-
-        self.avgdl = sum(self.doc_len) / self.corpus_size if self.corpus_size > 0 else 0.0
 
         # Compute Robertson-Spärck Jones IDF with smoothing
         self.idf = {}
@@ -79,7 +71,7 @@ class BM25Okapi:
                 tf = self.doc_freqs[idx].get(token, 0)
                 if tf > 0:
                     numerator = tf * (self.k1 + 1.0)
-                    denominator = tf + self.k1 * (1.0 - self.b + self.b * (self.doc_len[idx] / self.avgdl))
+                    denominator = tf + self.k1
                     scores[idx] += idf * (numerator / denominator)
 
         return scores

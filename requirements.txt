@@ -1,0 +1,1 @@
+-r semantic-product-search/requirements.txt
