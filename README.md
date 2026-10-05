@@ -310,14 +310,14 @@ Evaluated on the held-out 15-query test set (`data/eval/eval_set.json`):
 
 | Evaluation Metric | Score (BM25 Baseline) | Interpretation |
 | :--- | :--- | :--- |
-| **Mean Reciprocal Rank (MRR)** | **0.8300** | First relevant product is typically returned in rank 1 or 2. |
+| **Mean Reciprocal Rank (MRR)** | **0.7967** | First relevant product is typically returned near the top of the ranking. |
 | **Precision@5** | **0.4000** | 40% of top-5 returned items are relevant. |
 | **Recall@5** | **0.7800** | 78% of all relevant items are captured within top 5 results. |
-| **NDCG@5** | **0.7450** | High ranking quality and relevancy discounting at top-5. |
+| **NDCG@5** | **0.7343** | Ranking quality with relevance discounting at top-5. |
 | **Precision@10** | **0.2533** | Precision across wider result window. |
 | **Recall@10** | **0.9133** | Over 91% of ground truth catalog items retrieved in top 10. |
-| **NDCG@10** | **0.8118** | Strong ranking order maintained across top 10 positions. |
-| **Query Latency (p50 / p95)** | **0.11 ms / 0.12 ms** | Sub-millisecond keyword retrieval speed. |
+| **NDCG@10** | **0.7997** | Ranking quality with relevance discounting at top-10. |
+| **Query Latency (p50 / p95)** | **0.38 ms / 0.47 ms** | Sub-millisecond keyword retrieval speed. |
 
 ---
 
