@@ -1,5 +1,5 @@
 """
-Model Comparison: BM25 Keyword Baseline vs. Dense Vector Search.
+Model Comparison: BM25 Keyword Baseline vs. Semantic Vector Search.
 Runs both evaluation harnesses and produces a side-by-side Markdown report.
 """
 import json
@@ -8,16 +8,16 @@ from pathlib import Path
 
 from src.config import (
     BASELINE_METRICS_PATH,
-    DENSE_METRICS_PATH,
+    SEMANTIC_METRICS_PATH,
     COMPARISON_REPORT_PATH,
 )
 from src.baseline.evaluate_baseline import evaluate_baseline
-from src.dense.evaluate_dense import evaluate_dense
+from src.semantic.evaluate_semantic import evaluate_semantic
 
 
-def _delta(dense_val: float, base_val: float) -> str:
+def _delta(semantic_val: float, base_val: float) -> str:
     """Return a formatted delta string with a +/- sign and arrow."""
-    diff = dense_val - base_val
+    diff = semantic_val - base_val
     arrow = "▲" if diff >= 0 else "▼"
     return f"{arrow} {abs(diff):.4f}"
 
@@ -30,9 +30,9 @@ def run_comparison() -> None:
     baseline = evaluate_baseline()
 
     print("\n" + "=" * 60)
-    print("  Running Dense Vector Search Evaluation...")
+    print("  Running Semantic Vector Search Evaluation...")
     print("=" * 60)
-    dense = evaluate_dense()
+    semantic = evaluate_semantic()
 
     # ── Print console comparison table ────────────────────────────────
     print("\n\n" + "=" * 60)
@@ -44,22 +44,22 @@ def run_comparison() -> None:
         ("MAP", "map"),
     ]
 
-    print(f"{'Metric':<20} {'BM25':>10} {'Dense':>10} {'Δ (Dense-BM25)':>16}")
+    print(f"{'Metric':<20} {'BM25':>10} {'Semantic':>10} {'Δ (Semantic-BM25)':>16}")
     print("-" * 60)
     for label, key in metrics_to_compare:
         b = baseline.get(key, 0.0)
-        d = dense.get(key, 0.0)
+        d = semantic.get(key, 0.0)
         print(f"{label:<20} {b:>10.4f} {d:>10.4f} {_delta(d, b):>16}")
 
     all_ks = sorted(
-        set(baseline["metrics"].keys()) | set(dense["metrics"].keys())
+        set(baseline["metrics"].keys()) | set(semantic["metrics"].keys())
     )
     for k_key in all_ks:
         for metric_suffix in ["precision", "recall", "ndcg"]:
             b_val = baseline["metrics"].get(k_key, {}).get(
                 f"{metric_suffix}@{k_key.split('=')[1]}", 0.0
             )
-            d_val = dense["metrics"].get(k_key, {}).get(
+            d_val = semantic["metrics"].get(k_key, {}).get(
                 f"{metric_suffix}@{k_key.split('=')[1]}", 0.0
             )
             label = f"{metric_suffix.upper()}@{k_key.split('=')[1]}"
@@ -71,12 +71,12 @@ def run_comparison() -> None:
     print(
         f"{'Latency p50 (ms)':<20} "
         f"{baseline['latency_ms']['p50']:>10.2f} "
-        f"{dense['latency_ms']['p50']:>10.2f}"
+        f"{semantic['latency_ms']['p50']:>10.2f}"
     )
     print(
         f"{'Latency p95 (ms)':<20} "
         f"{baseline['latency_ms']['p95']:>10.2f} "
-        f"{dense['latency_ms']['p95']:>10.2f}"
+        f"{semantic['latency_ms']['p95']:>10.2f}"
     )
     print("=" * 60)
 
@@ -89,17 +89,17 @@ def run_comparison() -> None:
         f"\n> Generated: {timestamp}",
         "\n## Models Evaluated",
         f"- **Baseline**: {baseline['model']}",
-        f"- **Dense**: {dense['model']}",
+        f"- **Semantic**: {semantic['model']}",
         f"- **Queries**: {baseline['total_queries']}",
         "\n## Summary Metrics",
         "",
-        "| Metric | BM25 Baseline | Dense Search | Δ (Dense − BM25) |",
+        "| Metric | BM25 Baseline | Semantic Search | Δ (Semantic − BM25) |",
         "|--------|:-------------:|:------------:|:----------------:|",
     ]
 
     for label, key in metrics_to_compare:
         b = baseline.get(key, 0.0)
-        d = dense.get(key, 0.0)
+        d = semantic.get(key, 0.0)
         lines.append(f"| {label} | {b:.4f} | {d:.4f} | {_delta(d, b)} |")
 
     for k_key in all_ks:
@@ -108,7 +108,7 @@ def run_comparison() -> None:
             b_val = baseline["metrics"].get(k_key, {}).get(
                 f"{metric_suffix}@{k_num}", 0.0
             )
-            d_val = dense["metrics"].get(k_key, {}).get(
+            d_val = semantic["metrics"].get(k_key, {}).get(
                 f"{metric_suffix}@{k_num}", 0.0
             )
             label = f"{metric_suffix.capitalize()}@{k_num}"
@@ -119,10 +119,10 @@ def run_comparison() -> None:
     lines += [
         "\n## Latency",
         "",
-        "| Metric | BM25 Baseline | Dense Search |",
+        "| Metric | BM25 Baseline | Semantic Search |",
         "|--------|:-------------:|:------------:|",
-        f"| p50 (ms) | {baseline['latency_ms']['p50']:.2f} | {dense['latency_ms']['p50']:.2f} |",
-        f"| p95 (ms) | {baseline['latency_ms']['p95']:.2f} | {dense['latency_ms']['p95']:.2f} |",
+        f"| p50 (ms) | {baseline['latency_ms']['p50']:.2f} | {semantic['latency_ms']['p50']:.2f} |",
+        f"| p95 (ms) | {baseline['latency_ms']['p95']:.2f} | {semantic['latency_ms']['p95']:.2f} |",
         "\n---",
         "\n*Report auto-generated by `src/compare_models.py`*",
     ]

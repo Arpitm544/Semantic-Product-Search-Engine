@@ -1,5 +1,5 @@
 """
-Dense Vector Search Engine using Sentence-Transformers (SBERT) and FAISS index.
+Semantic Vector Search Engine using Sentence-Transformers (SBERT) and FAISS index.
 Provides semantic vector indexing and retrieval for product catalog records.
 """
 import pickle
@@ -21,9 +21,9 @@ from src.data.load_data import load_cleaned_products
 logger = logging.getLogger(__name__)
 
 
-class DenseVectorSearch:
+class SemanticVectorSearch:
     """
-    Dense Vector Search engine using SentenceTransformers embeddings and FAISS index.
+    Semantic Vector Search engine using SentenceTransformers embeddings and FAISS index.
     """
 
     def __init__(self, model_name: str = EMBEDDING_MODEL_NAME):
@@ -47,13 +47,13 @@ class DenseVectorSearch:
         norms[norms == 0] = 1e-10
         return (embeddings / norms).astype(np.float32)
 
-    def fit(self, products: List[Dict[str, Any]]) -> "DenseVectorSearch":
+    def fit(self, products: List[Dict[str, Any]]) -> "SemanticVectorSearch":
         """
         Extracts representation text from products, generates SBERT embeddings,
         normalizes them, and builds a FAISS IndexFlatIP index.
         """
         if not products:
-            raise ValueError("Cannot fit DenseVectorSearch on empty product catalog.")
+            raise ValueError("Cannot fit SemanticVectorSearch on empty product catalog.")
 
         self.products = products
         texts = [p.get("representation_text", p.get("title", "")) for p in products]
@@ -117,7 +117,7 @@ class DenseVectorSearch:
         cls,
         index_path: Path = FAISS_INDEX_PATH,
         map_path: Path = FAISS_ID_MAP_PATH,
-    ) -> "DenseVectorSearch":
+    ) -> "SemanticVectorSearch":
         """Loads serialized FAISS index and product metadata payload."""
         if not index_path.exists() or not map_path.exists():
             raise FileNotFoundError(f"Index or metadata map file not found at {index_path} / {map_path}")
@@ -138,13 +138,13 @@ def main():
     print("Loading cleaned products from MongoDB...")
     products = load_cleaned_products()
     
-    dense_engine = DenseVectorSearch()
-    dense_engine.fit(products)
-    dense_engine.save()
+    semantic_engine = SemanticVectorSearch()
+    semantic_engine.fit(products)
+    semantic_engine.save()
 
     test_query = "wireless Bluetooth headphones"
-    print(f"\n--- Testing Dense Search Query: '{test_query}' ---")
-    results = dense_engine.search(test_query, top_k=3)
+    print(f"\n--- Testing Semantic Search Query: '{test_query}' ---")
+    results = semantic_engine.search(test_query, top_k=3)
     for prod, score in results:
         print(f"[{score:.4f}] ID {prod.get('id')}: {prod.get('title')}")
 

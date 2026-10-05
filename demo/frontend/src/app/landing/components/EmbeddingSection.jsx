@@ -15,7 +15,7 @@ export default function EmbeddingSection() {
       <ScrollReveal>
         <div className="section-badge">Step 2</div>
         <h2 className="section-title">Text → Vector Embedding</h2>
-        <p className="section-sub">The Sentence Transformer model converts natural language into 384-dimensional dense vectors that capture semantic meaning.</p>
+        <p className="section-sub">The Sentence Transformer model converts natural language into 384-dimensional vectors that capture meaning.</p>
       </ScrollReveal>
 
       <div className="embedding-flow">

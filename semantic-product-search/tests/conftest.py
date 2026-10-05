@@ -140,17 +140,17 @@ def fitted_bm25(sample_products):
 
 
 # ---------------------------------------------------------------------------
-# Dense search fixture — fitted on sample catalog
+# Semantic search fixture — fitted on sample catalog
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
-def fitted_dense(sample_products):
+def fitted_semantic(sample_products):
     """
-    A DenseVectorSearch engine pre-fitted on the sample product catalog.
+    A SemanticVectorSearch engine pre-fitted on the sample product catalog.
     Session-scoped so the heavy embedding model is loaded only once.
     """
-    from src.dense.vector_search import DenseVectorSearch
-    engine = DenseVectorSearch()
+    from src.semantic.vector_search import SemanticVectorSearch
+    engine = SemanticVectorSearch()
     engine.fit(sample_products)
     return engine
 
