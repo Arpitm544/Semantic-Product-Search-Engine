@@ -1,13 +1,13 @@
 """
-Unit tests for Dense Vector Search module (Sentence-BERT + FAISS).
+Unit tests for Semantic Vector Search module (Sentence-BERT + FAISS).
 """
 import unittest
 import numpy as np
 
-from src.dense.vector_search import DenseVectorSearch
+from src.semantic.vector_search import SemanticVectorSearch
 
 
-class TestDenseVectorSearch(unittest.TestCase):
+class TestSemanticVectorSearch(unittest.TestCase):
     def setUp(self):
         self.sample_products = [
             {
@@ -37,7 +37,7 @@ class TestDenseVectorSearch(unittest.TestCase):
         ]
 
     def test_fit_and_search(self):
-        engine = DenseVectorSearch()
+        engine = SemanticVectorSearch()
         engine.fit(self.sample_products)
 
         self.assertIsNotNone(engine.index)
@@ -51,7 +51,7 @@ class TestDenseVectorSearch(unittest.TestCase):
         self.assertEqual(top_doc["id"], 1)
 
     def test_empty_catalog_raises(self):
-        engine = DenseVectorSearch()
+        engine = SemanticVectorSearch()
         with self.assertRaises(ValueError):
             engine.fit([])
 

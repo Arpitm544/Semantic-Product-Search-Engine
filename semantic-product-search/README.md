@@ -1,6 +1,6 @@
 # 🔍 Semantic Product Search Engine
 
-An applied Information Retrieval (IR) and NLP system engineered for high-precision e-commerce product discovery. This engine provides a hybrid search architecture combining lexical search (**BM25Okapi**) with dense semantic vector representations (**Sentence-BERT + FAISS**), accompanied by a rigorous offline IR evaluation suite measuring **MRR, Precision@K, Recall@K, and NDCG@K**.
+An applied Information Retrieval (IR) and NLP system engineered for high-precision e-commerce product discovery. This engine provides a hybrid search architecture combining lexical search (**BM25Okapi**) with semantic vector representations (**Sentence-BERT + FAISS**), accompanied by a rigorous offline IR evaluation suite measuring **MRR, Precision@K, Recall@K, and NDCG@K**.
 
 ---
 
@@ -9,7 +9,7 @@ An applied Information Retrieval (IR) and NLP system engineered for high-precisi
 - [2. High-Level Design (HLD)](#2-high-level-design-hld)
   - [2.1 Architecture Diagram](#21-architecture-diagram)
   - [2.2 Data Pipeline & Storage Flow](#22-data-pipeline--storage-flow)
-  - [2.3 Dual Search Paradigm (Lexical vs Dense Semantic)](#23-dual-search-paradigm-lexical-vs-dense-semantic)
+  - [2.3 Keyword and Semantic Search](#23-keyword-and-semantic-search)
   - [2.4 Evaluation Subsystem](#24-evaluation-subsystem)
 - [3. Low-Level Design (LLD)](#3-low-level-design-lld)
   - [3.1 Class & Component Decomposition](#31-class--component-decomposition)
@@ -31,7 +31,7 @@ Traditional e-commerce keyword search suffers from the **vocabulary mismatch pro
 
 This project implements a multi-stage search engine:
 1. **Lexical Baseline**: High-speed, inverted-index BM25Okapi retrieval.
-2. **Dense Vector Search**: Semantic embedding spaces generated via Sentence Transformers.
+2. **Semantic Vector Search**: Semantic embedding spaces generated via Sentence Transformers.
 3. **Data Integrity & Fallback**: Dual-layer storage (MongoDB primary with local atomic JSON caching fallback).
 4. **IR Evaluation Harness**: Standardized benchmarking on held-out test sets.
 
@@ -70,7 +70,7 @@ flowchart TD
         P --> M
         P --> N
         M --> Q[Ranked Candidates BM25]
-        N --> R[Ranked Candidates Dense]
+        N --> R[Ranked Candidates Semantic]
         Q & R --> S[Hybrid Re-Ranker / Evaluator\nsrc/baseline/evaluate_baseline.py]
         S --> T[Evaluation Report\nreports/baseline_metrics.json]
         S --> U[Top-K Product Recommendations]
@@ -82,8 +82,8 @@ flowchart TD
 - **Validation Engine**: Performs schema validation, verifies required fields (`id`, `title`, `price`), and logs missingness anomalies.
 - **Normalization & Templating**: Strips non-alphanumeric noise, lowercases, and creates a unified text field weighting title, brand, and category over body descriptions.
 
-### 2.3 Dual Search Paradigm (Lexical vs Dense Semantic)
-| Feature | Lexical (BM25Okapi) | Dense Semantic (SBERT + FAISS) | Hybrid (BM25 + Dense) |
+### 2.3 Keyword and Semantic Search
+| Feature | Lexical (BM25Okapi) | Semantic (SBERT + FAISS) | Hybrid (BM25 + Semantic) |
 | :--- | :--- | :--- | :--- |
 | **Matching Mechanism** | Exact & stemmed keyword overlap | Latent semantic cosine similarity | Reciprocal Rank Fusion (RRF) |
 | **Strengths** | Exact SKU/Brand matches, ultra-low latency (<0.2ms) | Solves synonymy and conceptual queries | Best-of-both-worlds precision & recall |
@@ -192,7 +192,7 @@ classDiagram
 ```
 
 ### 3.3 Text Representation & Templating Engine
-To optimize both keyword matching and dense vector similarity, a weighted representation is constructed:
+To optimize both keyword matching and semantic vector similarity, a weighted representation is constructed:
 $$\text{search\_text} = \text{clean}(\text{title}) \oplus \text{clean}(\text{category}) \oplus \text{clean}(\text{brand}) \oplus \text{clean}(\text{description})$$
 
 - Cleans special regex characters while preserving alphanumeric tokens.

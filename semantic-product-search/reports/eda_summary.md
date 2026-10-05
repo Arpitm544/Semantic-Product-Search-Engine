@@ -37,6 +37,6 @@
 ---
 
 ## 3. Preprocessing & Embedding Suitability Findings
-1. **Sequence Lengths:** The maximum canonical representation length is **52 words**, well within the 256-token context window of standard sentence-transformers (such as `all-MiniLM-L6-v2`), ensuring zero truncation leakage during dense embedding generation.
+1. **Sequence Lengths:** The maximum canonical representation length is **52 words**, well within the 256-token context window of standard sentence-transformers (such as `all-MiniLM-L6-v2`), ensuring zero truncation leakage during semantic embedding generation.
 2. **Missingness & Hygiene:** All 194 records contain valid titles, categories, and prices.
 3. **Lexical Baseline Impact:** Rich descriptions and tag structures provide sufficient token overlap for BM25/TF-IDF baseline comparisons.

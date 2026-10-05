@@ -23,7 +23,7 @@ EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 EDA_REPORT_PATH = REPORTS_DIR / "eda_summary.md"
 BASELINE_METRICS_PATH = REPORTS_DIR / "baseline_metrics.json"
-DENSE_METRICS_PATH = REPORTS_DIR / "dense_metrics.json"
+SEMANTIC_METRICS_PATH = REPORTS_DIR / "semantic_metrics.json"
 COMPARISON_REPORT_PATH = REPORTS_DIR / "comparison_report.md"
 
 # Ingestion API URL

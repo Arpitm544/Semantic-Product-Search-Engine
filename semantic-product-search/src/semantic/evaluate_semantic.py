@@ -1,5 +1,5 @@
 """
-Evaluation Harness for Dense Vector Search (Sentence-BERT + FAISS).
+Evaluation Harness for Semantic Vector Search (Sentence-BERT + FAISS).
 Measures standard IR metrics (MRR, Precision@K, Recall@K, NDCG@K, Latency).
 """
 import json
@@ -10,11 +10,11 @@ import numpy as np
 
 from src.config import (
     EVAL_SET_PATH,
-    DENSE_METRICS_PATH,
+    SEMANTIC_METRICS_PATH,
     FAISS_INDEX_PATH,
     FAISS_ID_MAP_PATH,
 )
-from src.dense.vector_search import DenseVectorSearch
+from src.semantic.vector_search import SemanticVectorSearch
 from src.data.load_data import load_cleaned_products
 from src.baseline.evaluate_baseline import (
     precision_at_k,
@@ -25,12 +25,12 @@ from src.baseline.evaluate_baseline import (
 )
 
 
-def evaluate_dense(
+def evaluate_semantic(
     eval_set_path: Path = EVAL_SET_PATH,
-    output_path: Path = DENSE_METRICS_PATH,
+    output_path: Path = SEMANTIC_METRICS_PATH,
     top_ks: List[int] = [5, 10],
 ) -> Dict[str, Any]:
-    """Runs evaluation benchmark for Dense Vector Search."""
+    """Runs evaluation benchmark for Semantic Vector Search."""
     if not eval_set_path.exists():
         raise FileNotFoundError(f"Evaluation set not found at {eval_set_path}")
 
@@ -39,12 +39,12 @@ def evaluate_dense(
 
     # Ensure FAISS index is available
     if FAISS_INDEX_PATH.exists() and FAISS_ID_MAP_PATH.exists():
-        dense_engine = DenseVectorSearch.load(FAISS_INDEX_PATH, FAISS_ID_MAP_PATH)
+        semantic_engine = SemanticVectorSearch.load(FAISS_INDEX_PATH, FAISS_ID_MAP_PATH)
     else:
         products = load_cleaned_products()
-        dense_engine = DenseVectorSearch()
-        dense_engine.fit(products)
-        dense_engine.save(FAISS_INDEX_PATH, FAISS_ID_MAP_PATH)
+        semantic_engine = SemanticVectorSearch()
+        semantic_engine.fit(products)
+        semantic_engine.save(FAISS_INDEX_PATH, FAISS_ID_MAP_PATH)
 
     results_by_k = {k: {"p": [], "r": [], "ndcg": []} for k in top_ks}
     mrr_list = []
@@ -56,7 +56,7 @@ def evaluate_dense(
         relevant_ids = set(item["relevant_doc_ids"])
 
         t0 = time.perf_counter()
-        search_results = dense_engine.search(query, top_k=max(top_ks))
+        search_results = semantic_engine.search(query, top_k=max(top_ks))
         latency = (time.perf_counter() - t0) * 1000.0
         latencies_ms.append(latency)
 
@@ -77,7 +77,7 @@ def evaluate_dense(
         ap_list.append(ap)
 
     metrics_summary = {
-        "model": "Sentence-BERT + FAISS (Dense Semantic Search)",
+        "model": "Sentence-BERT + FAISS (Semantic Search)",
         "total_queries": len(eval_queries),
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "latency_ms": {
@@ -101,13 +101,13 @@ def evaluate_dense(
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(metrics_summary, f, indent=2)
 
-    print(f"Dense evaluation saved to {output_path}")
+    print(f"Semantic evaluation saved to {output_path}")
     return metrics_summary
 
 
 def main():
-    metrics = evaluate_dense()
-    print("\n--- Dense Vector Search Benchmark Results ---")
+    metrics = evaluate_semantic()
+    print("\n--- Semantic Vector Search Benchmark Results ---")
     print(f"Queries Evaluated: {metrics['total_queries']}")
     print(f"MRR: {metrics['mrr']:.4f}")
     print(f"MAP: {metrics['map']:.4f}")
