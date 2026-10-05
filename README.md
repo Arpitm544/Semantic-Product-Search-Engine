@@ -201,13 +201,11 @@ $$\text{search\_text} = \text{clean}(\text{title}) \oplus \text{clean}(\text{cat
 ### 3.4 BM25 Search Algorithm & Tokenization
 The BM25 retrieval function calculates the relevance score for document $D$ given query $Q = \{q_1, q_2, \dots, q_n\}$:
 
-$$\text{Score}(D, Q) = \sum_{i=1}^{n} \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 + 1)}{f(q_i, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)}$$
+$$\text{Score}(D, Q) = \sum_{i=1}^{n} \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 + 1)}{f(q_i, D) + k_1}$$
 
 Where:
 - $f(q_i, D)$ = term frequency of query token $q_i$ in product document $D$.
-- $|D|$ = length of document $D$ in words.
-- $\text{avgdl}$ = average document length in the catalog.
-- $k_1 = 1.5$, $b = 0.75$ (tuned Okapi defaults).
+- $k_1 = 1.5$ controls term-frequency saturation; document length is not part of the score.
 - $\text{IDF}(q_i) = \ln \left( \frac{N - n(q_i) + 0.5}{n(q_i) + 0.5} + 1 \right)$.
 
 ### 3.5 Information Retrieval Evaluation Metrics

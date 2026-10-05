@@ -67,9 +67,9 @@ It first turns text into lowercase tokens:
 
 It records how often each word appears inside each product and how many products contain that word.
 
-When a query arrives, BM25 gives matching products scores. A rare word usually gives a stronger clue than a word found across the catalog. Repeating a matching word can increase the score, but the benefit gets smaller with more repetitions. The algorithm also adjusts for text length, so a long description does not get an automatic advantage just from having more words.
+When a query arrives, BM25 gives matching products scores. A rare word usually gives a stronger clue than a word found across the catalog. Repeating a matching word can increase the score, but the benefit gets smaller with more repetitions. This implementation does not adjust scores for document length; extra nonmatching words do not change a product's score.
 
-The code uses two settings: `k1 = 1.5` controls the effect of repeated words, and `b = 0.75` controls the length adjustment. You can understand the flow before memorizing the formula.
+The code uses one setting: `k1 = 1.5` controls how quickly the effect of repeated matching words levels off. You can understand the flow before memorizing the formula.
 
 ```text
 Query words → Match product words → Add scores → Sort → Return the top K
@@ -79,7 +79,7 @@ Here, **K means the number of results requested**. `top_k=5` asks for up to five
 
 BM25 does not expand synonyms or reduce words to their roots in this implementation. For example, `run` and `running` are separate tokens. A product with no matching query words gets a zero score and is left out.
 
-**Remember:** BM25 scores word overlap, with adjustments for rarity, repetition, and length.
+**Remember:** BM25 scores word overlap, with adjustments for rarity and repetition; this implementation does not normalize for document length.
 
 ## 5. Semantic search: turn text into numbers
 
