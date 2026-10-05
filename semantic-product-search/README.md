@@ -1,5 +1,7 @@
 # 🔍 Semantic Product Search Engine
 
+Start with [Study Notes](STUDY_NOTES.md) for a beginner walkthrough and [Run Commands](RUN_COMMANDS.md) for setup, commands for each executable module, and their expected outputs.
+
 An applied Information Retrieval (IR) and NLP system engineered for high-precision e-commerce product discovery. This engine provides a hybrid search architecture combining lexical search (**BM25Okapi**) with dense semantic vector representations (**Sentence-BERT + FAISS**), accompanied by a rigorous offline IR evaluation suite measuring **MRR, Precision@K, Recall@K, and NDCG@K**.
 
 ---
