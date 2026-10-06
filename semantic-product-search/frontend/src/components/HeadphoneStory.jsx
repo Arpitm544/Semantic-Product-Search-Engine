@@ -103,7 +103,6 @@ export default function HeadphoneStory() {
   }, [simple]);
 
   const goToChapter = (index) => {
-    if (simple) { document.getElementById(`story-mobile-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
     const track = trackRef.current;
     const start = track.getBoundingClientRect().top + window.scrollY;
     const distance = track.offsetHeight - window.innerHeight;

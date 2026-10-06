@@ -36,7 +36,6 @@
 .scene-turn-controls button:hover { background: #fff; }
 .scene-turn-controls .turn-left { transform: rotate(180deg); }
 .scene-fallback { position: absolute; inset: 0; border-radius: 15px; overflow: hidden; }
-.scene-fallback .product-art { background-size: 200% 206%; }
 .airpods-artwork { display: block; width: 100%; height: 100%; }
 .story-asset-credit { margin: 24px auto 0; padding: 0 24px; max-width: 1000px; text-align: center; font-size: 9px; line-height: 1.8; color: #53615b; }
 .story-asset-credit a { text-decoration: underline; text-underline-offset: 3px; }

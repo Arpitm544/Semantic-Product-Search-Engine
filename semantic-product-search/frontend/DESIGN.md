@@ -14,7 +14,7 @@ The headphone uses a locally hosted AirPods Max GLB by Mr.Philin under CC BY 4.0
 
 The point cloud is deterministic illustrative geometry, not exported embeddings. Its distances and connections explain the concept without presenting measured similarity. Comparison cards have no synthetic scores or speed claims. There are no backend or ML calls.
 
-Three.js is loaded near the story; rendering pauses when the canvas is off screen or the tab is hidden. Canvas resources are disposed when the scene unmounts. Mobile, reduced-motion, and WebGL-unavailable visitors see readable illustrated chapters instead of the long sticky sequence. AirPodsArtwork.jsx supplies an original lightweight SVG for these views and loading states.
+Three.js is loaded near the story; rendering pauses when the canvas is more than 100px outside the viewport or the tab is hidden. Canvas resources are disposed when the scene unmounts. Mobile, reduced-motion, and WebGL-unavailable visitors see readable illustrated chapters instead of the long sticky sequence. AirPodsArtwork.jsx supplies an original lightweight SVG for these views and loading states.
 
 ## Product render
 
