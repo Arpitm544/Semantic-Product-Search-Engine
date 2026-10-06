@@ -4,6 +4,8 @@ import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import Icon from './Icon';
 import ProductArtwork from './ProductArtwork';
+import HeadphoneStory from './HeadphoneStory';
+import SearchComparison from './SearchComparison';
 import AuthComingSoon from './AuthComingSoon';
 import { priceLabel } from '@/lib/format';
 
@@ -123,20 +125,21 @@ export default function LandingPage({ catalog }) {
           <header className="site-header">
             <Brand light />
             <nav className="desktop-nav" aria-label="Main navigation">
+              <a href="#how-it-works">The experience</a>
               <a href="#discover" onClick={() => chooseCollection()}>The collection</a>
-              <a href="#the-idea">The idea</a>
+              <a href="#comparison">Compare approaches</a>
             </nav>
             <div className="header-actions">
               <div className="header-auth"><button className="auth-login" aria-haspopup="dialog" onClick={openAuthMessage}>Log in</button><button className="auth-signup" aria-haspopup="dialog" onClick={openAuthMessage}>Sign up <Icon name="diagonal" size={14} /></button></div>
               <button ref={menuButtonRef} className="menu-button icon-button" aria-label={mobileMenu ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileMenu} onClick={() => setMobileMenu(!mobileMenu)}><Icon name={mobileMenu ? 'close' : 'menu'} /></button>
             </div>
-            {mobileMenu && <nav ref={mobileNavRef} className="mobile-nav" aria-label="Mobile navigation"><a href="#discover" onClick={() => chooseCollection()}>The collection</a><a href="#the-idea" onClick={() => setMobileMenu(false)}>The idea</a><div className="mobile-auth-actions"><button className="auth-login" aria-haspopup="dialog" onClick={openAuthMessage}>Log in</button><button className="auth-signup" aria-haspopup="dialog" onClick={openAuthMessage}>Sign up <Icon name="diagonal" size={14} /></button></div></nav>}
+            {mobileMenu && <nav ref={mobileNavRef} className="mobile-nav" aria-label="Mobile navigation"><a href="#how-it-works" onClick={() => setMobileMenu(false)}>The experience</a><a href="#discover" onClick={() => chooseCollection()}>The collection</a><a href="#comparison" onClick={() => setMobileMenu(false)}>Compare approaches</a><div className="mobile-auth-actions"><button className="auth-login" aria-haspopup="dialog" onClick={openAuthMessage}>Log in</button><button className="auth-signup" aria-haspopup="dialog" onClick={openAuthMessage}>Sign up <Icon name="diagonal" size={14} /></button></div></nav>}
           </header>
           <div className="hero-content">
             <span className="hero-eyebrow"><span className="tiny-star">✳</span> PRODUCT DISCOVERY, WITH A LITTLE MORE MEANING</span>
             <h1 id="hero-title">A little <em>meaning.</em><br />A better find.</h1>
             <p>You know what you’re looking for.<br className="mobile-break" /> You just don’t always know its name.</p>
-            <div className="hero-landing-actions"><a className="hero-primary-cta" href="#discover">Explore the collection <Icon name="arrow" size={20} /></a><a className="hero-secondary-cta" href="#the-idea">Meet the idea <Icon name="diagonal" size={16} /></a></div>
+            <div className="hero-landing-actions"><a className="hero-primary-cta" href="#how-it-works">Follow the story <Icon name="arrow" size={20} /></a><a className="hero-secondary-cta" href="#the-idea">Meet the idea <Icon name="diagonal" size={16} /></a></div>
             <div className="query-presets"><span>A little inspiration:</span>{inspirations.map((item) => <a key={item.label} href="#discover" onClick={() => chooseCollection(item.collection)}>{item.label}<Icon name="diagonal" size={12} /></a>)}</div>
           </div>
           <div className="hero-bottom"><div><span className="hero-bottom-label">LESS SCROLLING. MORE FINDING.</span><p>Made for the way you think.</p></div><a href="#discover" className="hero-scroll" aria-label="Explore product inspiration"><span>EXPLORE A LITTLE</span><span className="scroll-circle"><Icon name="down" size={20} /></span></a></div>
@@ -145,13 +148,14 @@ export default function LandingPage({ catalog }) {
 
         <div className="discovery-strip"><span><span className="tiny-star">✳</span> Good finds start with good intentions.</span><div><span>Everyday essentials</span><i /><span>Outdoor adventures</span><i /><span>A little more inspiration</span></div></div>
 
+        <HeadphoneStory />
 
         <section className="collection-section section-shell" id="discover" aria-labelledby="collection-title">
           <div className="collection-heading"><div><span className="eyebrow">THINGS FOR YOUR KIND OF EVERYDAY</span><h2 id="collection-title">A few good finds.</h2></div><p>For the small rituals, the big adventures, and everything in between.</p></div>
           <div className="collection-toolbar"><div className="collection-tabs" aria-label="Product inspiration collections">{collections.map((item) => <button key={item.id} className={collectionId === item.id ? 'active' : ''} aria-pressed={collectionId === item.id} onClick={() => chooseCollection(item.id)}>{item.label}</button>)}</div></div>
           <div className="results-meta"><span>A glimpse of the possibilities</span><span className="artwork-caption">Original illustrative product artwork</span></div>
           <div className="product-grid">{products.map((product, index) => <ProductPreview key={product.id} product={product} index={index} />)}</div>
-          <div className="collection-more"><a className="outline-button" href="#the-idea">Discover the idea behind it <Icon name="arrow" size={17} /></a></div>
+          <div className="collection-more"><a className="outline-button" href="#how-it-works">Discover the idea behind it <Icon name="arrow" size={17} /></a></div>
         </section>
 
         <section className="journey-section reveal" aria-labelledby="journey-title"><div className="journey-heading"><span className="eyebrow">FIND YOUR NEXT LITTLE ADVENTURE</span><h2 id="journey-title">For wherever<br /><em>life takes you.</em></h2><p>A rainy trail. A quiet commute. A space to create.<br />Start with the moment you’re shopping for.</p><a className="outline-button" href="#discover" onClick={() => chooseCollection('outdoors')}>Explore outdoor inspiration <Icon name="diagonal" size={17} /></a></div><div className="journey-scene" aria-hidden="true"><div className="journey-bottle"><div className="product-art product-art--bottle" /></div><div className="journey-pack"><div className="product-art product-art--backpack" /></div><span className="journey-tag"><Icon name="leaf" size={14} /> A little further from ordinary.</span><span className="journey-coordinate">DISCOVERY / EVERYDAY, REIMAGINED</span></div></section>
@@ -162,8 +166,9 @@ export default function LandingPage({ catalog }) {
           <div className="project-note"><span>An independent product discovery concept.</span><span>Made with everyday curiosity.</span></div>
         </section>
 
+        <SearchComparison />
 
-        <footer className="site-footer"><div className="footer-main"><div><span className="eyebrow">A LITTLE INSPIRATION STARTS HERE</span><h2>What’s your<br /><em>next good find?</em></h2></div><a className="footer-cta" href="#discover" aria-label="Explore product inspiration"><Icon name="diagonal" size={34} /></a></div><div className="footer-bottom"><Brand /><span>Semantic Product Search Engine</span><a href="#the-idea">A little curiosity goes a long way. <Icon name="diagonal" size={14} /></a></div></footer>
+        <footer className="site-footer"><div className="footer-main"><div><span className="eyebrow">A LITTLE INSPIRATION STARTS HERE</span><h2>What’s your<br /><em>next good find?</em></h2></div><a className="footer-cta" href="#discover" aria-label="Explore product inspiration"><Icon name="diagonal" size={34} /></a></div><div className="footer-bottom"><Brand /><span>Semantic Product Search Engine</span><a href="#how-it-works">A little curiosity goes a long way. <Icon name="diagonal" size={14} /></a></div></footer>
       </main>
       <AuthComingSoon open={authOpen} onClose={() => setAuthOpen(false)} triggerRef={authTriggerRef} menuRef={menuButtonRef} />
     </>

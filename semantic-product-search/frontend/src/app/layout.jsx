@@ -1,4 +1,5 @@
 import './globals.css';
+import './story.css';
 
 export const metadata = {
   title: 'Semantic — A little meaning. A better find.',
