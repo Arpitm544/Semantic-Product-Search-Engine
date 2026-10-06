@@ -185,7 +185,6 @@ em { font-weight: 400; }
 html[data-motion="ready"] .reveal:not(.is-visible) { transform: translateY(14px); }
 .reveal { transition: opacity .75s ease, transform .75s ease; }
 @keyframes arrive { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes breathe { 50% { opacity: .4; } }
 
 @media (min-width: 1500px) {
   .hero { max-height: 970px; }
@@ -232,7 +231,7 @@ html[data-motion="ready"] .reveal:not(.is-visible) { transform: translateY(14px)
   .hero-art-note { bottom: 12px; font-size: 7px; }
   .discovery-strip { margin-inline: 22px; min-height: 91px; gap: 10px; align-items: flex-start; justify-content: center; flex-direction: column; padding-block: 17px; }
   .discovery-strip > span { font-size: 10px; }
-  .discovery-strip > div { font-size: 9px; gap: 15px; }
+  .discovery-strip > div { width: 100%; flex-wrap: wrap; font-size: 9px; gap: 8px 15px; }
   .collection-section { padding-top: 56px; padding-bottom: 60px; }
   .collection-heading { align-items: flex-start; flex-direction: column; gap: 16px; margin-bottom: 25px; }
   .collection-heading h2 { font-size: 44px; }
@@ -336,7 +335,7 @@ html[data-motion="ready"] .reveal:not(.is-visible) { transform: translateY(14px)
 .auth-dialog h2 { margin: 19px 0 17px; font-size: clamp(30px, 6vw, 39px); letter-spacing: -1.5px; line-height: 1.2; }
 .auth-dialog-emoji { display: inline-block; font-size: .68em; vertical-align: 3px; }
 .auth-dialog p { color: #6f7d73; font-size: 14px; line-height: 1.9; }
-.auth-dialog p span { font-size: 12px; color: #90998d; }
+.auth-dialog p span { font-size: 12px; color: #617067; }
 .auth-dialog-dismiss { margin-top: 27px; min-width: 155px; }
 @media (prefers-reduced-motion: no-preference) {
   .auth-dialog[open] { animation: auth-arrive .22s ease-out; }

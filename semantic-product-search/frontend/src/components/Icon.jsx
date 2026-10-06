@@ -13,5 +13,11 @@ const paths = {
 };
 
 export default function Icon({ name, size = 20, ...props }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{paths[name] || paths.arrow}</svg>;
+  const icon = paths[name];
+  if (!icon) {
+    if (process.env.NODE_ENV !== 'production') console.warn(`Unknown icon name: ${name}`);
+    return null;
+  }
+
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{icon}</svg>;
 }
