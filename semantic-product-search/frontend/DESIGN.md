@@ -2,7 +2,7 @@
 
 Velorah was an atmosphere reference: generous photographic space, calm pastel light, and editorial serif typography. No template code, layout assets, or source files were downloaded or copied. The new design uses the project name `semantic.`, actual sample product names, INR prices, everyday needs, and the project’s focus on meaningful product discovery.
 
-The standalone landing page moves from an atmospheric hero and editorial collection into a concept illustration, an outdoor discovery composition, the project idea, and a final invitation to explore. Calls to action navigate between page sections; there are no API calls or ML integration. Custom artwork is clearly described as illustrative because the source catalog does not contain images.
+The standalone landing page moves from an atmospheric hero and editorial collection into a concept illustration, an outdoor discovery composition, the project idea, and a final invitation to explore. Content calls to action navigate between page sections, while Log in and Sign up open a local coming-soon dialog; there are no API calls or ML integration. Custom artwork is clearly described as illustrative because the source catalog does not contain images.
 
 CSS uses Georgia for display type and Arial/Helvetica for interface text, avoiding a remote font dependency. The page uses React, Next.js App Router, Three.js, plain CSS, and small original SVG icons. Motion respects reduced-motion preferences.
 

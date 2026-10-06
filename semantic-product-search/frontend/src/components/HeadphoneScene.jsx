@@ -101,40 +101,65 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
     let disposed = false, teardown = () => {};
     const host = mountRef.current;
     async function setup() {
+      let renderer, scene, pmrem, room, environment;
+      let resizeObserver, visibilityObserver, frame = 0;
+      let onVisibilityChange, pointerDown, pointerMove, pointerUp;
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        cancelAnimationFrame(frame);
+        resizeObserver?.disconnect(); visibilityObserver?.disconnect();
+        if (onVisibilityChange) document.removeEventListener('visibilitychange', onVisibilityChange);
+        if (renderer?.domElement) {
+          if (pointerDown) renderer.domElement.removeEventListener('pointerdown', pointerDown);
+          if (pointerMove) renderer.domElement.removeEventListener('pointermove', pointerMove);
+          if (pointerUp) {
+            renderer.domElement.removeEventListener('pointerup', pointerUp);
+            renderer.domElement.removeEventListener('pointercancel', pointerUp);
+          }
+        }
+        if (scene) disposeObject(scene);
+        environment?.dispose(); room?.dispose(); pmrem?.dispose();
+        if (renderer) {
+          renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+        }
+      };
       try {
         const [T, { RoomEnvironment }, { GLTFLoader }] = await Promise.all([import('three'), import('three/addons/environments/RoomEnvironment.js'), import('three/addons/loaders/GLTFLoader.js')]);
         if (disposed) return;
-        const renderer = new T.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'low-power' });
+        renderer = new T.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'low-power' });
+        teardown = cleanup;
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         renderer.outputColorSpace = T.SRGBColorSpace;
         renderer.toneMapping = T.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.1;
         renderer.domElement.setAttribute('aria-hidden', 'true');
         host.appendChild(renderer.domElement);
-        const scene = new T.Scene();
+        scene = new T.Scene();
         const camera = new T.PerspectiveCamera(33, 1, .1, 50);
         camera.position.set(0, .05, 8.2);
-        const pmrem = new T.PMREMGenerator(renderer);
-        const room = new RoomEnvironment();
-        const environment = pmrem.fromScene(room, .04);
+        pmrem = new T.PMREMGenerator(renderer);
+        room = new RoomEnvironment();
+        environment = pmrem.fromScene(room, .04);
         scene.environment = environment.texture;
         room.dispose(); pmrem.dispose();
+        room = null; pmrem = null;
         scene.add(new T.HemisphereLight('#ffffff', '#6d8082', 1.3));
         const light = new T.DirectionalLight('#ffffff', 2.4); light.position.set(-3, 5, 5); scene.add(light);
         const rim = new T.DirectionalLight('#ddd7f3', 1.8); rim.position.set(4, 1, -3); scene.add(rim);
-        // Establish cleanup before loading so partial setup and unmounts also release resources.
-        teardown = () => { disposeObject(scene); environment.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); };
         const headphones = await loadHeadphones(T, GLTFLoader);
         if (disposed) { disposeObject(headphones); return; }
+        scene.add(headphones);
         const field = makeMeaningSpace(T);
-        scene.add(headphones, field);
+        scene.add(field);
         const resize = () => {
           const width = host.clientWidth, height = host.clientHeight;
           if (!width || !height) return;
           camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height);
         };
-        const resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); resize();
-        let frame = 0, visible = false, dragging = false, lastX = 0, manualRotation = 0;
+        resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); resize();
+        let visible = false, dragging = false, lastX = 0, manualRotation = 0;
         let smoothed = progressRef.current;
         const lerp = T.MathUtils.lerp;
         const animate = (time = 0) => {
@@ -156,28 +181,21 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
           frame = requestAnimationFrame(animate);
         };
         const start = () => { cancelAnimationFrame(frame); if (visible && !document.hidden) frame = requestAnimationFrame(animate); };
-        const visibilityObserver = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; start(); }, { rootMargin: '100px' });
+        visibilityObserver = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; start(); }, { rootMargin: '100px' });
         visibilityObserver.observe(host);
-        const pointerDown = (event) => { if (event.pointerType !== 'mouse') return; dragging = true; lastX = event.clientX; renderer.domElement.setPointerCapture(event.pointerId); };
-        const pointerMove = (event) => { if (!dragging) return; manualRotation += (event.clientX - lastX) * .009; lastX = event.clientX; };
-        const pointerUp = () => { dragging = false; };
+        pointerDown = (event) => { if (event.pointerType !== 'mouse') return; dragging = true; lastX = event.clientX; renderer.domElement.setPointerCapture(event.pointerId); };
+        pointerMove = (event) => { if (!dragging) return; manualRotation += (event.clientX - lastX) * .009; lastX = event.clientX; };
+        pointerUp = () => { dragging = false; };
         renderer.domElement.addEventListener('pointerdown', pointerDown);
         renderer.domElement.addEventListener('pointermove', pointerMove);
         renderer.domElement.addEventListener('pointerup', pointerUp);
         renderer.domElement.addEventListener('pointercancel', pointerUp);
-        document.addEventListener('visibilitychange', start);
+        onVisibilityChange = start;
+        document.addEventListener('visibilitychange', onVisibilityChange);
         setReady(true);
-        teardown = () => {
-          cancelAnimationFrame(frame); resizeObserver.disconnect(); visibilityObserver.disconnect();
-          document.removeEventListener('visibilitychange', start);
-          renderer.domElement.removeEventListener('pointerdown', pointerDown);
-          renderer.domElement.removeEventListener('pointermove', pointerMove);
-          renderer.domElement.removeEventListener('pointerup', pointerUp);
-          renderer.domElement.removeEventListener('pointercancel', pointerUp);
-          disposeObject(scene);
-          environment.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
-        };
-      } catch { if (!disposed) { setFailed(true); onUnavailable(); } teardown(); }
+      } catch {
+        if (!disposed) { setFailed(true); teardown(); onUnavailable(); }
+      }
     }
     setup();
     return () => { disposed = true; teardown(); };

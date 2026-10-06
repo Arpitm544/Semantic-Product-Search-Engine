@@ -125,15 +125,15 @@ export default function LandingPage({ catalog }) {
           <header className="site-header">
             <Brand light />
             <nav className="desktop-nav" aria-label="Main navigation">
-              <a href="#discover" onClick={() => chooseCollection()}>The collection</a>
               <a href="#how-it-works">The experience</a>
+              <a href="#discover" onClick={() => chooseCollection()}>The collection</a>
               <a href="#comparison">Compare approaches</a>
             </nav>
             <div className="header-actions">
               <div className="header-auth"><button className="auth-login" aria-haspopup="dialog" onClick={openAuthMessage}>Log in</button><button className="auth-signup" aria-haspopup="dialog" onClick={openAuthMessage}>Sign up <Icon name="diagonal" size={14} /></button></div>
               <button ref={menuButtonRef} className="menu-button icon-button" aria-label={mobileMenu ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileMenu} onClick={() => setMobileMenu(!mobileMenu)}><Icon name={mobileMenu ? 'close' : 'menu'} /></button>
             </div>
-            {mobileMenu && <nav ref={mobileNavRef} className="mobile-nav" aria-label="Mobile navigation"><a href="#discover" onClick={() => chooseCollection()}>The collection</a><a href="#how-it-works" onClick={() => setMobileMenu(false)}>The experience</a><a href="#comparison" onClick={() => setMobileMenu(false)}>Compare approaches</a><div className="mobile-auth-actions"><button className="auth-login" aria-haspopup="dialog" onClick={openAuthMessage}>Log in</button><button className="auth-signup" aria-haspopup="dialog" onClick={openAuthMessage}>Sign up <Icon name="diagonal" size={14} /></button></div></nav>}
+            {mobileMenu && <nav ref={mobileNavRef} className="mobile-nav" aria-label="Mobile navigation"><a href="#how-it-works" onClick={() => setMobileMenu(false)}>The experience</a><a href="#discover" onClick={() => chooseCollection()}>The collection</a><a href="#comparison" onClick={() => setMobileMenu(false)}>Compare approaches</a><div className="mobile-auth-actions"><button className="auth-login" aria-haspopup="dialog" onClick={openAuthMessage}>Log in</button><button className="auth-signup" aria-haspopup="dialog" onClick={openAuthMessage}>Sign up <Icon name="diagonal" size={14} /></button></div></nav>}
           </header>
           <div className="hero-content">
             <span className="hero-eyebrow"><span className="tiny-star">✳</span> PRODUCT DISCOVERY, WITH A LITTLE MORE MEANING</span>
