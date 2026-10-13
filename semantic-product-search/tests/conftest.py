@@ -132,11 +132,11 @@ def electronics_products(sample_products):
 @pytest.fixture(scope="session")
 def fitted_bm25(sample_products):
     """
-    A BM25Okapi index pre-fitted on the sample product catalog.
+    A BM25 index fitted on the sample product catalog.
     Session-scoped so the model is built once and reused across tests.
     """
-    from src.baseline.bm25 import BM25Okapi
-    return BM25Okapi().fit(sample_products)
+    from src.baseline.bm25 import fit_bm25
+    return fit_bm25(sample_products)
 
 
 # ---------------------------------------------------------------------------

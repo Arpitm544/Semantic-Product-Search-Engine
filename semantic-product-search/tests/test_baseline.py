@@ -3,7 +3,7 @@ Unit tests for BM25 baseline retrieval and IR metric calculations.
 Addresses TR-003, TEST-006, BR-004.
 """
 import unittest
-from src.baseline.bm25 import BM25Okapi
+from src.baseline.bm25 import fit_bm25, search_bm25
 from src.baseline.evaluate_baseline import (
     precision_at_k,
     recall_at_k,
@@ -33,9 +33,9 @@ class TestBaseline(unittest.TestCase):
             },
         ]
 
-        bm25 = BM25Okapi().fit(docs)
-        res1 = bm25.search("winter jacket parka", top_k=2)
-        res2 = bm25.search("winter jacket parka", top_k=2)
+        index = fit_bm25(docs)
+        res1 = search_bm25(index, "winter jacket parka", top_k=2)
+        res2 = search_bm25(index, "winter jacket parka", top_k=2)
 
         self.assertEqual(len(res1), 1)
         self.assertEqual(res1[0][0]["id"], 1)
@@ -49,8 +49,8 @@ class TestBaseline(unittest.TestCase):
             {"id": 3, "representation_text": "unrelated item"},
         ]
 
-        bm25 = BM25Okapi().fit(docs)
-        results = bm25.search("jacket", top_k=10)
+        index = fit_bm25(docs)
+        results = search_bm25(index, "jacket", top_k=10)
 
         self.assertEqual([product["id"] for product, _ in results], [1, 2])
         self.assertEqual(results[0][1], results[1][1])

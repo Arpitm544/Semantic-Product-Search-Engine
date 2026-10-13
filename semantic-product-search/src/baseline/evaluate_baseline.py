@@ -4,6 +4,7 @@ Addresses TR-009 / BR-004: Standard IR metrics against held-out evaluation set.
 """
 import json
 import math
+import pickle
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Set
@@ -15,7 +16,7 @@ from src.config import (
     BM25_INDEX_PATH,
     PROCESSED_DATA_PATH,
 )
-from src.baseline.bm25 import BM25Okapi
+from src.baseline.bm25 import fit_bm25, load_bm25, save_bm25, search_bm25
 from src.data.load_data import load_cleaned_products
 
 
@@ -90,12 +91,13 @@ def evaluate_baseline(
         eval_queries = json.load(f)
 
     # Ensure BM25 index is available
-    if BM25_INDEX_PATH.exists():
-        bm25 = BM25Okapi.load(BM25_INDEX_PATH)
-    else:
+    try:
+        bm25 = load_bm25(BM25_INDEX_PATH)
+    except (AttributeError, ImportError, EOFError, FileNotFoundError, pickle.UnpicklingError):
+        # Rebuild a missing index or one saved by the previous class-based code.
         products = load_cleaned_products()
-        bm25 = BM25Okapi().fit(products)
-        bm25.save(BM25_INDEX_PATH)
+        bm25 = fit_bm25(products)
+        save_bm25(bm25, BM25_INDEX_PATH)
 
     results_by_k = {k: {"p": [], "r": [], "ndcg": []} for k in top_ks}
     mrr_list = []
@@ -107,7 +109,7 @@ def evaluate_baseline(
         relevant_ids = set(item["relevant_doc_ids"])
 
         t0 = time.perf_counter()
-        search_results = bm25.search(query, top_k=max(top_ks))
+        search_results = search_bm25(bm25, query, top_k=max(top_ks))
         latency = (time.perf_counter() - t0) * 1000.0
         latencies_ms.append(latency)
 
