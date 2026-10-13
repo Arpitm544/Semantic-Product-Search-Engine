@@ -46,7 +46,7 @@ const details = [
 ];
 
 function MeaningSketch() {
-  return <div className="meaning-sketch" role="img" aria-label="Schematic connection from a commute query to related headphone ideas"><svg viewBox="0 0 420 250" aria-hidden="true"><g fill="none" stroke="#becbcb"><ellipse cx="216" cy="123" rx="150" ry="91" /><ellipse cx="216" cy="123" rx="103" ry="61" strokeDasharray="4 5" /><path d="m115 114 133-55m-133 55 170 29m-170-29 133 66" stroke="#b49e76" /></g>{Array.from({ length: 24 }, (_, i) => <circle key={i} cx={243 + Math.sin(i * 2.3) * 43} cy={92 + Math.cos(i * 1.5) * 48} r={i % 3 === 0 ? 4 : 2} fill="#92a9b5" />)}<circle cx="115" cy="114" r="7" fill="#bba073" /></svg><span className="sketch-query">your commute query</span><span className="sketch-match">quieter listening</span><span className="sketch-other">nearby product ideas</span></div>;
+  return <div className="meaning-sketch" role="group" aria-label="Schematic connection from a commute query to related headphone ideas"><svg viewBox="0 0 420 250" aria-hidden="true"><g fill="none" stroke="#becbcb"><ellipse cx="216" cy="123" rx="150" ry="91" /><ellipse cx="216" cy="123" rx="103" ry="61" strokeDasharray="4 5" /><path d="m115 114 133-55m-133 55 170 29m-170-29 133 66" stroke="#b49e76" /></g>{Array.from({ length: 24 }, (_, i) => <circle key={i} cx={243 + Math.sin(i * 2.3) * 43} cy={92 + Math.cos(i * 1.5) * 48} r={i % 3 === 0 ? 4 : 2} fill="#92a9b5" />)}<circle cx="115" cy="114" r="7" fill="#bba073" /></svg><span className="sketch-query">your commute query</span><span className="sketch-match">quieter listening</span><span className="sketch-other">nearby product ideas</span></div>;
 }
 
 export default function HeadphoneStory() {

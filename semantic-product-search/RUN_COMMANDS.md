@@ -143,14 +143,18 @@ After building the indexes, this example loads both and prints their results wit
 
 ```bash
 python - <<'PY'
-from src.baseline.bm25 import BM25Okapi
+from src.baseline.bm25 import load_bm25, search_bm25
 from src.semantic.vector_search import SemanticVectorSearch
 
 query = "eyewear for sunny days"
 engines = [
-    ("Keyword", BM25Okapi.load()),
     ("Semantic", SemanticVectorSearch.load()),
 ]
+keyword_index = load_bm25()
+print(f"\nKeyword: {query}")
+for product, score in search_bm25(keyword_index, query, top_k=3):
+    print(product["id"], product["title"], score)
+
 for name, engine in engines:
     print(f"\n{name}: {query}")
     for product, score in engine.search(query, top_k=3):

@@ -27,7 +27,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetch(`${API_BASE}/api/dashboard`)
-      .then((response) => { if (!response.ok) throw new Error('Could not load the local project data.'); return response.json(); })
+      .then(async (response) => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error || 'Could not load the local project data.');
+        }
+        return response.json();
+      })
       .then(setData)
       .catch((error) => setLoadError(error instanceof TypeError
         ? 'The backend API is not reachable. Stop the current dev server and restart with npm run dev from the frontend folder.'

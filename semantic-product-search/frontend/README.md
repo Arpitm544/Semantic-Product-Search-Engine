@@ -14,6 +14,8 @@ This starts both the API and website. Open http://localhost:3001. To run only th
     npm run build
     npm run start
 
+`npm run start` serves only the frontend. Start the API separately with `python3 backend/main.py` from `semantic-product-search/` so the product search page can reach it.
+
 The frontend uses Next.js, React, and Three.js. The catalog search is a BM25 keyword search against the backend's processed product catalog. The scroll story and the approach comparison remain illustrative examples, not live search results.
 
 ## Design behavior

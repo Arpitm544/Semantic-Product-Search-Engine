@@ -152,7 +152,7 @@ export default function LandingPage({ catalog }) {
 
         <section className="collection-section section-shell" id="discover" aria-labelledby="collection-title">
           <div className="collection-heading"><div><span className="eyebrow">THINGS FOR YOUR KIND OF EVERYDAY</span><h2 id="collection-title">A few good finds.</h2></div><p>For the small rituals, the big adventures, and everything in between.</p></div>
-          <div className="collection-toolbar"><div className="collection-tabs" aria-label="Product inspiration collections">{collections.map((item) => <button key={item.id} className={collectionId === item.id ? 'active' : ''} aria-pressed={collectionId === item.id} onClick={() => chooseCollection(item.id)}>{item.label}</button>)}</div></div>
+          <div className="collection-toolbar"><div className="collection-tabs" role="group" aria-label="Product inspiration collections">{collections.map((item) => <button key={item.id} className={collectionId === item.id ? 'active' : ''} aria-pressed={collectionId === item.id} onClick={() => chooseCollection(item.id)}>{item.label}</button>)}</div></div>
           <div className="results-meta"><span>A glimpse of the possibilities</span><span className="artwork-caption">Original illustrative product artwork</span></div>
           <div className="product-grid">{products.map((product, index) => <ProductPreview key={product.id} product={product} index={index} />)}</div>
           <div className="collection-more"><a className="outline-button" href="#how-it-works">Discover the idea behind it <Icon name="arrow" size={17} /></a></div>
