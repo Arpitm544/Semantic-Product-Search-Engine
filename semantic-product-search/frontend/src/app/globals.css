@@ -109,7 +109,7 @@ em { font-weight: 400; }
 .product-art svg { width: 92%; height: 92%; }
 .product-number { position: absolute; pointer-events: none; left: 16px; top: 16px; color: #7a8375; font-size: 9px; letter-spacing: 1px; }
 .product-info { padding: 18px 0 10px; }
-.product-category { display: block; font-size: 8px; letter-spacing: .9px; text-transform: uppercase; color: #8b9082; margin-bottom: 8px; }
+.product-category { display: block; font-size: 8px; letter-spacing: .9px; text-transform: uppercase; color: #66756c; margin-bottom: 8px; }
 .product-title-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; min-height: 39px; }
 .product-title-row h3 { text-align: left; font-size: 12px; line-height: 1.5; font-weight: 500; letter-spacing: -.1px; border: 0; background: transparent; padding: 0; }
 .product-title-row > span { font-size: 11px; white-space: nowrap; line-height: 1.65; }

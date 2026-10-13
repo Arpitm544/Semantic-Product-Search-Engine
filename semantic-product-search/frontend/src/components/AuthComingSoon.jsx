@@ -5,6 +5,7 @@ import Icon from './Icon';
 
 export default function AuthComingSoon({ open, onClose, triggerRef, menuRef }) {
   const dialogRef = useRef(null);
+  const backdropPressRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -20,13 +21,23 @@ export default function AuthComingSoon({ open, onClose, triggerRef, menuRef }) {
     };
   }, [open, triggerRef, menuRef]);
 
+  const rememberBackdropPress = (event) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    backdropPressRef.current = event.target === event.currentTarget && (
+      event.clientX < bounds.left || event.clientX > bounds.right ||
+      event.clientY < bounds.top || event.clientY > bounds.bottom
+    );
+  };
+
   const dismissBackdrop = (event) => {
-    if (event.target !== event.currentTarget) return;
+    const startedOnBackdrop = backdropPressRef.current;
+    backdropPressRef.current = false;
+    if (!startedOnBackdrop || event.target !== event.currentTarget) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
   };
 
-  return <dialog ref={dialogRef} className="auth-dialog" aria-labelledby="auth-coming-soon-title" aria-describedby="auth-coming-soon-description" onCancel={(event) => { event.preventDefault(); onClose(); }} onClick={dismissBackdrop}>
+  return <dialog ref={dialogRef} className="auth-dialog" aria-labelledby="auth-coming-soon-title" aria-describedby="auth-coming-soon-description" onCancel={(event) => { event.preventDefault(); onClose(); }} onMouseDown={rememberBackdropPress} onClick={dismissBackdrop}>
     <button className="auth-dialog-close" aria-label="Close coming soon message" onClick={onClose}><Icon name="close" size={18} /></button>
     <span className="auth-dialog-symbol" aria-hidden="true">✳</span>
     <span className="eyebrow">A LITTLE PATIENCE, A LITTLE MEANING.</span>

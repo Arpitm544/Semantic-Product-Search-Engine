@@ -8,7 +8,7 @@ export default function AirPodsArtwork() {
       <linearGradient id={`${id}-metal`} x1="0" x2="1" y1="0" y2=".3"><stop stopColor="#a4b1ad" /><stop offset=".35" stopColor="#e6ebe7" /><stop offset=".68" stopColor="#c8d3cc" /><stop offset="1" stopColor="#849a8c" /></linearGradient>
       <linearGradient id={`${id}-pad`}><stop stopColor="#63746a" /><stop offset=".45" stopColor="#b7c3b7" /><stop offset="1" stopColor="#6c8071" /></linearGradient>
       <pattern id={`${id}-knit`} width="4" height="4" patternUnits="userSpaceOnUse"><path d="M0 0h4v4" fill="none" stroke="#9aa99b" strokeWidth=".8" /></pattern>
-      <filter id={`${id}-shadow`}><feGaussianBlur stdDeviation="9" /></filter>
+      <filter id={`${id}-shadow`} x="-25%" y="-150%" width="150%" height="400%"><feGaussianBlur stdDeviation="9" /></filter>
     </defs>
     <ellipse cx="250" cy="433" rx="117" ry="14" fill="#698779" opacity=".13" filter={`url(#${id}-shadow)`} />
     <g transform="rotate(-10 250 250)">

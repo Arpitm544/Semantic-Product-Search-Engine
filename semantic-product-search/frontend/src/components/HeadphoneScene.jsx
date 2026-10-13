@@ -183,7 +183,7 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
         const start = () => { cancelAnimationFrame(frame); if (visible && !document.hidden) frame = requestAnimationFrame(animate); };
         visibilityObserver = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; start(); }, { rootMargin: '100px' });
         visibilityObserver.observe(host);
-        pointerDown = (event) => { if (event.pointerType !== 'mouse') return; dragging = true; lastX = event.clientX; renderer.domElement.setPointerCapture(event.pointerId); };
+        pointerDown = (event) => { if (event.button !== 0) return; event.preventDefault(); dragging = true; lastX = event.clientX; renderer.domElement.setPointerCapture(event.pointerId); };
         pointerMove = (event) => { if (!dragging) return; manualRotation += (event.clientX - lastX) * .009; lastX = event.clientX; };
         pointerUp = () => { dragging = false; };
         renderer.domElement.addEventListener('pointerdown', pointerDown);

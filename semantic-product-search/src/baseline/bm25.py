@@ -1,126 +1,84 @@
-"""
-BM25Okapi Information Retrieval baseline implementation.
-Addresses TR-003 / BR-004: Keyword-search baseline over preprocessed catalog.
-"""
+"""Simple keyword search over the processed product catalog."""
+from collections import Counter
 import math
 import pickle
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.config import BM25_INDEX_PATH, PROCESSED_DATA_PATH
+from src.config import BM25_INDEX_PATH
 from src.data.load_data import load_cleaned_products
 
 
 def tokenize(text: str) -> List[str]:
-    """Tokenize text into lowercase alphanumeric tokens."""
+    """Turn text into lowercase words."""
     return re.findall(r"\b\w+\b", (text or "").lower())
 
 
-class BM25Okapi:
-    """
-    BM25Okapi retrieval model implementation.
-    Parameters:
-        k1: Term frequency saturation parameter (default: 1.5)
-    """
-
-    def __init__(self, k1: float = 1.5):
-        self.k1 = k1
-        self.corpus_size = 0
-        self.doc_freqs: List[Dict[str, int]] = []
-        self.idf: Dict[str, float] = {}
-        self.products: List[Dict[str, Any]] = []
-
-    def fit(self, products: List[Dict[str, Any]]) -> "BM25Okapi":
-        """Index the products using their canonical representation text."""
-        self.products = products
-        self.corpus_size = len(products)
-        self.doc_freqs = []
-
-        df_counts: Dict[str, int] = {}
-
-        for p in products:
-            text = p.get("representation_text") or f"{p.get('title', '')} {p.get('description', '')}"
-            tokens = tokenize(text)
-
-            frequencies: Dict[str, int] = {}
-            for token in tokens:
-                frequencies[token] = frequencies.get(token, 0) + 1
-            self.doc_freqs.append(frequencies)
-
-            for token in frequencies.keys():
-                df_counts[token] = df_counts.get(token, 0) + 1
-
-        # Compute Robertson-Spärck Jones IDF with smoothing
-        self.idf = {}
-        for token, freq in df_counts.items():
-            self.idf[token] = math.log((self.corpus_size - freq + 0.5) / (freq + 0.5) + 1.0)
-
-        return self
-
-    def get_scores(self, query: str) -> List[float]:
-        """Compute BM25 relevance scores for all documents given a query."""
-        tokens = tokenize(query)
-        scores = [0.0] * self.corpus_size
-
-        for token in tokens:
-            if token not in self.idf:
-                continue
-            idf = self.idf[token]
-            for idx in range(self.corpus_size):
-                tf = self.doc_freqs[idx].get(token, 0)
-                if tf > 0:
-                    numerator = tf * (self.k1 + 1.0)
-                    denominator = tf + self.k1
-                    scores[idx] += idf * (numerator / denominator)
-
-        return scores
-
-    def search(self, query: str, top_k: int = 10) -> List[Tuple[Dict[str, Any], float]]:
-        """Search products and return top_k (product, score) pairs."""
-        scores = self.get_scores(query)
-        scored_indices = sorted(
-            [(idx, score) for idx, score in enumerate(scores) if score > 0.0],
-            key=lambda x: x[1],
-            reverse=True,
-        )
-
-        results = []
-        for idx, score in scored_indices[:top_k]:
-            results.append((self.products[idx], score))
-        return results
-
-    def save(self, path: Optional[Path] = None) -> Path:
-        """Serialize BM25 index to disk."""
-        target_path = path or BM25_INDEX_PATH
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(target_path, "wb") as f:
-            pickle.dump(self, f)
-        print(f"BM25 index saved to {target_path}")
-        return target_path
-
-    @classmethod
-    def load(cls, path: Optional[Path] = None) -> "BM25Okapi":
-        """Load serialized BM25 index from disk."""
-        target_path = path or BM25_INDEX_PATH
-        if not target_path.exists():
-            raise FileNotFoundError(f"BM25 index not found at {target_path}")
-        with open(target_path, "rb") as f:
-            return pickle.load(f)
+def fit_bm25(products: List[Dict[str, Any]], k1: float = 1.5) -> Dict[str, Any]:
+    """Build a BM25 index from products."""
+    word_counts = [
+        Counter(tokenize(product.get("representation_text") or
+                         f"{product.get('title', '')} {product.get('description', '')}"))
+        for product in products
+    ]
+    doc_frequency = Counter(word for counts in word_counts for word in counts)
+    total_products = len(products)
+    idf = {
+        word: math.log((total_products - count + 0.5) / (count + 0.5) + 1)
+        for word, count in doc_frequency.items()
+    }
+    return {"products": products, "word_counts": word_counts, "idf": idf, "k1": k1}
 
 
-def main():
-    products = load_cleaned_products()
-    bm25 = BM25Okapi()
-    bm25.fit(products)
-    bm25.save(BM25_INDEX_PATH)
+def search_bm25(
+    index: Dict[str, Any], query: str, top_k: int = 10
+) -> List[Tuple[Dict[str, Any], float]]:
+    """Return the best matching products and their scores."""
+    query_words = tokenize(query)
+    scores = []
 
-    # Test sample search
-    sample_query = "warm winter jacket"
-    results = bm25.search(sample_query, top_k=3)
-    print(f"\nQuery: '{sample_query}'")
-    for prod, score in results:
-        print(f"- [Score: {score:.2f}] {prod['title']} ({prod['category']})")
+    for counts in index["word_counts"]:
+        score = 0.0
+        for word in query_words:
+            frequency = counts.get(word, 0)
+            if frequency:
+                k1 = index["k1"]
+                score += index["idf"][word] * frequency * (k1 + 1) / (frequency + k1)
+        scores.append(score)
+
+    ranked = sorted(
+        ((i, score) for i, score in enumerate(scores) if score > 0),
+        key=lambda result: result[1],
+        reverse=True,
+    )
+    return [(index["products"][i], score) for i, score in ranked[:top_k]]
+
+
+def save_bm25(index: Dict[str, Any], path: Optional[Path] = None) -> Path:
+    """Save the index to a file."""
+    path = path or BM25_INDEX_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "wb") as file:
+        pickle.dump(index, file)
+    print(f"BM25 index saved to {path}")
+    return path
+
+
+def load_bm25(path: Optional[Path] = None) -> Dict[str, Any]:
+    """Load an index from a file."""
+    with open(path or BM25_INDEX_PATH, "rb") as file:
+        return pickle.load(file)
+
+
+def main() -> None:
+    index = fit_bm25(load_cleaned_products())
+    save_bm25(index)
+
+    query = "warm winter jacket"
+    print(f"\nQuery: '{query}'")
+    for product, score in search_bm25(index, query, top_k=3):
+        print(f"- [Score: {score:.2f}] {product['title']} ({product['category']})")
 
 
 if __name__ == "__main__":

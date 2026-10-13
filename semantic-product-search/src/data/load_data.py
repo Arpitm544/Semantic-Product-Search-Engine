@@ -7,19 +7,12 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from src.config import RAW_DATA_PATH, PROCESSED_DATA_PATH
-from src.data.db import (
-    is_mongo_available,
-    load_raw_products as load_raw_mongo,
-    load_processed_products as load_processed_mongo,
-)
+from src.data.db import (is_mongo_available,load_raw_products as load_raw_mongo,load_processed_products as load_processed_mongo)
 
 logger = logging.getLogger(__name__)
 
 
-def load_raw_products(
-    path: Optional[Path] = None,
-    prefer_mongo: bool = True
-) -> List[Dict[str, Any]]:
+def load_raw_products(path: Optional[Path] = None,prefer_mongo: bool = True) -> List[Dict[str, Any]]:
     """
     Load raw products.
     If prefer_mongo is True and MongoDB is reachable, loads from database.
@@ -47,10 +40,7 @@ def load_raw_products(
         raise ValueError(f"Unexpected data format in {target_path}")
 
 
-def load_cleaned_products(
-    path: Optional[Path] = None,
-    prefer_mongo: bool = True
-) -> List[Dict[str, Any]]:
+def load_cleaned_products(path: Optional[Path] = None,prefer_mongo: bool = True) -> List[Dict[str, Any]]:
     """
     Load cleaned/preprocessed products.
     If prefer_mongo is True and MongoDB is reachable, loads from database.

@@ -21,10 +21,8 @@ FAISS_ID_MAP_PATH = INDEXES_DIR / "faiss_id_map.pkl"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
 REPORTS_DIR = PROJECT_ROOT / "reports"
-EDA_REPORT_PATH = REPORTS_DIR / "eda_summary.md"
 BASELINE_METRICS_PATH = REPORTS_DIR / "baseline_metrics.json"
 SEMANTIC_METRICS_PATH = REPORTS_DIR / "semantic_metrics.json"
-COMPARISON_REPORT_PATH = REPORTS_DIR / "comparison_report.md"
 
 # Ingestion API URL
 API_URL = "https://dummyjson.com/products?limit=0"
