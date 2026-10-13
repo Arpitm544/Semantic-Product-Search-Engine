@@ -120,7 +120,7 @@ def main():
     print("=" * 55)
     print("Loading raw products from MongoDB...")
     raw = load_raw_products()
-    is_valid, report = validate_catalog(raw)
+    is_valid,report = validate_catalog(raw)
     print(f"Validation: {'✅ PASSED' if is_valid else '❌ FAILED'}")
     if not is_valid:
         print("Validation report:", report)

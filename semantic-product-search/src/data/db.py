@@ -18,10 +18,7 @@ from src.config import (
 logger = logging.getLogger(__name__)
 
 
-def get_mongo_client(
-    uri: Optional[str] = None,
-    server_selection_timeout_ms: int = 3000
-) -> MongoClient:
+def get_mongo_client(uri: Optional[str] = None,server_selection_timeout_ms: int = 3000) -> MongoClient:
     """Creates and returns a MongoClient instance with configured timeout."""
     connection_uri = uri or MONGO_URI
     return MongoClient(
@@ -30,10 +27,7 @@ def get_mongo_client(
     )
 
 
-def get_database(
-    db_name: Optional[str] = None,
-    uri: Optional[str] = None
-) -> Database:
+def get_database(db_name: Optional[str] = None,uri: Optional[str] = None) -> Database:
     """Returns the target MongoDB database."""
     client = get_mongo_client(uri)
     name = db_name or MONGO_DB_NAME
@@ -67,10 +61,7 @@ def get_processed_collection(db: Optional[Database] = None) -> Collection:
     return col
 
 
-def save_raw_products(
-    products: List[Dict[str, Any]],
-    db: Optional[Database] = None
-) -> int:
+def save_raw_products(products: List[Dict[str, Any]],db: Optional[Database] = None) -> int:
     """
     Saves raw products into MongoDB collection with upsert on 'id'.
     Returns count of processed operations.
@@ -96,10 +87,7 @@ def load_raw_products(db: Optional[Database] = None) -> List[Dict[str, Any]]:
     return list(collection.find({}, {"_id": 0}))
 
 
-def save_processed_products(
-    products: List[Dict[str, Any]],
-    db: Optional[Database] = None
-) -> int:
+def save_processed_products(products: List[Dict[str, Any]],db: Optional[Database] = None) -> int:
     """
     Saves cleaned/processed products into MongoDB collection with upsert on 'id'.
     Returns count of processed operations.
@@ -125,11 +113,7 @@ def load_processed_products(db: Optional[Database] = None) -> List[Dict[str, Any
     return list(collection.find({}, {"_id": 0}))
 
 
-def get_products_by_ids(
-    ids: List[int],
-    processed: bool = True,
-    db: Optional[Database] = None
-) -> List[Dict[str, Any]]:
+def get_products_by_ids(ids: List[int],processed: bool = True,db: Optional[Database] = None) -> List[Dict[str, Any]]:
     """
     Retrieves a list of product documents by their IDs, preserving order if possible.
     """

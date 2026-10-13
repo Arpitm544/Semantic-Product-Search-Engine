@@ -67,9 +67,9 @@ It first turns text into lowercase tokens:
 
 It records how often each word appears inside each product and how many products contain that word.
 
-When a query arrives, BM25 gives matching products scores. A rare word usually gives a stronger clue than a word found across the catalog. Repeating a matching word can increase the score, but the benefit gets smaller with more repetitions. This implementation does not adjust scores for document length; extra nonmatching words do not change a product's score.
+When a query arrives, BM25 gives matching products scores. A rare word usually gives a stronger clue than a word found across the catalog. Repeating a matching word can increase the score, but the benefit gets smaller with more repetitions. The algorithm also adjusts for text length, so a long description does not get an automatic advantage just from having more words.
 
-The code uses one setting: `k1 = 1.5` controls how quickly the effect of repeated matching words levels off. You can understand the flow before memorizing the formula.
+The code uses two settings: `k1 = 1.5` controls the effect of repeated words, and `b = 0.75` controls the length adjustment. You can understand the flow before memorizing the formula.
 
 ```text
 Query words → Match product words → Add scores → Sort → Return the top K
@@ -79,11 +79,11 @@ Here, **K means the number of results requested**. `top_k=5` asks for up to five
 
 BM25 does not expand synonyms or reduce words to their roots in this implementation. For example, `run` and `running` are separate tokens. A product with no matching query words gets a zero score and is left out.
 
-**Remember:** BM25 scores word overlap, with adjustments for rarity and repetition; this implementation does not normalize for document length.
+**Remember:** BM25 scores word overlap, with adjustments for rarity, repetition, and length.
 
 ## 5. Semantic search: turn text into numbers
 
-The semantic search code is in `src/dense/vector_search.py`. It uses the pretrained model **`all-MiniLM-L6-v2`**, loaded through the **Sentence Transformers** library.
+The semantic search code is in `src/semantic/vector_search.py`. It uses the pretrained model **`all-MiniLM-L6-v2`**, loaded through the **Sentence Transformers** library.
 
 An **embedding** is a list of numbers representing a piece of text. This model produces **384 numbers for each input text**. The values are learned features; we have not manually assigned a coordinate to “shoes,” “beauty,” or “price.” The model is designed for sentence and short-paragraph similarity. [Official model card](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
 
@@ -181,7 +181,7 @@ Changing product text or the embedding model requires rebuilding the relevant in
 
 We use `data/eval/eval_set.json`. It contains 15 queries and the product IDs labeled relevant to each one. A relevant ID acts like an answer key for checking retrieval.
 
-The two evaluation scripts search these queries and compare their results with that answer key. `src/compare_models.py` runs both and writes a comparison report.
+The baseline and semantic evaluation scripts search these queries and compare their results with that answer key. Each writes its own metrics report.
 
 | Metric | Easy way to remember it |
 | --- | --- |
@@ -194,9 +194,9 @@ The two evaluation scripts search these queries and compare their results with t
 
 Example: two relevant hits among five results gives Precision@5 = `2/5`. If four products are labeled relevant in total, finding those two gives Recall@5 = `2/4`.
 
-The saved comparison from 30 September 2026 shows Precision@5 of **0.40 for BM25** and **0.52 for dense search**. Dense search also recorded a higher median query time. These results describe this small evaluation set; we have not rerun the benchmark for these notes.
+The saved comparison from 30 September 2026 shows Precision@5 of **0.40 for BM25** and **0.52 for semantic search**. Semantic search also recorded a higher median query time. These results describe this small evaluation set; we have not rerun the benchmark for these notes.
 
-The current evaluators retrieve at most 10 results by default. Even the saved MRR and MAP use that retrieved list. Dense timing includes query encoding and can include the first model load.
+The current evaluators retrieve at most 10 results by default. Even the saved MRR and MAP use that retrieved list. Semantic timing includes query encoding and can include the first model load.
 
 **Remember:** evaluation checks the rankings against labeled product IDs.
 
@@ -235,7 +235,6 @@ semantic-product-search/
 ├── src/                    The working code
 │   ├── config.py           Paths, source URL, and model name
 │   ├── ingestion.py        Fetch products
-│   ├── compare_models.py   Compare search methods
 │   ├── data/
 │   │   ├── db.py           MongoDB helpers
 │   │   ├── load_data.py    Load database or file records
@@ -244,12 +243,9 @@ semantic-product-search/
 │   ├── baseline/
 │   │   ├── bm25.py         Keyword search
 │   │   └── evaluate_baseline.py
-│   ├── dense/
+│   ├── semantic/
 │   │   ├── vector_search.py  Embeddings and semantic search
-│   │   └── evaluate_dense.py
-│   └── eda/
-│       └── eda_analysis.py Catalog statistics
-│
+│   │   └── evaluate_semantic.py
 ├── indexes/                Saved search preparation
 ├── reports/                Saved statistics and evaluation results
 ├── notebooks/              Interactive data exploration
@@ -270,7 +266,7 @@ The code has a few defaults that are easy to miss:
 - A failed validation report is printed, but the preprocessing command still continues.
 - Existing indexes can be reused by evaluation, so you must rebuild them after changing the searchable catalog.
 
-The model's default limit is 256 word pieces. The EDA script counts ordinary words, which does not prove that a description fits the model token limit. [Model card](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
+The model's default limit is 256 word pieces. Ordinary word counts do not prove that a description fits the model token limit. [Model card](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
 
 From the `semantic-product-search` folder, run each executable module with its command below:
 
@@ -279,12 +275,10 @@ From the `semantic-product-search` folder, run each executable module with its c
 | `src/ingestion.py` | `python -m src.ingestion` |
 | `src/data/validation.py` | `python -m src.data.validation` |
 | `src/data/preprocess.py` | `python -m src.data.preprocess` |
-| `src/eda/eda_analysis.py` | `python -m src.eda.eda_analysis` |
 | `src/baseline/bm25.py` | `python -m src.baseline.bm25` |
 | `src/baseline/evaluate_baseline.py` | `python -m src.baseline.evaluate_baseline` |
-| `src/dense/vector_search.py` | `python -m src.dense.vector_search` |
-| `src/dense/evaluate_dense.py` | `python -m src.dense.evaluate_dense` |
-| `src/compare_models.py` | `python -m src.compare_models` |
+| `src/semantic/vector_search.py` | `python -m src.semantic.vector_search` |
+| `src/semantic/evaluate_semantic.py` | `python -m src.semantic.evaluate_semantic` |
 
 `config.py`, `db.py`, and `load_data.py` provide helpers used by these modules. They have no standalone command that runs a pipeline step. Package marker files such as `__init__.py` do not need a run command.
 

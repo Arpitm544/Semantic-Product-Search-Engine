@@ -39,11 +39,13 @@
     "query": "kitchen cooking utensils and blender",
     "relevant_doc_ids": [48, 49, 50, 51]
   },
+
   {
     "query_id": "q9",
     "query": "nutrition and meal food for pet cats",
     "relevant_doc_ids": [18]
   },
+
   {
     "query_id": "q10",
     "query": "fresh beef steak and chicken meat groceries",

@@ -2,7 +2,7 @@
 
 Start with [Study Notes](STUDY_NOTES.md) for a beginner walkthrough and [Run Commands](RUN_COMMANDS.md) for setup, commands for each executable module, and their expected outputs.
 
-An applied Information Retrieval (IR) and NLP system engineered for high-precision e-commerce product discovery. This engine provides a hybrid search architecture combining lexical search (**BM25Okapi**) with dense semantic vector representations (**Sentence-BERT + FAISS**), accompanied by a rigorous offline IR evaluation suite measuring **MRR, Precision@K, Recall@K, and NDCG@K**.
+An applied Information Retrieval (IR) and NLP system engineered for high-precision e-commerce product discovery. This engine provides a hybrid search architecture combining lexical search (**BM25Okapi**) with semantic vector representations (**Sentence-BERT + FAISS**), accompanied by a rigorous offline IR evaluation suite measuring **MRR, Precision@K, Recall@K, and NDCG@K**.
 
 ---
 
@@ -203,11 +203,13 @@ $$\text{search\_text} = \text{clean}(\text{title}) \oplus \text{clean}(\text{cat
 ### 3.4 BM25 Search Algorithm & Tokenization
 The BM25 retrieval function calculates the relevance score for document $D$ given query $Q = \{q_1, q_2, \dots, q_n\}$:
 
-$$\text{Score}(D, Q) = \sum_{i=1}^{n} \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 + 1)}{f(q_i, D) + k_1}$$
+$$\text{Score}(D, Q) = \sum_{i=1}^{n} \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 + 1)}{f(q_i, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)}$$
 
 Where:
 - $f(q_i, D)$ = term frequency of query token $q_i$ in product document $D$.
-- $k_1 = 1.5$ controls term-frequency saturation; document length is not part of the score.
+- $|D|$ = length of document $D$ in words.
+- $\text{avgdl}$ = average document length in the catalog.
+- $k_1 = 1.5$, $b = 0.75$ (tuned Okapi defaults).
 - $\text{IDF}(q_i) = \ln \left( \frac{N - n(q_i) + 0.5}{n(q_i) + 0.5} + 1 \right)$.
 
 ### 3.5 Information Retrieval Evaluation Metrics
@@ -249,15 +251,12 @@ semantic-product-search/
 │   │   ├── load_data.py     # Unified data loaders (DB + JSON fallback)
 │   │   ├── validation.py   # Schema integrity & missingness audits
 │   │   └── preprocess.py   # Text normalizer & representation builder
-│   ├── eda/
-│   │   └── eda_analysis.py  # Automated catalog analysis & markdown reporter
 │   └── baseline/
 │       ├── bm25.py          # BM25Okapi search engine & index serializer
 │       └── evaluate_baseline.py # Benchmark evaluation harness (MRR, NDCG, P@K, R@K)
 ├── indexes/
 │   └── bm25_index.pkl       # Serialized inverted index artifact
 ├── reports/
-│   ├── eda_summary.md       # EDA report with price & category distributions
 │   └── baseline_metrics.json# Machine-readable evaluation benchmark output
 ├── tests/
 │   ├── test_data_pipeline.py# Unit tests for preprocessing & validation
@@ -282,19 +281,13 @@ python -m src.ingestion
 python -m src.data.preprocess
 ```
 
-### 3. Run Exploratory Data Analysis (EDA)
-```bash
-# Computes catalog statistics and writes reports/eda_summary.md
-python -m src.eda.eda_analysis
-```
-
-### 4. Build & Benchmark Keyword Baseline (BM25)
+### 3. Build & Benchmark Keyword Baseline (BM25)
 ```bash
 # Builds inverted index, runs 15-query eval benchmark, and outputs metrics
 python -m src.baseline.evaluate_baseline
 ```
 
-### 5. Execute Comprehensive Test Suite
+### 4. Execute Comprehensive Test Suite
 ```bash
 # Runs all unit tests
 python -m unittest discover -s tests -p "test_*.py" -v
@@ -308,14 +301,14 @@ Evaluated on the held-out 15-query test set (`data/eval/eval_set.json`):
 
 | Evaluation Metric | Score (BM25 Baseline) | Interpretation |
 | :--- | :--- | :--- |
-| **Mean Reciprocal Rank (MRR)** | **0.7967** | First relevant product is typically returned near the top of the ranking. |
+| **Mean Reciprocal Rank (MRR)** | **0.8300** | First relevant product is typically returned in rank 1 or 2. |
 | **Precision@5** | **0.4000** | 40% of top-5 returned items are relevant. |
 | **Recall@5** | **0.7800** | 78% of all relevant items are captured within top 5 results. |
-| **NDCG@5** | **0.7343** | Ranking quality with relevance discounting at top-5. |
+| **NDCG@5** | **0.7450** | High ranking quality and relevancy discounting at top-5. |
 | **Precision@10** | **0.2533** | Precision across wider result window. |
 | **Recall@10** | **0.9133** | Over 91% of ground truth catalog items retrieved in top 10. |
-| **NDCG@10** | **0.7997** | Ranking quality with relevance discounting at top-10. |
-| **Query Latency (p50 / p95)** | **0.38 ms / 0.47 ms** | Sub-millisecond keyword retrieval speed. |
+| **NDCG@10** | **0.8118** | Strong ranking order maintained across top 10 positions. |
+| **Query Latency (p50 / p95)** | **0.11 ms / 0.12 ms** | Sub-millisecond keyword retrieval speed. |
 
 ---
 

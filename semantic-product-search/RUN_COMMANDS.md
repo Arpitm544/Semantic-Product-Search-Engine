@@ -22,7 +22,26 @@ python -m pip install -r requirements.txt
 
 On later visits, activate the environment with `source .venv/bin/activate` before running the modules. On Windows, the activation command is `.venv\Scripts\activate`.
 
-The embedding library may download the MiniLM model the first time you use dense search. An internet connection is needed for API ingestion and for an uncached model download.
+The embedding library may download the MiniLM model the first time you use semantic search. An internet connection is needed for API ingestion and for an uncached model download.
+
+## Start the backend API
+
+From the `semantic-product-search/frontend` folder, install and start both the API and website:
+
+```bash
+npm install
+npm run dev
+```
+
+The website is at `http://localhost:3001`; the API listens on `http://127.0.0.1:8000` and provides `/api/health`, `/api/dashboard`, and `/api/search?q=...`. Both stop with `Ctrl+C`.
+
+To run them separately, start the API from `semantic-product-search/`:
+
+```bash
+python3 backend/main.py
+```
+
+Then start the frontend with `npm run dev:frontend` from `frontend/`. To use another backend URL, set `NEXT_PUBLIC_API_URL` before starting Next.js. The backend accepts local frontend origins on port 3001; `FRONTEND_ORIGINS` can override that allowlist.
 
 ## Commands for each executable module
 
@@ -71,15 +90,7 @@ PY
 
 This version explicitly stops on failed validation and writes `data/processed/products_cleaned.json`. It is a shell example for macOS/Linux.
 
-### 4. Explore the catalog — `src/eda/eda_analysis.py`
-
-```bash
-python -m src.eda.eda_analysis
-```
-
-Loads processed products and summarizes categories, prices, ratings, vocabulary, and text lengths. Writes `reports/eda_summary.md`.
-
-### 5. Build keyword search — `src/baseline/bm25.py`
+### 4. Build keyword search — `src/baseline/bm25.py`
 
 ```bash
 python -m src.baseline.bm25
@@ -87,7 +98,7 @@ python -m src.baseline.bm25
 
 Builds a BM25 index from processed products, writes `indexes/bm25_index.pkl`, then searches the example query `warm winter jacket` and prints up to three results. Running it again rebuilds the saved index.
 
-### 6. Evaluate keyword search — `src/baseline/evaluate_baseline.py`
+### 5. Evaluate keyword search — `src/baseline/evaluate_baseline.py`
 
 ```bash
 python -m src.baseline.evaluate_baseline
@@ -95,43 +106,33 @@ python -m src.baseline.evaluate_baseline
 
 Loads the saved BM25 index, or builds one if absent, and searches the queries in `data/eval/eval_set.json`. Prints retrieval metrics and query timing, then writes `reports/baseline_metrics.json`.
 
-### 7. Build semantic search — `src/dense/vector_search.py`
+### 6. Build semantic search — `src/semantic/vector_search.py`
 
 ```bash
-python -m src.dense.vector_search
+python -m src.semantic.vector_search
 ```
 
 Loads processed products, generates MiniLM embeddings, normalizes them, and builds a FAISS `IndexFlatIP` index. Writes both `indexes/faiss_index.bin` and `indexes/faiss_id_map.pkl`.
 
 It then searches the example query `wireless Bluetooth headphones` and prints up to three results. Running it again rebuilds both index artifacts.
 
-### 8. Evaluate semantic search — `src/dense/evaluate_dense.py`
+### 7. Evaluate semantic search — `src/semantic/evaluate_semantic.py`
 
 ```bash
-python -m src.dense.evaluate_dense
+python -m src.semantic.evaluate_semantic
 ```
 
-Loads the saved FAISS index and metadata, or builds them if either is missing, and evaluates the same labeled queries. Prints metrics and timing, then writes `reports/dense_metrics.json`.
+Loads the saved FAISS index and metadata, or builds them if either is missing, and evaluates the same labeled queries. Prints metrics and timing, then writes `reports/semantic_metrics.json`.
 
-### 9. Compare both methods — `src/compare_models.py`
-
-```bash
-python -m src.compare_models
-```
-
-Runs both evaluators and prints a comparison. Refreshes the two metrics JSON files and writes `reports/comparison_report.md`.
-
-Evaluation reuses existing indexes. After changing searchable product text or the embedding model, run the two index-building commands before comparing the methods.
+Evaluation reuses existing indexes. After changing searchable product text or the embedding model, rebuild the corresponding index before evaluating that search method.
 
 ## A simple learning sequence
 
 With dependencies installed and the saved raw catalog available, you can use the local JSON preprocessing example above, then run:
 
 ```bash
-python -m src.eda.eda_analysis
 python -m src.baseline.bm25
-python -m src.dense.vector_search
-python -m src.compare_models
+python -m src.semantic.vector_search
 ```
 
 Loaders normally prefer nonempty MongoDB collections when available. For an explicitly local-only experiment in Python, call `load_raw_products(prefer_mongo=False)` or `load_cleaned_products(prefer_mongo=False)`. The existing module commands do not expose a local-only command-line flag.
@@ -143,12 +144,12 @@ After building the indexes, this example loads both and prints their results wit
 ```bash
 python - <<'PY'
 from src.baseline.bm25 import BM25Okapi
-from src.dense.vector_search import DenseVectorSearch
+from src.semantic.vector_search import SemanticVectorSearch
 
 query = "eyewear for sunny days"
 engines = [
     ("Keyword", BM25Okapi.load()),
-    ("Semantic", DenseVectorSearch.load()),
+    ("Semantic", SemanticVectorSearch.load()),
 ]
 for name, engine in engines:
     print(f"\n{name}: {query}")
@@ -174,9 +175,9 @@ Or select one file:
 | `tests/test_data_pipeline.py` | `python -m pytest tests/test_data_pipeline.py` |
 | `tests/test_db.py` | `python -m pytest tests/test_db.py` |
 | `tests/test_baseline.py` | `python -m pytest tests/test_baseline.py` |
-| `tests/test_dense_search.py` | `python -m pytest tests/test_dense_search.py` |
+| `tests/test_semantic_search.py` | `python -m pytest tests/test_semantic_search.py` |
 
-Dense search tests use a real encoder and may need the model download. `tests/conftest.py` supplies fixtures to pytest; it is not a standalone test command.
+Semantic search tests use a real encoder and may need the model download. `tests/conftest.py` supplies fixtures to pytest; it is not a standalone test command.
 
 ## Open the notebook
 
