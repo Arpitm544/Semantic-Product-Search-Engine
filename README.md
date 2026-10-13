@@ -317,7 +317,7 @@ Evaluated on the held-out 15-query test set (`data/eval/eval_set.json`):
 | **Precision@10** | **0.2533** | Precision across wider result window. |
 | **Recall@10** | **0.9133** | Over 91% of ground truth catalog items retrieved in top 10. |
 | **NDCG@10** | **0.7997** | Ranking quality with relevance discounting at top-10. |
-| **Query Latency (p50 / p95)** | **0.38 ms / 0.47 ms** | Sub-millisecond keyword retrieval speed. |
+| **Query Latency (p50 / p95)** | **0.127 ms / 0.172 ms** | Sub-millisecond keyword retrieval speed. |
 
 ---
 

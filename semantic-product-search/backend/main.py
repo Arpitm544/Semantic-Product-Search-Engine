@@ -59,7 +59,7 @@ def get_catalog_index():
         if _catalog_index is not None and file_mtime == _catalog_file_mtime:
             return _catalog_index
         try:
-            products = load_cleaned_products(prefer_mongo=not PRODUCTS_PATH.exists())
+            products = load_cleaned_products()
         except (OSError, json.JSONDecodeError) as error:
             raise FileNotFoundError(
                 f"Processed catalog is missing or unreadable. Expected it at {PRODUCTS_PATH}."
