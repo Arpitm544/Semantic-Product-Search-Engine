@@ -52,6 +52,7 @@ export default function LandingPage({ catalog }) {
   const [authOpen, setAuthOpen] = useState(false);
   const authTriggerRef = useRef(null);
   const menuButtonRef = useRef(null);
+  const mobileNavRef = useRef(null);
   const openAuthMessage = (event) => {
     authTriggerRef.current = event.currentTarget;
     setMobileMenu(false);
@@ -79,6 +80,29 @@ export default function LandingPage({ catalog }) {
   }, []);
 
   useEffect(() => {
+    const desktopBreakpoint = window.matchMedia('(min-width: 781px)');
+    const closeMobileMenu = (event) => {
+      if (event.matches) setMobileMenu(false);
+    };
+    desktopBreakpoint.addEventListener('change', closeMobileMenu);
+    return () => desktopBreakpoint.removeEventListener('change', closeMobileMenu);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileMenu) return;
+
+    mobileNavRef.current?.querySelector('a, button')?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setMobileMenu(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [mobileMenu]);
+
+  useEffect(() => {
     document.documentElement.dataset.motion = 'ready';
     const observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
       if (entry.isIntersecting) { entry.target.classList.add('is-visible'); observer.unobserve(entry.target); }
@@ -101,22 +125,21 @@ export default function LandingPage({ catalog }) {
           <header className="site-header">
             <Brand light />
             <nav className="desktop-nav" aria-label="Main navigation">
-              <a href="#discover" onClick={() => chooseCollection()}>The collection</a>
-              <a href="/search">Product search</a>
               <a href="#how-it-works">The experience</a>
+              <a href="#discover" onClick={() => chooseCollection()}>The collection</a>
               <a href="#comparison">Compare approaches</a>
             </nav>
             <div className="header-actions">
               <div className="header-auth"><button className="auth-login" aria-haspopup="dialog" onClick={openAuthMessage}>Log in</button><button className="auth-signup" aria-haspopup="dialog" onClick={openAuthMessage}>Sign up <Icon name="diagonal" size={14} /></button></div>
               <button ref={menuButtonRef} className="menu-button icon-button" aria-label={mobileMenu ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileMenu} onClick={() => setMobileMenu(!mobileMenu)}><Icon name={mobileMenu ? 'close' : 'menu'} /></button>
             </div>
-            {mobileMenu && <nav className="mobile-nav" aria-label="Mobile navigation"><a href="#discover" onClick={() => chooseCollection()}>The collection</a><a href="/search" onClick={() => setMobileMenu(false)}>Product search</a><a href="#how-it-works" onClick={() => setMobileMenu(false)}>The experience</a><a href="#comparison" onClick={() => setMobileMenu(false)}>Compare approaches</a><div className="mobile-auth-actions"><button className="auth-login" aria-haspopup="dialog" onClick={openAuthMessage}>Log in</button><button className="auth-signup" aria-haspopup="dialog" onClick={openAuthMessage}>Sign up <Icon name="diagonal" size={14} /></button></div></nav>}
+            {mobileMenu && <nav ref={mobileNavRef} className="mobile-nav" aria-label="Mobile navigation"><a href="#how-it-works" onClick={() => setMobileMenu(false)}>The experience</a><a href="#discover" onClick={() => chooseCollection()}>The collection</a><a href="#comparison" onClick={() => setMobileMenu(false)}>Compare approaches</a><div className="mobile-auth-actions"><button className="auth-login" aria-haspopup="dialog" onClick={openAuthMessage}>Log in</button><button className="auth-signup" aria-haspopup="dialog" onClick={openAuthMessage}>Sign up <Icon name="diagonal" size={14} /></button></div></nav>}
           </header>
           <div className="hero-content">
             <span className="hero-eyebrow"><span className="tiny-star">✳</span> PRODUCT DISCOVERY, WITH A LITTLE MORE MEANING</span>
             <h1 id="hero-title">A little <em>meaning.</em><br />A better find.</h1>
             <p>You know what you’re looking for.<br className="mobile-break" /> You just don’t always know its name.</p>
-            <div className="hero-landing-actions"><a className="hero-primary-cta" href="/search">Search the catalog <Icon name="arrow" size={20} /></a><a className="hero-secondary-cta" href="#how-it-works">Follow the story <Icon name="diagonal" size={16} /></a></div>
+            <div className="hero-landing-actions"><a className="hero-primary-cta" href="#how-it-works">Follow the story <Icon name="arrow" size={20} /></a><a className="hero-secondary-cta" href="#the-idea">Meet the idea <Icon name="diagonal" size={16} /></a></div>
             <div className="query-presets"><span>A little inspiration:</span>{inspirations.map((item) => <a key={item.label} href="#discover" onClick={() => chooseCollection(item.collection)}>{item.label}<Icon name="diagonal" size={12} /></a>)}</div>
           </div>
           <div className="hero-bottom"><div><span className="hero-bottom-label">LESS SCROLLING. MORE FINDING.</span><p>Made for the way you think.</p></div><a href="#discover" className="hero-scroll" aria-label="Explore product inspiration"><span>EXPLORE A LITTLE</span><span className="scroll-circle"><Icon name="down" size={20} /></span></a></div>
@@ -129,7 +152,7 @@ export default function LandingPage({ catalog }) {
 
         <section className="collection-section section-shell" id="discover" aria-labelledby="collection-title">
           <div className="collection-heading"><div><span className="eyebrow">THINGS FOR YOUR KIND OF EVERYDAY</span><h2 id="collection-title">A few good finds.</h2></div><p>For the small rituals, the big adventures, and everything in between.</p></div>
-          <div className="collection-toolbar"><div className="collection-tabs" aria-label="Product inspiration collections">{collections.map((item) => <button key={item.id} className={collectionId === item.id ? 'active' : ''} aria-pressed={collectionId === item.id} onClick={() => chooseCollection(item.id)}>{item.label}</button>)}</div><a className="outline-button collection-search-link" href="/search">Search all products <Icon name="arrow" size={16} /></a></div>
+          <div className="collection-toolbar"><div className="collection-tabs" aria-label="Product inspiration collections">{collections.map((item) => <button key={item.id} className={collectionId === item.id ? 'active' : ''} aria-pressed={collectionId === item.id} onClick={() => chooseCollection(item.id)}>{item.label}</button>)}</div></div>
           <div className="results-meta"><span>A glimpse of the possibilities</span><span className="artwork-caption">Original illustrative product artwork</span></div>
           <div className="product-grid">{products.map((product, index) => <ProductPreview key={product.id} product={product} index={index} />)}</div>
           <div className="collection-more"><a className="outline-button" href="#how-it-works">Discover the idea behind it <Icon name="arrow" size={17} /></a></div>
