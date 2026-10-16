@@ -46,7 +46,7 @@ export default function SearchPage() {
 
   return (
     <main className="product-search-page">
-      <header className="search-page-header"><a className="search-page-brand" href="/dashboard"><span>✳</span> semantic<span>.</span></a><a className="back-dashboard" href="/dashboard">Back to dashboard <span>↗</span></a></header>
+      <header className="search-page-header"><a className="search-page-brand" href="/"><span>✳</span> semantic<span>.</span></a><a className="back-dashboard" href="/dashboard">Back to dashboard <span>↗</span></a></header>
       <section className="search-hero">
         <span className="search-page-eyebrow">PRODUCT DISCOVERY</span>
         <h1>Find what you’re<br/><em>looking for.</em></h1>

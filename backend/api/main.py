@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
+import re
 import sys
 from threading import Lock, Event, Thread
 from urllib.parse import parse_qs, urlparse
@@ -26,10 +27,14 @@ REPORTS_DIR = PROJECT_ROOT / "reports"
 EVAL_PATH = DATA_DIR / "eval" / "eval_set.json"
 BM25_REPORT_PATH = REPORTS_DIR / "baseline_metrics.json"
 SEMANTIC_REPORT_PATH = REPORTS_DIR / "dense_metrics.json"
-FRONTEND_ORIGINS = set(os.environ.get(
-    "FRONTEND_ORIGINS",
-    "http://localhost:3001,http://127.0.0.1:3001",
-).split(","))
+FRONTEND_ORIGINS = {
+    origin.strip()
+    for origin in os.environ.get(
+        "FRONTEND_ORIGINS",
+        "http://localhost:3001,http://127.0.0.1:3001",
+    ).split(",")
+    if origin.strip()
+}
 PORT = int(os.environ.get("PORT", "8000"))
 _search_engine = None
 _search_signature = None
@@ -140,7 +145,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     server_version = "SemanticSearchAPI/1.0"
 
     def end_headers(self):
-        origin = self.headers.get("Origin")
+        origin = getattr(self, "headers", {}).get("Origin")
         if origin in FRONTEND_ORIGINS:
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
@@ -201,7 +206,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.write_json(404, {"error": "Route not found."})
 
     def log_message(self, format_string, *args):
-        print(f"[{self.log_date_time_string()}] {format_string % args}")
+        message = format_string % args
+        message = re.sub(r"(/api/search)\?[^\s\"]+", r"\1", message)
+        print(f"[{self.log_date_time_string()}] {message}")
 
 
 def initialize_search():

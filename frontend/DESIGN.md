@@ -2,19 +2,19 @@
 
 Velorah was an atmosphere reference: generous photographic space, calm pastel light, and editorial serif typography. No template code, layout assets, or source files were downloaded or copied. The new design uses the project name `semantic.`, actual sample product names, INR prices, everyday needs, and the project’s focus on meaningful product discovery.
 
-The standalone landing page moves from an atmospheric hero and editorial collection into a concept illustration, an outdoor discovery composition, the project idea, and a final invitation to explore. Calls to action navigate between page sections; there are no API calls or ML integration. Custom artwork is clearly described as illustrative because the source catalog does not contain images.
+The landing page moves from an atmospheric hero into the headphone story, editorial collection, outdoor discovery composition, project idea, search comparison, and final invitation to explore. In-page links navigate between sections; the catalog search call to action opens `/search`, where submitted queries call `/api/search`. Log in and Sign up open a local coming-soon dialog. Custom artwork is clearly described as illustrative because the source catalog does not contain images.
 
 CSS uses Georgia for display type and Arial/Helvetica for interface text, avoiding a remote font dependency. The page uses React, Next.js App Router, Three.js, plain CSS, and small original SVG icons. Motion respects reduced-motion preferences.
 
 ## Headphone scroll story
 
-The original photographic hero remains at the top. Below it, the visitor first sees a scripted search bar type “Apple headphones for a quieter commute” as they scroll. A local button advances to the 3D AirPods Max reveal and details, followed by the schematic vector space and possible match. The same query appears in the final keyword / semantic / hybrid comparison, where exact brand/product terms and the quieter-commute meaning are explained separately. Mobile and reduced motion show the full query before the product image. This sequence makes no live search request.
+The original photographic hero remains at the top. Below it, a sticky scene follows one illustrative headphone from product details to an everyday query, a schematic vector space, and a possible match. The same example query appears in the final keyword / semantic / hybrid comparison.
 
 The headphone uses a locally hosted AirPods Max GLB by Mr.Philin under CC BY 4.0, verified on the creator page and in embedded GLB metadata. Geometry is preserved; embedded textures are reduced to at most 1024px and encoded as WebP, reducing the download from 18.03 MB to 3.26 MB. Full source and license are in public/models/ATTRIBUTION.md, with visible credit below the story. The environment is procedural. The green finish uses the artist’s original textures; silver is a desaturated color study. The story uses original-generation AirPods Max details rather than the fictional catalog product, without claiming an Apple partnership or live catalog result.
 
 The point cloud is deterministic illustrative geometry, not exported embeddings. Its distances and connections explain the concept without presenting measured similarity. Comparison cards have no synthetic scores or speed claims. There are no backend or ML calls.
 
-Three.js is loaded near the story; rendering pauses when the canvas is off screen or the tab is hidden. Canvas resources are disposed when the scene unmounts. Mobile, reduced-motion, and WebGL-unavailable visitors see readable illustrated chapters instead of the long sticky sequence. AirPodsArtwork.jsx supplies an original lightweight SVG for these views and loading states.
+Three.js is loaded near the story; rendering pauses when the canvas is more than 100px outside the viewport or the tab is hidden. Canvas resources are disposed when the scene unmounts. Mobile, reduced-motion, and WebGL-unavailable visitors see readable illustrated chapters instead of the long sticky sequence. AirPodsArtwork.jsx supplies an original lightweight SVG for these views and loading states.
 
 ## Product render
 

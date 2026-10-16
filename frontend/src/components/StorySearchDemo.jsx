@@ -7,7 +7,7 @@ export default function StorySearchDemo({ typedCount = STORY_QUERY.length, onRev
     <div className="demo-search-brand"><span aria-hidden="true">✳</span> semantic.</div>
     <span className="demo-search-eyebrow">A GOOD FIND STARTS WITH YOUR WORDS</span>
     <h4>A little search.<br /><em>A world of possibility.</em></h4>
-    <div className="demo-search-bar" aria-label="Scripted example search">
+    <div className="demo-search-bar" role="group" aria-label="Scripted example search">
       <Icon name="search" size={19} />
       <span className="demo-search-text" aria-hidden="true">{typedCount ? STORY_QUERY.slice(0, typedCount) : <span className="demo-search-placeholder">What are you looking for?</span>}<i className="demo-search-cursor" /></span>
       <span className="sr-only">{STORY_QUERY}</span>

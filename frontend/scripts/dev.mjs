@@ -20,23 +20,32 @@ const frontend = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'de
 });
 
 let stopping = false;
-function stop() {
+function stop(exitCode) {
   if (stopping) return;
   stopping = true;
+  if (exitCode != null) process.exitCode = exitCode;
   backend.kill('SIGTERM');
   frontend.kill('SIGTERM');
 }
 
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
-backend.on('error', (error) => console.error(`Could not start backend (${python}): ${error.message}`));
+backend.on('error', (error) => {
+  console.error(`Could not start backend (${python}): ${error.message}`);
+  stop(1);
+});
 backend.on('exit', (code) => {
-  if (!stopping && code !== 0) {
-    console.error(`Backend exited (${code ?? 'unknown status'}). Product search needs the API on port 8000.`);
-  }
+  if (stopping) return;
+  if (code !== 0) console.error(`Backend exited (${code ?? 'unknown status'}). Product search needs the API on port 8000.`);
+  else console.error('Backend exited unexpectedly. Product search needs the API on port 8000.');
+  stop(1);
 });
 frontend.on('error', (error) => {
   console.error(`Could not start the frontend: ${error.message}`);
+  stop(1);
+});
+frontend.on('exit', (code, signal) => {
+  if (stopping) return;
+  if (code !== 0) process.exitCode = code ?? 1;
   stop();
 });
-frontend.on('exit', stop);
