@@ -1,21 +1,20 @@
-# Amazon search backend
+# Product search backend
 
 > Commands and artifact paths in this guide are relative to `backend/`, unless stated otherwise.
 
 The serving catalog is MongoDB `semantic_product_search.amazon_products`.
 There is no JSON fallback in the API. The prepared JSON is only an import artifact.
-The existing raw and processed collections are preserved.
 
 ## Start
 
 Ensure MongoDB is running, then from the Python project directory:
 
 ```sh
-sh scripts/start_amazon_backend.sh
+sh scripts/start_backend.sh
 ```
 
 The first startup embeds 42,617 products using the fine-tuned MiniLM on CPU.
-It can take several minutes. Later startups reuse vectors under `indexes/amazon`.
+It can take several minutes. Later startups reuse vectors under `indexes/catalog`.
 These caches contain only vectors and product IDs; product documents come from MongoDB.
 The API remains at `http://127.0.0.1:8000`. Start the existing frontend separately.
 The dashboard displays the first 100 records and the full product count.
@@ -39,12 +38,12 @@ this backend has not been benchmarked for accuracy or latency yet.
 
 ## Database settings and import
 
-Set `MONGO_URI`, `MONGO_DB_NAME`, and `MONGO_AMAZON_COLLECTION` before starting
+Set `MONGO_URI`, `MONGO_DB_NAME`, and `MONGO_COLLECTION` before starting
 or importing when using a different database. Defaults are localhost port 27017,
 `semantic_product_search`, and `amazon_products`.
 
 ```sh
-.venv/bin/python scripts/import_amazon_mongo.py
+.venv/bin/python scripts/import_catalog.py
 ```
 
 The importer upserts by product ID, records a catalog version, and does not delete
@@ -57,3 +56,7 @@ An external application should use the same version-manifest protocol.
 Optional model overrides: `SEMANTIC_MODEL_PATH` and `RERANKER_MODEL_PATH`.
 Training checkpoints and original models can remain as backups. No retraining
 is performed by the backend.
+
+The backend uses FastAPI with function-based routes. Uvicorn starts when you run
+`api/main.py`; the startup script sets the local CPU thread limits.
+Interactive API documentation is available at http://127.0.0.1:8000/docs.

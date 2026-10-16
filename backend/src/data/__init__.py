@@ -1,3 +1,3 @@
 """
-Data loading, preprocessing, validation, and MongoDB helpers.
+MongoDB access for the prepared product catalog.
 """

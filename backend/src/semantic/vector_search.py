@@ -16,7 +16,7 @@ from src.config import (
     FAISS_ID_MAP_PATH,
     EMBEDDING_MODEL_NAME,
 )
-from src.data.load_data import load_cleaned_products
+from src.data.catalog import load_products
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class SemanticVectorSearch:
 
     @property
     def model(self) -> SentenceTransformer:
-        """Lazy load SentenceTransformer model."""
+        """Load the embedding model only when it is first needed."""
         if self._model is None:
             logger.info(f"Loading SentenceTransformer model: {self.model_name}")
             self._model = SentenceTransformer(
@@ -50,7 +50,7 @@ class SemanticVectorSearch:
         return self._model
 
     def _normalize_embeddings(self, embeddings: np.ndarray) -> np.ndarray:
-        """Normalizes vector embeddings to unit length for Cosine Similarity via Inner Product."""
+        """Scale vectors to length one so their dot product measures similarity."""
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
         norms[norms == 0] = 1e-10
         return (embeddings / norms).astype(np.float32)
@@ -143,8 +143,8 @@ class SemanticVectorSearch:
 
 
 def main():
-    print("Loading cleaned products from MongoDB...")
-    products = load_cleaned_products()
+    print("Loading products from MongoDB...")
+    products = load_products()
     
     semantic_engine = SemanticVectorSearch()
     semantic_engine.fit(products)

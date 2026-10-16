@@ -67,16 +67,10 @@ def save_bm25(index: Dict[str, Any], path: Optional[Path] = None) -> Path:
     return path
 
 
-def load_bm25(path: Optional[Path] = None) -> Dict[str, Any]:
-    """Load an index from a file."""
-    with open(path or BM25_INDEX_PATH, "rb") as file:
-        return pickle.load(file)
-
-
 def main() -> None:
-    from src.data.load_data import load_cleaned_products
+    from src.data.catalog import load_products
 
-    index = fit_bm25(load_cleaned_products())
+    index = fit_bm25(load_products())
     save_bm25(index)
 
     query = "warm winter jacket"

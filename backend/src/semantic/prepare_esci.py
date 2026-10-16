@@ -10,18 +10,20 @@ import random
 import re
 import unicodedata
 
-from src.semantic.download_esci import ESCI_DIR
-from src.semantic.prepare_training import (
+from src.config import DATASET_DIR
+from src.semantic.dataset import (
     TYPO_KINDS, catalog_fingerprint, query_records, typo_query,
 )
 from src.search.typos import STOP_WORDS
 
 
 def normalize_query(query):
+    """Make case, spacing, and punctuation consistent when comparing queries."""
     return " ".join(re.findall(r"\w+", unicodedata.normalize("NFKC", query).casefold()))
 
 
 def clean_field(value, max_chars):
+    """Remove HTML and extra spaces, then limit the text length."""
     if value is None:
         return ""
     value = html.unescape(str(value))
@@ -29,11 +31,13 @@ def clean_field(value, max_chars):
 
 
 def has_typo_word(query):
+    """Check whether the query has an English word suitable for a generated typo."""
     return any(match.group().lower() not in STOP_WORDS
                for match in re.finditer(r"\b[a-zA-Z]{4,}\b", query))
 
 
 def group_judgments(examples):
+    """Collect relevance labels for queries with the same normalized text."""
     groups = {}
     for query, product_id, label, query_id in examples[
             ["query", "product_id", "esci_label", "query_id"]].itertuples(index=False, name=None):
@@ -54,6 +58,7 @@ def group_judgments(examples):
 
 
 def choose_training_pairs(groups, families, count, held_queries, seed):
+    """Select exact matches and irrelevant negatives without using held-out queries."""
     rng = random.Random(seed)
     queues = {}
     for family in sorted(families):
@@ -99,6 +104,7 @@ def choose_training_pairs(groups, families, count, held_queries, seed):
 
 
 def evaluation_records(groups, families, seed):
+    """Create clean and typo queries for measuring search quality."""
     rng = random.Random(seed)
     records = []
     for family in sorted(families):
@@ -115,6 +121,7 @@ def evaluation_records(groups, families, seed):
 
 def select_splits(train_groups, test_groups, validation_count, test_count, seed):
     # Even duplicate normalized query strings with different IDs stay together.
+    """Keep related queries together and separate training from evaluation."""
     test_families = set(test_groups)
     eligible = sorted(
         family for family, group in train_groups.items()
@@ -136,6 +143,7 @@ def select_splits(train_groups, test_groups, validation_count, test_count, seed)
 
 
 def read_needed_products(parquet_path, needed_ids):
+    """Read only the selected US products from the large source file."""
     import pyarrow as pa
     import pyarrow.compute as pc
     import pyarrow.parquet as pq
@@ -182,20 +190,43 @@ def read_needed_products(parquet_path, needed_ids):
 
 
 def write_jsonl(path, rows):
+    """Write one JSON object per line."""
     with path.open("w", encoding="utf-8") as output:
         for row in rows:
             output.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def main():
+def parse_arguments():
+    """Read options supplied after the command name."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--raw-dir", type=Path, default=ESCI_DIR / "raw")
-    parser.add_argument("--output-dir", type=Path, default=ESCI_DIR / "prepared")
+    parser.add_argument("--raw-dir", type=Path, default=DATASET_DIR / "raw")
+    parser.add_argument("--output-dir", type=Path, default=DATASET_DIR / "prepared")
     parser.add_argument("--pairs", type=int, default=20000)
     parser.add_argument("--validation-queries", type=int, default=200)
     parser.add_argument("--test-queries", type=int, default=200)
     parser.add_argument("--seed", type=int, default=42)
-    args = parser.parse_args()
+    return parser, parser.parse_args()
+
+
+def build_training_rows(selected, products):
+    """Create one clean row and one typo row for each selected product pair."""
+    by_id = {product["id"]: product for product in products}
+    rows = []
+    for pair in selected:
+        common = {
+            "query_family": pair["family"], "product_id": pair["product_id"],
+            "negative_id": pair["negative_id"], "negative_group": pair["family"],
+            "positive": by_id[pair["product_id"]]["representation_text"],
+            "negative": by_id[pair["negative_id"]]["representation_text"],
+            "relevant_product_ids": pair["relevant_product_ids"],
+        }
+        rows.append({**common, "query": pair["query"], "kind": "clean"})
+        rows.append({**common, "query": pair["typo"], "kind": pair["typo_kind"]})
+    return rows
+
+
+def prepare_dataset(args, parser):
+    """Build separate training, validation, and test data from source labels."""
     if min(args.pairs, args.validation_queries, args.test_queries) < 1:
         parser.error("Pair and query counts must be positive.")
     if (args.output_dir / "manifest.json").exists():
@@ -227,18 +258,7 @@ def main():
     products = read_needed_products(
         args.raw_dir / "shopping_queries_dataset_products.parquet", needed,
     )
-    by_id = {product["id"]: product for product in products}
-    rows = []
-    for pair in selected:
-        common = {
-            "query_family": pair["family"], "product_id": pair["product_id"],
-            "negative_id": pair["negative_id"], "negative_group": pair["family"],
-            "positive": by_id[pair["product_id"]]["representation_text"],
-            "negative": by_id[pair["negative_id"]]["representation_text"],
-            "relevant_product_ids": pair["relevant_product_ids"],
-        }
-        rows.append({**common, "query": pair["query"], "kind": "clean"})
-        rows.append({**common, "query": pair["typo"], "kind": pair["typo_kind"]})
+    rows = build_training_rows(selected, products)
     rng = random.Random(args.seed)
     rng.shuffle(rows)
     source = json.loads((args.raw_dir / "source.json").read_text())
@@ -268,6 +288,11 @@ def main():
         "training_query_families", "counts",
     )}, indent=2), flush=True)
     print(f"Prepared data: {args.output_dir}", flush=True)
+
+
+def main():
+    parser, args = parse_arguments()
+    prepare_dataset(args, parser)
 
 
 if __name__ == "__main__":

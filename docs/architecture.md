@@ -2,7 +2,7 @@
 
 ```mermaid
 flowchart LR
-    U[Next.js website] --> A[Python HTTP API]
+    U[Next.js website] --> A[FastAPI HTTP API]
     M[(MongoDB Amazon catalog)] --> A
     A --> S[Spelling and query expansion]
     S --> R[Keyword and semantic retrieval]
@@ -13,9 +13,11 @@ flowchart LR
 
 ## Ownership
 
-- `backend/api/` handles HTTP requests and engine initialization.
-- `src/data/amazon_mongo.py` loads catalog records and their import version.
-- `src/search/amazon.py` implements the serving search pipeline.
+- `backend/api/main.py` defines function-based health, search, and dashboard routes and starts Uvicorn.
+- `backend/api/search_service.py` loads models and reuses the search index.
+- `backend/api/dashboard.py` builds catalog summaries for the dashboard.
+- `src/data/catalog.py` loads catalog records and their import version.
+- `src/search/product_search.py` implements the serving search pipeline.
 - `src/semantic/` owns model training, embedding generation, and evaluation tools.
 - `scripts/` provides operator commands; `notebooks/` contains cloud experiments.
 - Root `frontend/` owns the user interface. Its illustrative landing-page fixtures are
@@ -23,6 +25,9 @@ flowchart LR
 - `models/`, `indexes/`, `reports/`, and `colab/` contain generated local artifacts.
 
 ## Storage
+
+`backend/data/dataset/raw/` holds the original search dataset. Its `prepared/`
+sibling holds the processed product catalog and training, validation, and test files.
 
 The MongoDB collection `amazon_products` stores the prepared Amazon products.
 `catalog_manifests` records the successful import version. The importer upserts

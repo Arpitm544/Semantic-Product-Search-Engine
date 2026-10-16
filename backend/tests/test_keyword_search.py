@@ -1,10 +1,10 @@
 """
-Unit tests for BM25 baseline retrieval and IR metric calculations.
+Unit tests for BM25 keyword retrieval and IR metric calculations.
 Addresses TR-003, TEST-006, BR-004.
 """
 import unittest
-from src.baseline.bm25 import fit_bm25, search_bm25
-from src.baseline.evaluate_baseline import (
+from src.keyword_search.bm25 import fit_bm25, search_bm25
+from metrics_helpers import (
     precision_at_k,
     recall_at_k,
     reciprocal_rank,
@@ -12,7 +12,7 @@ from src.baseline.evaluate_baseline import (
 )
 
 
-class TestBaseline(unittest.TestCase):
+class TestKeywordSearch(unittest.TestCase):
 
     def test_bm25_search_determinism(self):
         docs = [

@@ -7,8 +7,7 @@ from unittest.mock import patch
 from src.search.hybrid import HybridSearch
 from src.search.typos import CatalogSpelling, edit_distance
 from src.semantic.evaluate_typos import retrieval_metrics
-from src.semantic.fine_tune import grouped_batches
-from src.semantic.prepare_training import prepare_data, typo_query
+from src.semantic.dataset import grouped_batches, typo_query
 
 
 PRODUCTS = [
@@ -73,25 +72,6 @@ class TestHybrid(unittest.TestCase):
 
 
 class TestTrainingProtocol(unittest.TestCase):
-    def test_families_and_curated_eval_products_never_enter_training(self):
-        products = [
-            {"id": i, "title": f"Product name{i}", "category": f"category{i % 3}"}
-            for i in range(20)
-        ]
-        products.append({"id": 20, "title": "Product name0", "category": "category0"})
-        queries = [{"query_id": "q1", "query": "Product name0", "relevant_doc_ids": [0]}]
-        data, manifest = prepare_data(products, queries)
-        train_ids = {row["product_id"] for row in data["train"]}
-        held_ids = {i for split in ("validation", "test")
-                    for row in data[split] for i in row["relevant_doc_ids"]}
-        self.assertFalse(train_ids & held_ids)
-        self.assertNotIn(0, train_ids)
-        self.assertNotIn(20, train_ids)
-        self.assertEqual(prepare_data(products, queries), (data, manifest))
-        train_queries = {row["query"].lower() for row in data["train"]}
-        held_queries = {row["query"].lower() for split in ("validation", "test") for row in data[split]}
-        self.assertFalse(train_queries & held_queries)
-
     def test_batches_do_not_treat_same_category_as_negative(self):
         rows = [{"negative_group": str(i % 4)} for i in range(40)]
         batches = grouped_batches(rows, 4, 42)

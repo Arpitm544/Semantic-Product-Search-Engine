@@ -2,17 +2,15 @@
 
 ## Running the application
 
-- [Amazon backend](amazon-backend.md): MongoDB import, startup, and local model files.
+- [Catalog backend](backend.md): MongoDB import, startup, and local model files.
 - [Architecture](architecture.md): responsibilities, storage, and configuration.
-- [Commands](commands.md): module commands and offline workflows.
-
+- [Commands](commands.md): startup, dataset import, training, and evaluation.
 
 ## Training and learning
 
 - [Colab training](colab-training.md): hosted GPU setup and checkpoints.
-- [Typo search](typo-search.md): original experiments and evaluation guidance.
+- [Search evaluation](typo-search.md): dataset splits, spelling, and retrieval metrics.
 - [Study notes](study-notes.md): introductory explanations.
 
-`archive/` preserves earlier project descriptions; it does not define the current
-serving configuration. Training guides may describe offline JSON workflows; the
-live Amazon backend always reads product records from MongoDB.
+Training guides may describe offline JSON workflows; the live Catalog backend
+always reads product records from MongoDB.
