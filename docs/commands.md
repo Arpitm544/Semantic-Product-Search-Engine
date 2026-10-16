@@ -9,7 +9,7 @@ Keep this guide beside the [Study Notes](study-notes.md). Each command below tel
 From the repository root, enter the Python project:
 
 ```bash
-cd semantic-product-search
+cd backend
 ```
 
 All module, notebook, and test commands below run from this folder. Use `python -m src...` so Python can find the project's imports.
@@ -28,7 +28,7 @@ The embedding library may download the MiniLM model the first time you use seman
 
 ## Start the backend API
 
-From the `backend/frontend` folder, install and start both the API and website:
+From the repository's `frontend/` folder, install and start both the API and website:
 
 ```bash
 npm install

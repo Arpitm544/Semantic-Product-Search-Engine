@@ -4,17 +4,17 @@ An original, standalone ecommerce-inspired landing page for the Semantic Product
 
 ## Run
 
-From `semantic-product-search/frontend/`, run:
+From the repository's `frontend/` folder, run:
 
     npm install
     npm run dev
 
-This starts both the API and website. Open http://localhost:3001. To run only the API, use `python3 backend/main.py` from `semantic-product-search/`; to run only the frontend, use `npm run dev:frontend`. The API listens at `http://127.0.0.1:8000`. Set `NEXT_PUBLIC_API_URL` before starting the frontend to use a different backend URL. For a production preview:
+This starts both the API and website. Open http://localhost:3001. To run only the API, use `python3 api/main.py` from `backend/`; to run only the frontend, use `npm run dev:frontend`. The API listens at `http://127.0.0.1:8000`. Set `NEXT_PUBLIC_API_URL` before starting the frontend to use a different backend URL. For a production preview:
 
     npm run build
     npm run start
 
-`npm run start` serves only the frontend. Start the API separately with `python3 backend/main.py` from `semantic-product-search/` so the product search page can reach it.
+`npm run start` serves only the frontend. Start the API separately with `python3 api/main.py` from `backend/` so the product search page can reach it.
 
 The frontend uses Next.js, React, and Three.js. The catalog search is a BM25 keyword search against the backend's processed product catalog. The scroll story and the approach comparison remain illustrative examples, not live search results.
 
