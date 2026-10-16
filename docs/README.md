@@ -6,7 +6,6 @@
 - [Architecture](architecture.md): responsibilities, storage, and configuration.
 - [Commands](commands.md): module commands and offline workflows.
 
-- [Live marketplaces](marketplaces.md): Amazon and Flipkart credentials and source selection.
 
 ## Training and learning
 

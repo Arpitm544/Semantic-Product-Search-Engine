@@ -55,7 +55,6 @@ First backend startup builds product vectors; later startups reuse the index.
 ## Documentation
 
 - [MongoDB backend and model setup](docs/amazon-backend.md)
-- [Live Amazon and Flipkart sources](docs/marketplaces.md)
 - [Architecture and configuration](docs/architecture.md)
 - [Google Colab training](docs/colab-training.md)
 - [Command reference](docs/commands.md)

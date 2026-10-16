@@ -20,7 +20,6 @@ from src.config import EMBEDDING_MODEL_NAME
 from src.search.amazon import AmazonSearch
 from src.data.amazon_mongo import load_products, version, COLLECTION
 from pymongo.errors import PyMongoError
-from src.providers.marketplaces import live_search
 
 DATA_DIR = PROJECT_ROOT / "data"
 REPORTS_DIR = PROJECT_ROOT / "reports"
@@ -189,40 +188,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             if len(query) > 512:
                 self.write_json(400, {"error": "Search queries must be 512 characters or fewer."})
                 return
-            source = params.get("source", ["mongo"])[0]
-            if source not in ("mongo", "amazon", "flipkart", "all"):
-                self.write_json(400, {"error": "Choose mongo, amazon, flipkart, or all."})
-                return
             try:
                 engine = get_search_engine()
                 fuzzy = params.get("fuzzy", ["1"])[0] != "0"
-                if source == "mongo":
-                    payload = engine.search(query, fuzzy=fuzzy)
-                    payload["sourceStatus"] = {"mongo": {"status": "ok"}}
-                else:
-                    corrected, corrections = engine.spelling.correct(query) if fuzzy else (query, [])
-                    sources = ["amazon", "flipkart"] if source == "all" else [source]
-                    external, statuses = live_search(corrected, sources)
-                    local = engine.search(query, limit=50, fuzzy=fuzzy) if source == "all" else None
-                    candidates = ([{**p, "marketplace": "mongo"} for p in local["results"]] if local else []) + external
-                    if local:
-                        statuses["mongo"] = {"status": "ok", "count": len(local["results"])}
-                    # Marketplace candidates are normalized, then scored by the existing reranker.
-                    if candidates:
-                        with engine.lock:
-                            scores = engine.reranker.predict(
-                                [(corrected, p.get("representation_text") or p["title"]) for p in candidates],
-                                batch_size=32, show_progress_bar=False)
-                        candidates = [candidates[i] for i in sorted(range(len(candidates)), key=lambda i: (-float(scores[i]), i))]
-                    payload = {"query": query, "correctedQuery": corrected if corrections else None,
-                               "corrections": corrections, "searchMode": "live-marketplace-reranked",
-                               "semanticModel": "fine-tuned", "total": len(candidates),
-                               "results": candidates[:20], "sourceStatus": statuses}
-                    if not candidates and all(v["status"] != "ok" for v in statuses.values()):
-                        payload["error"] = "Selected marketplace sources are unavailable. Check backend API settings."
-                        self.write_json(503, payload)
-                        return
-                payload["source"] = source
+                payload = engine.search(query, fuzzy=fuzzy)
             except (FileNotFoundError, ValueError, RuntimeError, OSError, PyMongoError) as error:
                 self.write_json(503, {"error": str(error)})
                 return
