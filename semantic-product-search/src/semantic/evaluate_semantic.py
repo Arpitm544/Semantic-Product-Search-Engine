@@ -8,27 +8,14 @@ from pathlib import Path
 from typing import Any, Dict, List
 import numpy as np
 
-from src.config import (
-    EVAL_SET_PATH,
-    SEMANTIC_METRICS_PATH,
-    FAISS_INDEX_PATH,
-    FAISS_ID_MAP_PATH,
-)
+from src.config import (EVAL_SET_PATH,SEMANTIC_METRICS_PATH,FAISS_INDEX_PATH,FAISS_ID_MAP_PATH,)
 from src.semantic.vector_search import SemanticVectorSearch
 from src.data.load_data import load_cleaned_products
-from src.baseline.evaluate_baseline import (
-    precision_at_k,
-    recall_at_k,
-    ndcg_at_k,
-    reciprocal_rank,
-    average_precision,
-)
+from src.baseline.evaluate_baseline import (precision_at_k,recall_at_k,ndcg_at_k,reciprocal_rank,average_precision,)
 
 
 def evaluate_semantic(
-    eval_set_path: Path = EVAL_SET_PATH,
-    output_path: Path = SEMANTIC_METRICS_PATH,
-    top_ks: List[int] = [5, 10],
+    eval_set_path: Path = EVAL_SET_PATH, output_path: Path = SEMANTIC_METRICS_PATH,top_ks: List[int] = [5, 10],
 ) -> Dict[str, Any]:
     """Runs evaluation benchmark for Semantic Vector Search."""
     if not eval_set_path.exists():
