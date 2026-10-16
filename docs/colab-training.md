@@ -1,21 +1,24 @@
 # Start the 40,000-example run in Google Colab
 
+
+The generated notebook has been removed for now. Recreate it only when requested;
+the instructions below apply after it is regenerated.
 > Commands and artifact paths in this guide are relative to `backend/`, unless stated otherwise.
 
 Use these two files from this project:
 
-* Notebook: `notebooks/02_colab_esci_fine_tuning.ipynb`
-* Prepared data and code: `colab/esci_colab_bundle.zip` (about 54 MiB)
+* Notebook: `notebooks/02_colab_data_training.ipynb`
+* Prepared data and code: `colab/data_colab_bundle.zip` (about 54 MiB)
 
 ## Open the notebook
 
 1. Go to [Google Colab](https://colab.research.google.com/).
 2. Choose **File → Upload notebook** and select
-   `02_colab_esci_fine_tuning.ipynb`.
+   `02_colab_data_training.ipynb`.
 3. Choose **Runtime → Change runtime type → GPU**. Select T4 if available,
    then save and connect. The first cell checks that CUDA is available.
 4. Run the cells from top to bottom. Colab will ask you to authorize mounting
-   your Google Drive and to upload `esci_colab_bundle.zip`.
+   your Google Drive and to upload `data_colab_bundle.zip`.
 5. Run the training cell. It processes all **40,000 examples** in one epoch:
    20,000 English Exact query–product pairs plus 20,000 generated typo variants.
 
@@ -31,20 +34,20 @@ checksum and each packaged file before training.
 ## If Colab rejects the ZIP upload
 
 **File → Upload notebook** accepts the `.ipynb` notebook, not the data ZIP.
-Open `02_colab_esci_fine_tuning.ipynb` there first. The ZIP belongs in the
+Open `02_colab_data_training.ipynb` there first. The ZIP belongs in the
 file picker shown by notebook cell 3.
 
 You can also bypass that picker using Google Drive:
 
 1. Open Google Drive and create `semantic-product-search` inside **My Drive**.
 2. Open that folder and use **New → File upload** to upload
-   `esci_colab_bundle.zip`. Keep the filename unchanged.
+   `data_colab_bundle.zip`. Keep the filename unchanged.
 3. In Colab, run cells 1 and 2 and authorize Drive access.
 4. Run cell 3. It automatically reads the ZIP from Drive and verifies it.
 5. Continue running the remaining cells in order.
 
 The expected location is
-`My Drive/backend/esci_colab_bundle.zip`.
+`My Drive/backend/data_colab_bundle.zip`.
 
 ## Where outputs are saved
 
@@ -52,7 +55,7 @@ The notebook creates a dedicated Google Drive folder:
 
 ```text
 MyDrive/backend/
-  esci_colab_bundle.zip
+  data_colab_bundle.zip
   models/esci-minilm-20k/
     checkpoints/latest.pt
     training_report.json
@@ -61,7 +64,7 @@ MyDrive/backend/
     validation_metrics.json
     selection.json
     test_metrics.json
-  esci_minilm_model.zip
+  data_minilm_model.zip
 ```
 
 Training uses batch size 32, sequence length 128, and one epoch (1,250 steps).
@@ -90,7 +93,7 @@ test comparison once. The reports separate clean and typo queries. Do not
 compare these percentages directly with the earlier 194-product experiment;
 this experiment uses a 42,617-product sampled Amazon corpus.
 
-The final cell downloads `esci_minilm_model.zip` and saves a copy in Drive.
+The final cell downloads `data_minilm_model.zip` and saves a copy in Drive.
 That download includes deployable weights and reports, excluding the large
 optimizer checkpoints.
 

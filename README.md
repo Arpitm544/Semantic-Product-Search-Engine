@@ -16,15 +16,14 @@ correction, query expansion, and a blended cross-encoder reranker.
 │   ├── src/                    Shared Python modules
 │   │   ├── data/               MongoDB catalog access
 │   │   ├── search/             Correction, expansion, and ranking
-│   │   ├── semantic/           Embeddings, training, and evaluation
+│   │   ├── semantic/           Meaning-based search and evaluation
 │   │   └── keyword_search/     Keyword search (BM25)
 │   ├── scripts/                Import, packaging, and startup commands
-│   ├── notebooks/              Colab experiments
 │   ├── tests/                  Automated checks
 │   ├── data/                   dataset/ source, training, and evaluation data
 │   ├── models/                 Local model weights (Git ignored)
 │   ├── indexes/                Derived vector caches (Git ignored)
-│   ├── reports/                Evaluation outputs (Git ignored)
+│   ├── reports/                Created when evaluation saves reports (Git ignored)
 │   └── colab/                  Generated upload bundles (Git ignored)
 ├── requirements.txt            Repository dependency entry point
 └── pytest.ini                  Existing test discovery configuration
@@ -51,8 +50,28 @@ Backend: `http://127.0.0.1:8000`. The frontend prints its URL when it starts. Al
 `frontend/` starts both services; use it instead of the two separate commands.
 First backend startup builds product vectors; later startups reuse the index.
 
+## Search flow
+
+FastAPI routes in `backend/api/main.py` call the reusable search engine from
+`api/search_service.py`. `src/search/product_search.py` prepares the query, finds
+hybrid matches, and reranks them. Spelling rules live in `typos.py`; `hybrid.py`
+combines keyword and semantic rankings.
+
+Interactive API documentation: `http://127.0.0.1:8000/docs`.
+
+## Colab files
+
+The local downloader, preparation script, training script, and notebook have been
+removed. Existing
+uploaded Colab ZIPs keep their own code. The bundle generator remains, but requires
+`backend/src/semantic/train_data.py` to be restored before rebuilding a training
+package. Recreate the notebook when needed. Evaluation tools remain available locally; rebuilding prepared data requires
+restoring the preparation script.
+
 ## Documentation
 
+- [Backend reading guide](backend/READING_GUIDE.md)
+- [Backend commands and endpoints](backend/README.md)
 - [MongoDB backend and model setup](docs/backend.md)
 - [Architecture and configuration](docs/architecture.md)
 - [Google Colab training](docs/colab-training.md)
@@ -64,6 +83,10 @@ First backend startup builds product vectors; later startups reuse the index.
 
 MongoDB is the serving source of truth for all 42,617 Amazon product records.
 Offline JSON files are import/evaluation artifacts; the API has no JSON fallback.
+The search page also offers optional Google Shopping results through SerpApi.
+Set `SERPAPI_API_KEY` in `backend/.env` and restart the backend; see the
+[shopping setup](backend/README.md#google-shopping-search-optional). Shopping
+results come from the external provider and do not use the MongoDB search index.
 Local weights and vector caches are separate from the product database.
 All local dataset files are under backend/data/dataset/, with raw/ and prepared/ subfolders.
 

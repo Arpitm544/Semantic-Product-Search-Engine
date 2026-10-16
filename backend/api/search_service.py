@@ -8,6 +8,7 @@ from threading import Lock
 from src.config import PROJECT_ROOT
 from src.data.catalog import load_products, version
 from src.search.product_search import ProductSearch
+from api.ranking_service import get_candidate_ranker
 
 _search_engine = None
 _search_signature = None
@@ -36,7 +37,7 @@ def get_search_engine():
         reranker = load_reranker(reranker_path)
 
         # ProductSearch combines spelling correction, retrieval, and ranking.
-        _search_engine = ProductSearch(products, semantic, reranker)
+        _search_engine = ProductSearch(products, semantic, reranker, model_lock=get_candidate_ranker().lock)
         _search_signature = signature
         return _search_engine
 
@@ -60,13 +61,16 @@ def load_semantic_search(products, model_path, catalog_hash):
     torch.set_num_threads(2)
     model_path = str((PROJECT_ROOT / model_path).resolve())
     semantic = SemanticVectorSearch(model_path, local_files_only=True, device="cpu")
+    ranker = get_candidate_ranker()
+    semantic._model = ranker.encoder
     cache_path = vector_cache_path(model_path, catalog_hash)
 
     if cache_path.exists():
         restore_vectors(semantic, products, cache_path)
     else:
         print(f"Building vectors for {len(products):,} products on CPU. This may take several minutes.", flush=True)
-        semantic.fit(products)
+        with ranker.lock:
+            semantic.fit(products)
         vectors = semantic.index.reconstruct_n(0, len(products))
         product_ids = np.array([product["id"] for product in products])
         np.savez_compressed(cache_path, ids=product_ids, vectors=vectors)
@@ -93,9 +97,5 @@ def restore_vectors(semantic, products, cache_path):
 
 
 def load_reranker(model_path):
-    """Load the local model that puts the best matches first."""
-    from sentence_transformers import CrossEncoder
-
-    print("Loading reranker...", flush=True)
-    model_path = str((PROJECT_ROOT / model_path).resolve())
-    return CrossEncoder(model_path, local_files_only=True, device="cpu", max_length=256)
+    """Reuse the same cross-encoder as Google Shopping candidate ranking."""
+    return get_candidate_ranker().reranker

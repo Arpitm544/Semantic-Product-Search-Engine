@@ -1,4 +1,4 @@
-"""Package the prepared 40k ESCI dataset and generate a Google Colab notebook."""
+"""Package the prepared 40k training dataset and generate a Google Colab notebook."""
 
 import hashlib
 import json
@@ -64,23 +64,23 @@ DRIVE_ROOT.mkdir(parents=True, exist_ok=True)
 MODEL_DIR = DRIVE_ROOT / "models" / RUN_NAME
 REPORTS_DIR = DRIVE_ROOT / "reports" / RUN_NAME
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-PROJECT = Path("/content/esci_runtime/semantic-product-search")
+PROJECT = Path("/content/data_runtime/semantic-product-search")
 DATA_DIR = PROJECT / "data/dataset/prepared"
 """),
         cell("markdown", """## 3. Upload and verify the prepared bundle
-Upload **esci_colab_bundle.zip** when the file picker opens. On reconnect, the
+Upload **data_colab_bundle.zip** when the file picker opens. On reconnect, the
 verified copy in Drive is reused. Extraction happens on the Colab VM for fast reads.
 The original 1 GB download is already processed and is not needed here.
 """),
         cell("code", """from google.colab import files
 
 EXPECTED_SHA256 = "__BUNDLE_SHA__"
-BUNDLE_NAME = "esci_colab_bundle.zip"
+BUNDLE_NAME = "data_colab_bundle.zip"
 drive_bundle = DRIVE_ROOT / BUNDLE_NAME
 runtime_bundle = Path("/content") / BUNDLE_NAME
 if not drive_bundle.exists():
     uploaded = files.upload()
-    assert BUNDLE_NAME in uploaded, "Upload the supplied esci_colab_bundle.zip."
+    assert BUNDLE_NAME in uploaded, "Upload the supplied data_colab_bundle.zip."
     shutil.copy2(runtime_bundle, drive_bundle)
     del uploaded
 else:
@@ -120,7 +120,7 @@ This checks query leakage and relevant-product protection before training.
 It confirms that a batch size of 32 uses every example: 1,250 steps per epoch.
 """),
         cell("code", """from src.semantic.dataset import read_jsonl, catalog_fingerprint, grouped_batches
-from src.semantic.train_esci import validate_training_rows
+from src.semantic.train_data import validate_training_rows
 
 manifest = json.loads((DATA_DIR / "manifest.json").read_text())
 rows = read_jsonl(DATA_DIR / "train.jsonl")
@@ -136,7 +136,7 @@ print("Training examples:", len(rows), "| Steps:", len(batches))
 print("Product catalog:", len(products))
 del rows, held, products, batches
 subprocess.run([sys.executable, "-m", "pytest",
-    "tests/test_esci_training.py", "tests/test_typo_search.py", "tests/test_keyword_search.py", "-q"
+    "tests/test_keyword_index.py", "tests/test_typo_search.py", "tests/test_keyword_search.py", "-q"
 ], check=True)
 """),
         cell("markdown", """## 6. Train on the Colab GPU
@@ -173,7 +173,7 @@ if already_complete:
     assert report["status"] == "trained" and report["trained_examples"] == 40000
     print("This run is already complete. Proceed to evaluation.")
 else:
-    command = [sys.executable, "-u", "-m", "src.semantic.train_esci",
+    command = [sys.executable, "-u", "-m", "src.semantic.train_data",
         "--data-dir", str(DATA_DIR), "--output-dir", str(MODEL_DIR),
         "--device", "cuda", "--epochs", "1", "--batch-size", "32",
         "--max-length", "128", "--learning-rate", "0.00002",
@@ -234,7 +234,7 @@ After downloading, extract `esci-minilm-20k` into your project's `models/` folde
 Use `SEMANTIC_MODEL_PATH=models/esci-minilm-20k` when starting the API after
 reviewing the results.
 """),
-        cell("code", """download_zip = Path("/content/esci_minilm_model.zip")
+        cell("code", """download_zip = Path("/content/data_minilm_model.zip")
 with zipfile.ZipFile(download_zip, "w", zipfile.ZIP_DEFLATED) as archive:
     for path in MODEL_DIR.rglob("*"):
         relative = path.relative_to(MODEL_DIR)
@@ -249,12 +249,14 @@ files.download(str(download_zip))
     ]
     return {
         "nbformat": 4, "nbformat_minor": 5, "cells": cells,
-        "metadata": {"colab": {"name": "02_colab_esci_fine_tuning.ipynb"},
+        "metadata": {"colab": {"name": "02_colab_data_training.ipynb"},
                      "accelerator": "GPU", "kernelspec": {"display_name": "Python 3", "name": "python3"}},
     }
 
 
 def main():
+    if not (PROJECT / "src/semantic/train_data.py").exists():
+        raise SystemExit("Training code was removed locally. Restore train_data.py before rebuilding the Colab bundle.")
     manifest = json.loads((DATA / "manifest.json").read_text())
     if manifest["clean_training_pairs"] != 20000 or manifest["augmented_training_pairs"] != 40000:
         raise ValueError("This notebook is configured for the prepared 20k + 20k dataset.")
@@ -269,7 +271,7 @@ def main():
     hashes = {path.relative_to(PROJECT).as_posix(): sha256(path) for path in paths}
     directory = PROJECT / "colab"
     directory.mkdir(exist_ok=True)
-    bundle = directory / "esci_colab_bundle.zip"
+    bundle = directory / "data_colab_bundle.zip"
     with zipfile.ZipFile(bundle, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for path in paths:
             archive.write(path, (Path("semantic-product-search") / path.relative_to(PROJECT)).as_posix())
@@ -277,7 +279,7 @@ def main():
                          json.dumps({"sha256": hashes, "source_revision": manifest["source_revision"]}, indent=2))
     bundle_sha = sha256(bundle)
     # Keep the notebook and ZIP together by recording the ZIP hash in a cell.
-    notebook_path = PROJECT / "notebooks" / "02_colab_esci_fine_tuning.ipynb"
+    notebook_path = PROJECT / "notebooks" / "02_colab_data_training.ipynb"
     notebook_path.parent.mkdir(exist_ok=True)
     notebook_path.write_text(json.dumps(notebook(bundle_sha), indent=2) + "\n")
     report = {"bundle": str(bundle), "sha256": bundle_sha, "bytes": bundle.stat().st_size,

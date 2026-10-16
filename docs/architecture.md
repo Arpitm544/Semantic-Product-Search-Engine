@@ -19,7 +19,7 @@ flowchart LR
 - `src/data/catalog.py` loads catalog records and their import version.
 - `src/search/product_search.py` implements the serving search pipeline.
 - `src/semantic/` owns model training, embedding generation, and evaluation tools.
-- `scripts/` provides operator commands; `notebooks/` contains cloud experiments.
+- `scripts/` provides operator commands; `notebooks/` is generated when a Colab notebook is needed.
 - Root `frontend/` owns the user interface. Its illustrative landing-page fixtures are
   separate from the live MongoDB search catalog.
 - `models/`, `indexes/`, `reports/`, and `colab/` contain generated local artifacts.

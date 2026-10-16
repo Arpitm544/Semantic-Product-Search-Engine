@@ -1,77 +1,120 @@
 # Understanding the backend
 
-Start with `api/main.py`. A route connects a URL to an ordinary Python function:
+Start with `api/main.py`, then follow the functions it calls. The API receives a
+query, gets a prepared search engine, and returns matching products as JSON.
+
+## How a URL calls a function
+
+In `api/main.py`:
 
 ```python
 @app.get("/api/search")
 def search_products(q: str = "", fuzzy: str = "1"):
 ```
 
-FastAPI puts the URL's `q` value into the function's `q` argument. The function
-gets the search engine, calls `engine.search(...)`, and returns JSON.
+Opening `/api/search?q=headphones` makes FastAPI call
+`search_products(q="headphones")`. The decorator connects the URL to the function.
+The URL calls a function; folders organize the files that contain the code.
 
-## Follow a search request
+## Follow a search
 
-1. `api/main.py` receives `/api/search?q=headphones`.
-2. `api/search_service.py` returns an existing engine or builds one.
-3. `src/data/catalog.py` loads products from MongoDB.
-4. `src/search/product_search.py` finds candidates and ranks them.
-5. FastAPI sends the results back to the frontend.
+```text
+/api/search?q=headphones
+    ↓
+api/main.py → search_products()
+    ↓
+api/search_service.py → get_search_engine()
+    ↓
+src/search/product_search.py → ProductSearch.search()
+    ↓
+JSON results returned to the frontend
+```
 
-The engine has two main ranking steps:
+`get_search_engine()` loads products and models when needed and reuses the engine
+while the catalog and model settings stay the same. This line creates the engine:
 
-- `find_candidates()` combines keyword and meaning-based matches across query variations.
-- `rank_candidates()` uses the reranker model, then combines its ranking with retrieval ranking.
+```python
+_search_engine = ProductSearch(products, semantic, reranker)
+```
 
-A **vector** is a list of numbers representing text's meaning. A **reranker** is a
-model that scores how well a query matches each candidate product. A **cache**
-saves previously calculated vectors to avoid calculating them again.
+`ProductSearch.search()` has three steps:
 
-## What each folder does
+1. Prepare the query and its spelling variations.
+2. `find_candidates()` gets possible matches from hybrid search.
+3. `rank_candidates()` puts the best matches first.
 
-| Folder | Purpose | Start reading here |
+## Search files
+
+| File | Job | Functions to read first |
 |---|---|---|
-| `api/` | URLs, startup, search-engine loading, dashboard summaries | `main.py` |
-| `src/data/` | MongoDB connection and catalog loading | `catalog.py` |
-| `src/keyword_search/` | Match words using BM25 | `bm25.py` |
-| `src/search/` | Spelling, combined retrieval, final ranking | `product_search.py` |
-| `src/semantic/` | Meaning-based search, data preparation, training, evaluation | `vector_search.py` |
-| `scripts/` | Startup, catalog import, and Colab packaging commands | `start_backend.sh` |
-| `tests/` | Checks using small test inputs and mocked services | `test_search_api.py` |
-| `data/dataset/raw/` | Original downloaded dataset and license | `source.json` |
-| `data/dataset/prepared/` | Catalog plus separate training and evaluation examples | `manifest.json` |
-| `models/` | Downloaded and trained model files | Configured by `.env` |
-| `indexes/` | Saved product vectors | Created automatically |
-| `notebooks/` | Instructions to run training in Colab | The Colab notebook |
-| `colab/` | Generated ZIP to upload to Colab | Rebuilt by the bundle script |
-| `.venv/` | Installed Python dependencies | Managed by pip |
+| `search/product_search.py` | Manage the complete search | `search()`, `find_candidates()`, `rank_candidates()` |
+| `search/typos.py` | Find cautious spelling corrections | `correct()`, `suggestion()`, `alternatives()` |
+| `search/hybrid.py` | Combine keyword and meaning-based matches | `search()`, `collect_rankings()`, `combine_rankings()` |
+| `keyword_search/bm25.py` | Match query words to product text | `fit_bm25()`, `search_bm25()` |
+| `semantic/vector_search.py` | Find products with similar meaning | `fit()`, `search()` |
 
-`src/config.py` defines shared paths and database defaults. `.env` supplies local
-settings. `requirements.txt` lists the Python packages to install.
+These paths are inside `src/`. In `typos.py`, `CatalogSpelling` chooses clear
+corrections; `FrequencySpelling` also considers how common words are in the catalog.
+Use `fuzzy=0` in the search URL to disable spelling correction and query variations.
+Keyword search, semantic search, and reranking still run.
 
-## Follow the training workflow
+A **vector** is a list of numbers representing text's meaning. A **reranker**
+scores how well a query matches candidate products. Final ranking combines
+retrieval order (25%) with reranker order (75%).
 
-The command modules use the same pattern: `main()` reads command arguments,
-then calls the function that performs the task.
+## API and database files
 
-1. `download_esci.py` → `download_dataset()` downloads and verifies source files.
-2. `prepare_esci.py` → `prepare_dataset()` builds the catalog and separate query splits.
-3. `train_esci.py` → `train_model()` trains the model; `train_batch()` updates it for one batch.
-4. `evaluate_typos.py` → `evaluate_models()` compares search methods and saves scores.
+| File | Job |
+|---|---|
+| `api/main.py` | Define FastAPI routes and start Uvicorn |
+| `api/search_service.py` | Load models, restore saved vectors, and reuse the engine |
+| `api/dashboard.py` | Build catalog counts, categories, and a product preview |
+| `src/data/catalog.py` | Load the MongoDB catalog and check its import status |
+| `src/data/db.py` | Create the MongoDB connection |
+| `src/config.py` | Define shared paths and database defaults |
+| `.env` | Supply local configuration; shell settings take precedence |
+
+The startup script sets CPU limits and runs `api/main.py`. Models load in a
+background thread. `/api/health` reports progress until search is ready.
+
+API routes use ordinary functions. Search classes keep products, models,
+vocabulary, and indexes together so requests can reuse them.
+
+## Data preparation and evaluation
+
+| File in `src/semantic/` | Job |
+|---|---|
+| `dataset.py` | Read data, generate typo examples, and group training batches |
+| `evaluate_typos.py` | Compare search methods on clean and typo queries |
+| `vector_search.py` | Run meaning-based search |
+
+The prepared catalog and query splits already exist in `data/dataset/prepared/`.
+The preparation script has been removed. Restore it from Git history if you need
+to rebuild or change those files.
 
 A **query family** groups queries with the same normalized wording. Keeping
-families in separate splits prevents training on evaluation questions.
-A **checkpoint** saves model and optimizer state so interrupted training can resume.
-A **manifest** records counts, source information, and hashes used to validate files.
+families separate prevents training on evaluation questions. A **manifest**
+records counts, source information, and hashes used to validate the files.
+ESCI is the source dataset's name; its labels mean Exact, Substitute, Complement,
+and Irrelevant. Source labels and IDs remain compatible with the existing data.
 
-ESCI is the source dataset's name. Its labels mean Exact match, Substitute,
-Complement, and Irrelevant. These names remain in training code to match the data.
+## Other folders and scripts
 
-## Functions and classes
+| Location | Contents |
+|---|---|
+| `scripts/start_backend.sh` | Start the API with local CPU limits |
+| `scripts/import_catalog.py` | Import the prepared catalog into MongoDB |
+| `scripts/create_colab_bundle.py` | Generator retained for future Colab packaging |
+| `tests/` | Automated checks, small test inputs, and mocked services |
+| `data/dataset/raw/` | Original downloaded files, source information, and license |
+| `data/dataset/prepared/` | Catalog, training/validation/test examples, and manifest |
+| `models/` | Local embedding model and reranker weights |
+| `indexes/` | Saved product vectors that avoid repeated calculation |
+| `colab/` | Previously generated upload artifacts |
+| `.venv/` | Installed Python packages |
 
-API routes and command steps use ordinary functions. Search classes keep related
-state together: products, models, spelling vocabulary, and indexes. Read their
-`search()` methods first, then follow the helper calls as needed.
-
-The startup shell script sets CPU limits and runs `api/main.py`. Model loading
-happens in a background thread; `/api/health` reports readiness while it runs.
+The local downloader, preparation script, training script, and notebook have been
+removed. Existing
+uploaded Colab ZIPs contain their own code. Restore `src/semantic/train_data.py`
+before rebuilding a training bundle. The generator stops with a clear message
+while that file is absent. Recreate the notebook when it is requested.

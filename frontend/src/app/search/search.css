@@ -121,6 +121,20 @@
   font-size:10px;
   color:#a1a99f
 }
+.search-source-picker { border:0; padding:0; margin:0 0 18px; display:flex; justify-content:center; gap:10px; flex-wrap:wrap; }
+.search-source-picker legend { margin:0 auto 10px; font-size:11px; color:#667665; }
+.search-source-picker label { display:flex; align-items:center; gap:7px; padding:10px 13px; border:1px solid #dce4d9; border-radius:8px; font-size:12px; cursor:pointer; background:#fff; }
+.search-source-picker label.is-selected { background:#edf3e9; border-color:#719375; color:#3e6747; }
+.search-source-picker input { accent-color:#4f7857; }
+.search-source-picker label:focus-within { outline:2px solid #4f7857; outline-offset:3px; }
+.search-result-art { overflow:hidden; }
+.search-result-art img { width:100%; height:100%; object-fit:contain; background:#fff; }
+.search-result-copy h3 a { color:inherit; text-decoration:none; }
+.search-result-copy h3 a:hover { text-decoration:underline; }
+.search-result-copy h3 a:focus-visible { outline:2px solid #4f7857; outline-offset:3px; }
+.search-error { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.search-error button { flex-shrink:0; padding:8px 10px; background:#fff; border:1px solid #dcbda9; border-radius:5px; color:#804e36; cursor:pointer; font:inherit; }
+.search-ranking-warning { margin:15px 0; padding:12px 14px; border:1px solid #e5d9b5; border-radius:8px; background:#fffaf0; color:#796338; font-size:12px; line-height:1.5; }
 .search-results-section {
   max-width:990px;
   min-height:290px;
@@ -344,6 +358,10 @@
   .relevance-score small {
     display:none
   }
+  .search-result-card { flex-wrap:wrap; }
+  .search-result-copy { flex-basis:calc(100% - 70px); }
+  .relevance-score { margin-left:66px; }
+  .search-error { align-items:flex-start; flex-direction:column; }
 }
 
 .search-spelling-note{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:15px 0;padding:12px 14px;border:1px solid #dce4d9;border-radius:8px;background:#edf3e9;color:#455b48;font-size:12px;line-height:1.5}.search-spelling-note button{border:0;background:transparent;color:#4f7857;font:600 11px 'DM Sans',sans-serif;text-decoration:underline;cursor:pointer;flex-shrink:0}.search-spelling-note button:focus-visible{outline:2px solid #4f7857;outline-offset:4px}@media(max-width:600px){.search-spelling-note{align-items:flex-start;flex-direction:column}}

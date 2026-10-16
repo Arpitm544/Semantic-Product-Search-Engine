@@ -26,20 +26,11 @@ All local source and prepared data live under data/dataset/ inside backend/:
 - raw/: original Amazon products, labeled queries, source information, and license.
 - prepared/: products.json, train.jsonl, validation.jsonl, test.jsonl, and manifest.json.
 
-Download the original dataset only when it is missing:
+The original dataset is already stored in `data/dataset/raw/`.
+Source information and file hashes are recorded in `raw/source.json`.
 
-~~~sh
-python -m src.semantic.download_esci
-~~~
-
-Prepare the dataset only when prepared/ is missing:
-
-~~~sh
-python -m src.semantic.prepare_esci
-~~~
-
-The preparation command refuses to overwrite an existing manifest.
-For a separate experiment, supply another --output-dir.
+The preparation script has been removed. Use the existing prepared files; restore
+the script from Git history before changing the preparation process.
 
 ## Import the catalog into MongoDB
 
@@ -52,21 +43,9 @@ Serving reads the imported MongoDB catalog.
 
 ## Training
 
-Use the [Colab guide](colab-training.md) for GPU training.
-To regenerate the matching upload ZIP and notebook after code changes:
-
-~~~sh
-python scripts/create_colab_bundle.py
-~~~
-
-Local training uses the same prepared dataset:
-
-~~~sh
-python -m src.semantic.train_esci --output-dir models/new-run
-~~~
-
-Training requires the embedding model and training libraries. Use a new output
-directory for a new run; --resume continues a compatible checkpoint.
+The local training script has been removed. Existing uploaded Colab ZIPs keep
+their own copy. Restore `src/semantic/train_data.py` before creating a new
+training ZIP or notebook with `scripts/create_colab_bundle.py`.
 
 ## Evaluate search
 
