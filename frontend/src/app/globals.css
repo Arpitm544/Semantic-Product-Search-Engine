@@ -3,6 +3,7 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 @source "../";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+@custom-variant light (&:where(:root:not([data-theme="dark"]), :root:not([data-theme="dark"]) *));
 
 /* Preserve native form defaults: this project did not use a CSS reset. */
 
@@ -43,10 +44,10 @@
 @keyframes arrive { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes auth-arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-:root { --surface-topbar: rgba(255,255,255,.8); --focus-ring: #4f7857; }
+:root { --surface-topbar: #faf8f2ed; --focus-ring: #4f7857; }
 :root[data-theme="dark"] { --surface-topbar: #1c241f; --focus-ring: #a6c5b0; }
 
-/* Theme tokens preserve the original light palette exactly. */
+/* Base palette aliases; the light and dark refinements are scoped below. */
 @layer base {
   :root {
     --border-4f7857: #4f7857;
@@ -648,5 +649,145 @@
     --text-ffffff8c: #ffffff8c;
     --text-ffffffdc: #ffffffdc;
     --text-ffffffeb: #ffffffeb;
+  }
+}
+
+/* Warm light theme: canvas, cream panels and sage sections. */
+@layer base {
+  :root:not([data-theme="dark"]) {
+    --day-canvas: #f3f1e9;
+    --day-card: #faf8f2;
+    --day-sage: #e4ebdd;
+    --day-forest: #293d31;
+    --day-copy: #59685c;
+    --day-line: #cdd5c5;
+    --day-action: #344f3b;
+    --day-on-action: #faf8f2;
+    --paper: var(--day-canvas);
+    --ink: var(--day-forest);
+    --muted: var(--day-copy);
+    --line: var(--day-line);
+    --sage: var(--day-sage);
+    --surface-topbar: #faf8f2ed;
+    --surface-fff: var(--day-card);
+    --surface-fafbf8: var(--day-canvas);
+    --surface-fafbf9: var(--day-canvas);
+    --surface-f5f7f4: #eaece2;
+    --surface-fafcf9: #eeeee3;
+    --surface-eff1ed: var(--day-sage);
+    --surface-eaf0ed: #e8ece0;
+    --surface-f2f6ef: #f0f1e7;
+    --surface-fdfef9: var(--day-card);
+    --surface-e8e9de: #e6e9d9;
+    --surface-e5ebdc: #dce5d2;
+    --surface-f8f9f4: #f3f1e6;
+    --surface-fbfcf6: var(--day-card);
+    --surface-fafbf6d6: #faf8f2ed;
+    --surface-fafbf6ed: #faf8f2ed;
+    --surface-f9fbf2c9: #faf8f2ed;
+    --surface-edf4ec: #e0e8d8;
+    --surface-edf3e9: #e5ebdc;
+    --surface-fbfaf0: #f3f0e4;
+    --surface-fbfaf4: #f6f2e6;
+    --surface-f9faf5: #f7f4e9;
+    --border-e9ede8: var(--day-line);
+    --border-e8ece6: var(--day-line);
+    --border-e7ebe5: var(--day-line);
+    --border-e8ece7: var(--day-line);
+    --border-e9ede7: var(--day-line);
+    --border-f0f2ef: #d9dece;
+    --border-edf0ec: #d4dbc9;
+    --border-d6e1d8: #c4cfbc;
+    --text-64818c: #59685c;
+    --text-667c78: #59685c;
+    --text-66916b: #59685c;
+    --text-677567: #59685c;
+    --text-69858a: #59685c;
+    --text-6c9a6c: #59685c;
+    --text-6e7e5e: #59685c;
+    --text-6f796f: #59685c;
+    --text-6f7d73: #59685c;
+    --text-6f8869: #59685c;
+    --text-718071: #59685c;
+    --text-719375: #59685c;
+    --text-719571: #59685c;
+    --text-728076: #59685c;
+    --text-737b6c: #59685c;
+    --text-739b72: #59685c;
+    --text-73a073: #59685c;
+    --text-759272: #59685c;
+    --text-7595ad: #635e78;
+    --text-77928b: #59685c;
+    --text-788478: #59685c;
+    --text-797296: #59685c;
+    --text-79806f: #59685c;
+    --text-798273: #59685c;
+    --text-79937a: #59685c;
+    --text-7a8077: #59685c;
+    --text-7a8375: #59685c;
+    --text-7b8572: #59685c;
+    --text-7b857b: #59685c;
+    --text-7b8770: #59685c;
+    --text-7c8974: #59685c;
+    --text-7caa7c: #59685c;
+    --text-7d867c: #59685c;
+    --text-7e887e: #59685c;
+    --text-7f8d71: #59685c;
+    --text-7f8e70: #59685c;
+    --text-81977f: #59685c;
+    --text-827da1: #635e78;
+    --text-828d81: #59685c;
+    --text-82927f: #59685c;
+    --text-838d82: #59685c;
+    --text-848d84: #59685c;
+    --text-849175: #59685c;
+    --text-849387: #59685c;
+    --text-859482: #59685c;
+    --text-879087: #59685c;
+    --text-879187: #59685c;
+    --text-879587: #59685c;
+    --text-8878ae: #635e78;
+    --text-899587: #59685c;
+    --text-8a9080: #59685c;
+    --text-8a9085: #59685c;
+    --text-8b9081: #59685c;
+    --text-8b948a: #59685c;
+    --text-8b958a: #59685c;
+    --text-8c9382: #59685c;
+    --text-8c9581: #59685c;
+    --text-8c968b: #59685c;
+    --text-8caaac: #59685c;
+    --text-8d9386: #59685c;
+    --text-8d978d: #59685c;
+    --text-919b90: #59685c;
+    --text-929990: #59685c;
+    --text-929c91: #59685c;
+    --text-939b92: #59685c;
+    --text-949888: #59685c;
+    --text-94b3a3: #59685c;
+    --text-987b62: #6e6155;
+    --text-9a8067: #6e6155;
+    --text-9a9f8e: #59685c;
+    --text-9aa198: #59685c;
+    --text-9aa398: #59685c;
+    --text-9ba39a: #59685c;
+    --text-a07870: #6e6155;
+    --text-a0a79e: #59685c;
+    --text-a0a79f: #59685c;
+    --text-a1a99f: #59685c;
+    --text-a1aaa0: #59685c;
+    --text-a27e78: #6e6155;
+    --text-a4aba3: #59685c;
+    --text-a4aca3: #59685c;
+    --text-b1b6a9: #59685c;
+    --text-bbc1b9: #59685c;
+    --text-bc8c61: #6e6155;
+    --text-66756c: #4f624f;
+    --text-4f7954: #4f624f;
+    --text-4c7851: #4f624f;
+    --text-746949: #4f624f;
+    --text-5b805b: #4f624f;
+    --text-657a60: #4f624f;
+    --text-667665: #4f624f;
   }
 }

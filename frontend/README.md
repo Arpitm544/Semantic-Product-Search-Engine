@@ -72,6 +72,8 @@ Development output is stored in `.next-dev/`; production builds use `.next/`. Th
 
 ### Color themes
 
-The header theme toggle switches between the original light palette (default) and dark mode. The preference is saved as `semantic-theme` in local storage and restored before paint; it also follows changes from another tab. Color tokens live in `src/app/globals.css`, with dark values scoped to `data-theme="dark"`. Layout, artwork, Three.js materials, and motion preferences are shared between themes.
+The header theme toggle switches between the warm light palette (default) and dark mode. The preference is saved as `semantic-theme` in local storage and restored before paint; it also follows changes from another tab. Color tokens live in `src/app/globals.css`, with dark values scoped to `data-theme="dark"`. Layout, artwork, Three.js materials, and motion preferences are shared between themes.
 
 The refined dark palette uses semantic `--night-*` tokens for canvas, panels, text, borders, and sage actions. Selected comparison cards, form actions, and dashboard navigation have distinct dark states. Product photographs retain a light studio background; preview failures use a readable dark card. Theme changes from another tab, including clearing the saved preference, remain synchronized.
+
+Light mode uses a warm ivory canvas, cream panels, sage section backgrounds and forest-green actions. The `--day-*` palette and its aliases are scoped to light mode; the dark palette and product photography are unchanged.
