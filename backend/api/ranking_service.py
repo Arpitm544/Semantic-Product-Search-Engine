@@ -4,6 +4,7 @@ import os
 from threading import Lock
 
 from src.config import PROJECT_ROOT
+from src.search.ranking import blend_ranks
 
 _ranker = None
 _signature = None
@@ -50,10 +51,7 @@ class CandidateRanker:
         reranker_order = sorted(range(len(products)), key=lambda i: (-float(reranker_scores[i]), i))
         semantic_positions = {i: position for position, i in enumerate(semantic_order, 1)}
         reranker_positions = {i: position for position, i in enumerate(reranker_order, 1)}
-        scores = {
-            i: 0.25 / (60 + semantic_positions[i]) + 0.75 / (60 + reranker_positions[i])
-            for i in range(len(products))
-        }
+        scores = blend_ranks(semantic_positions, reranker_positions)
         order = sorted(range(len(products)), key=lambda i: (-scores[i], semantic_positions[i], i))
         return [{
             **products[i],

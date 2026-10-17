@@ -9,7 +9,7 @@ In `api/main.py`:
 
 ```python
 @app.get("/api/search")
-def search_products(q: str = "", fuzzy: str = "1"):
+def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
 ```
 
 Opening `/api/search?q=headphones` makes FastAPI call
@@ -22,10 +22,12 @@ The URL calls a function; folders organize the files that contain the code.
 /api/search?q=headphones
     ↓
 api/main.py → search_products()
-    ↓
-api/search_service.py → get_search_engine()
-    ↓
-src/search/product_search.py → ProductSearch.search()
+    ├─ source=mongo (default)
+    │  api/search_service.py → get_search_engine()
+    │  src/search/product_search.py → ProductSearch.search()
+    └─ source=serpapi
+       api/shopping_service.py → search_shopping() → rank_shopping_response()
+       api/ranking_service.py → shared encoder and reranker
     ↓
 JSON results returned to the frontend
 ```
@@ -34,7 +36,7 @@ JSON results returned to the frontend
 while the catalog and model settings stay the same. This line creates the engine:
 
 ```python
-_search_engine = ProductSearch(products, semantic, reranker)
+_search_engine = ProductSearch(products, semantic, reranker, model_lock=get_candidate_ranker().lock)
 ```
 
 `ProductSearch.search()` has three steps:
@@ -89,8 +91,8 @@ vocabulary, and indexes together so requests can reuse them.
 | `vector_search.py` | Run meaning-based search |
 
 The prepared catalog and query splits already exist in `data/dataset/prepared/`.
-The preparation script has been removed. Restore it from Git history if you need
-to rebuild or change those files.
+Use `src/semantic/prepare_esci.py` to rebuild the prepared files after downloading
+the source with `src/semantic/download_esci.py`.
 
 A **query family** groups queries with the same normalized wording. Keeping
 families separate prevents training on evaluation questions. A **manifest**
@@ -113,8 +115,6 @@ and Irrelevant. Source labels and IDs remain compatible with the existing data.
 | `colab/` | Previously generated upload artifacts |
 | `.venv/` | Installed Python packages |
 
-The local downloader, preparation script, training script, and notebook have been
-removed. Existing
-uploaded Colab ZIPs contain their own code. Restore `src/semantic/train_data.py`
-before rebuilding a training bundle. The generator stops with a clear message
-while that file is absent. Recreate the notebook when it is requested.
+The downloader, preparation script, and `src/semantic/train_esci.py` support
+reproducible training. Follow [Colab training](../docs/colab-training.md) to
+regenerate the notebook and its matching ZIP with the bundle generator.

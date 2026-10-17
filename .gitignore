@@ -18,7 +18,12 @@ backend/indexes/*.bin
 backend/indexes/*.pkl
 
 # Local training datasets and model checkpoints
-backend/data/dataset/
+backend/data/dataset/*
+!backend/data/dataset/raw/
+backend/data/dataset/raw/*
+!backend/data/dataset/raw/LICENSE
+!backend/data/dataset/raw/NOTICE
+!backend/data/dataset/raw/source.json
 backend/models/
 backend/colab/*.zip
 backend/colab/bundle_build_manifest.json

@@ -196,7 +196,7 @@ def rank_shopping_response(response):
     except Exception as error:
         # Keep shopping usable if local weights cannot load. Disclose the fallback
         # and never expose exception details or claim semantic ranking occurred.
-        logger.warning('Shopping model ranking failed (%s).', type(error).__name__)
+        logger.warning('Shopping model ranking failed (%s).', type(error).__name__, exc_info=True)
         return {
             **response, 'rankingStatus': 'unavailable',
             'warning': "Our search models are unavailable. Showing Google's original order. Please try again shortly.",

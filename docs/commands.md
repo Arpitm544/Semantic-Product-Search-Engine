@@ -26,11 +26,21 @@ All local source and prepared data live under data/dataset/ inside backend/:
 - raw/: original Amazon products, labeled queries, source information, and license.
 - prepared/: products.json, train.jsonl, validation.jsonl, test.jsonl, and manifest.json.
 
-The original dataset is already stored in `data/dataset/raw/`.
+A fresh checkout contains no dataset. From `backend/`, install
+`requirements.txt`, then run the following preparation commands before importing.
+The downloader obtains the official Amazon ESCI files and attribution metadata
+in `data/dataset/raw/`; preparation creates `prepared/products.json`.
 Source information and file hashes are recorded in `raw/source.json`.
+The downloader also writes `raw/LICENSE` and `raw/NOTICE`. These attribution
+and provenance files are allowed by Git; the large dataset files stay ignored.
 
-The preparation script has been removed. Use the existing prepared files; restore
-the script from Git history before changing the preparation process.
+```sh
+python -m src.semantic.download_esci
+python -m src.semantic.prepare_esci --pairs 20000
+```
+
+See [Colab preparation](colab-training.md#prepare-the-bundle-from-a-fresh-checkout)
+for environment setup, download size, and complete preparation options.
 
 ## Import the catalog into MongoDB
 
@@ -43,9 +53,9 @@ Serving reads the imported MongoDB catalog.
 
 ## Training
 
-The local training script has been removed. Existing uploaded Colab ZIPs keep
-their own copy. Restore `src/semantic/train_data.py` before creating a new
-training ZIP or notebook with `scripts/create_colab_bundle.py`.
+Use `scripts/create_colab_bundle.py` to package `src/semantic/train_esci.py`
+and the prepared data. Follow [Colab training](colab-training.md) to generate
+and run the matching training ZIP and notebook.
 
 ## Evaluate search
 

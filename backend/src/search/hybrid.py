@@ -26,14 +26,14 @@ class HybridSearch:
         corrections = []
         if fuzzy:
             corrected_query, corrections = self.spelling.correct(query)
-        mode = "hybrid" if self.semantic is not None else "bm25-fuzzy"
+        mode = "hybrid" if self.semantic is not None else ("bm25-fuzzy" if fuzzy else "bm25")
         payload = {
             "query": query,
             "correctedQuery": corrected_query if corrections else None,
             "corrections": corrections,
             "searchMode": mode,
             "semanticModel": self.semantic_model,
-            "total": 0,
+            "candidateCount": 0,
             "results": [],
         }
         if not tokenize(query) or limit <= 0:
@@ -44,16 +44,16 @@ class HybridSearch:
 
         # 3. Merge the lists into one score and result list per product.
         ranked_ids, results = self.combine_rankings(rankings, limit)
-        payload["total"] = len(ranked_ids)
+        payload["candidateCount"] = len(ranked_ids)
         payload["results"] = results
         return payload
 
     def collect_rankings(self, query, corrected_query, corrections, limit):
         """Keep the results of each search method with its scoring weight."""
-        rankings = [("keyword", 1.0, search_bm25(self.lexical, query, len(self.products)))]
+        rankings = [("keyword", 1.0, search_bm25(self.lexical, query, max(50, limit)))]
         if corrections:
             rankings.append((
-                "fuzzy", 0.85, search_bm25(self.lexical, corrected_query, len(self.products)),
+                "fuzzy", 0.85, search_bm25(self.lexical, corrected_query, max(50, limit)),
             ))
         if self.semantic is not None:
             candidate_k = min(len(self.products), max(50, limit))
