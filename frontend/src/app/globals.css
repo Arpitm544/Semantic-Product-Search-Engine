@@ -26,7 +26,7 @@
   button { cursor: pointer; color: inherit; }
   button:disabled { cursor: wait; opacity: .6; }
   button, input, select, a { outline-offset: 5px; }
-  :focus-visible { outline: 2px solid #456cc4; }
+  :focus-visible { outline: 2px solid var(--focus-ring); }
   a { color: inherit; text-decoration: none; }
   svg { flex-shrink: 0; }
   ::selection { background: #cad4bd; color: #253a30; }
@@ -661,6 +661,7 @@
     --day-forest: #293d31;
     --day-copy: #59685c;
     --day-line: #cdd5c5;
+    --text-e5ebdc: #c4cfbc;
     --day-action: #344f3b;
     --day-on-action: #faf8f2;
     --paper: var(--day-canvas);
