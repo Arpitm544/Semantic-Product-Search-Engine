@@ -61,7 +61,7 @@ def download_verified(url, destination, expected_sha, expected_size):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=ESCI_DIR / "raw")
-    parser.add_argument("--revision", default=None, help="Pinned Git commit; defaults to current main.")
+    parser.add_argument("--revision", default=None, help="Pinned Git commit; defaults to the cached revision, or current main when no manifest exists.")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     metadata_path = args.output_dir / "source.json"

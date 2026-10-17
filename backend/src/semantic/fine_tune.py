@@ -5,6 +5,7 @@ from collections import defaultdict
 import json
 from pathlib import Path
 import random
+import tempfile
 
 from src.config import EMBEDDING_MODEL_NAME, PROJECT_ROOT, PROCESSED_DATA_PATH
 from src.semantic.prepare_training import (
@@ -12,8 +13,8 @@ from src.semantic.prepare_training import (
 )
 
 
-def grouped_batches(rows, batch_size, seed):
-    """One category per batch to reduce false negatives among similar products."""
+def grouped_batches(rows, batch_size, seed, include_remainder=False):
+    """Separate categories; include remainder only with a false-negative-masked loss."""
     if batch_size < 2:
         raise ValueError("Contrastive learning requires a batch size of at least two.")
     groups = defaultdict(list)
@@ -33,7 +34,27 @@ def grouped_batches(rows, batch_size, seed):
         # Prioritize large groups so one category is less likely to be left alone.
         active.sort(key=lambda group: len(groups[group]), reverse=True)
         batches.append([groups[group].pop() for group in active[:batch_size]])
+    if include_remainder:
+        remaining = [index for indices in groups.values() for index in indices]
+        batches.extend(remaining[offset:offset + batch_size]
+                       for offset in range(0, len(remaining), batch_size))
     return batches
+
+
+def save_candidate(model, products, output, training_report):
+    """Publish the model and index together; a failed build leaves output retryable."""
+    from src.semantic.vector_search import SemanticVectorSearch
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=f".{output.name}-", dir=output.parent) as directory:
+        staging = Path(directory)
+        model.save_pretrained(str(staging))
+        (staging / "training_report.json").write_text(json.dumps(training_report, indent=2) + "\n")
+        engine = SemanticVectorSearch(str(output))
+        engine._model = model
+        engine.fit(products)
+        engine.save(staging / "faiss_index.bin", staging / "faiss_id_map.pkl")
+        staging.replace(output)
 
 
 def main():
@@ -54,7 +75,7 @@ def main():
         parser.error("epochs, learning rate, and threads must be positive.")
     if args.max_steps is not None and args.max_steps < 1:
         parser.error("max-steps must be positive.")
-    if (args.output_dir / "modules.json").exists():
+    if args.output_dir.exists() and any(args.output_dir.iterdir()):
         parser.error("The output already contains a model. Choose a new output directory.")
 
     products = load_catalog(args.catalog)
@@ -130,7 +151,6 @@ def main():
             break
     model.eval()
     output = args.output_dir.resolve()
-    model.save_pretrained(str(output))
     training_report = {
         "base_model": args.model, "steps": step, "epochs_requested": args.epochs,
         "pairs": len(rows), "device": str(model.device), "seed": manifest["seed"],
@@ -143,14 +163,7 @@ def main():
             len(rows) - sum(len(batch) for batch in batches) for batches in epoch_batches
         ],
     }
-    (output / "training_report.json").write_text(json.dumps(training_report, indent=2) + "\n")
-    # Separate artifacts prevent overwriting the original model's index.
-    from src.semantic.vector_search import SemanticVectorSearch
-
-    engine = SemanticVectorSearch(str(output))
-    engine._model = model
-    engine.fit(products)
-    engine.save(output / "faiss_index.bin", output / "faiss_id_map.pkl")
+    save_candidate(model, products, output, training_report)
     print(f"Saved candidate model and rebuilt FAISS index at {output}", flush=True)
     print("Run evaluate_typos before activating this model.", flush=True)
 

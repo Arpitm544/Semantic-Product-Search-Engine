@@ -1,5 +1,6 @@
 """
-Evaluation Harness for Semantic Vector Search (Sentence-BERT + FAISS).
+Legacy processed-catalog benchmark for Sentence-BERT + FAISS.
+This does not evaluate the Amazon serving pipeline; use ESCI evaluation for that corpus.
 Measures standard IR metrics (MRR, Precision@K, Recall@K, NDCG@K, Latency).
 """
 import json
@@ -11,8 +12,6 @@ import numpy as np
 from src.config import (
     EVAL_SET_PATH,
     SEMANTIC_METRICS_PATH,
-    FAISS_INDEX_PATH,
-    FAISS_ID_MAP_PATH,
 )
 from src.semantic.vector_search import SemanticVectorSearch
 from src.data.load_data import load_cleaned_products
@@ -37,14 +36,15 @@ def evaluate_semantic(
     with open(eval_set_path, "r", encoding="utf-8") as f:
         eval_queries = json.load(f)
 
-    # Ensure FAISS index is available
-    if FAISS_INDEX_PATH.exists() and FAISS_ID_MAP_PATH.exists():
-        semantic_engine = SemanticVectorSearch.load(FAISS_INDEX_PATH, FAISS_ID_MAP_PATH)
-    else:
-        products = load_cleaned_products()
-        semantic_engine = SemanticVectorSearch()
-        semantic_engine.fit(products)
-        semantic_engine.save(FAISS_INDEX_PATH, FAISS_ID_MAP_PATH)
+    if not eval_queries:
+        raise ValueError("The legacy evaluation set is empty.")
+    products = load_cleaned_products()
+    catalog_ids = {product["id"] for product in products}
+    if any(set(item["relevant_doc_ids"]) - catalog_ids for item in eval_queries):
+        raise ValueError("Legacy evaluation labels do not match the processed catalog.")
+    semantic_engine = SemanticVectorSearch()
+    semantic_engine.fit(products)
+    semantic_engine.search(eval_queries[0]["query"], top_k=1)
 
     results_by_k = {k: {"p": [], "r": [], "ndcg": []} for k in top_ks}
     mrr_list = []
@@ -56,7 +56,7 @@ def evaluate_semantic(
         relevant_ids = set(item["relevant_doc_ids"])
 
         t0 = time.perf_counter()
-        search_results = semantic_engine.search(query, top_k=max(top_ks))
+        search_results = semantic_engine.search(query, top_k=len(products))
         latency = (time.perf_counter() - t0) * 1000.0
         latencies_ms.append(latency)
 
@@ -77,6 +77,7 @@ def evaluate_semantic(
         ap_list.append(ap)
 
     metrics_summary = {
+        "benchmark": "legacy processed catalog; not Amazon serving",
         "model": "Sentence-BERT + FAISS (Semantic Search)",
         "total_queries": len(eval_queries),
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),

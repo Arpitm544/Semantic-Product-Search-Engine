@@ -5,6 +5,8 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
+from threading import Event
+import numpy as np
 
 from api import main as api
 from src.search.hybrid import HybridSearch
@@ -20,7 +22,10 @@ def request(route, engine):
     handler = object.__new__(api.ApiHandler)
     handler.path = route
     handler.write_json = Mock()
-    with patch.object(api, "get_search_engine", return_value=engine):
+    ready = Event()
+    ready.set()
+    with patch.object(api, "_search_ready", ready), \
+            patch.object(api, "get_search_engine", return_value=engine):
         handler.do_GET()
     return handler.write_json.call_args.args
 
@@ -46,26 +51,40 @@ class TestSearchAPI(unittest.TestCase):
 
     def test_catalog_indexes_are_reused_and_refreshed_after_a_change(self):
         with tempfile.TemporaryDirectory() as directory:
-            catalog = Path(directory) / "products.json"
-            catalog.write_text(json.dumps(PRODUCTS))
-            with patch.object(api, "PRODUCTS_PATH", catalog), \
+            root = Path(directory)
+            weights = root / "models/esci-minilm-20k/model.safetensors"
+            weights.parent.mkdir(parents=True)
+            weights.touch()
+            manifest = {"sha256": "first", "updated_at": "1"}
+            semantic = Mock()
+            semantic.index.reconstruct_n.return_value = np.array([[1., 0.], [0., 1.]], dtype=np.float32)
+            with patch.object(api, "PROJECT_ROOT", root), \
+                    patch.object(api, "version", side_effect=lambda: dict(manifest)), \
+                    patch.object(api, "load_products", return_value=PRODUCTS) as catalog, \
                     patch.object(api, "_search_engine", None), \
                     patch.object(api, "_search_signature", None), \
-                    patch.dict("os.environ", {"SEARCH_SEMANTIC": "0"}):
+                    patch.dict("os.environ", {"SEMANTIC_MODEL_PATH": "models/esci-minilm-20k"}), \
+                    patch("src.semantic.vector_search.SemanticVectorSearch", return_value=semantic), \
+                    patch("sentence_transformers.CrossEncoder"), \
+                    patch.object(api, "AmazonSearch", side_effect=lambda *args: Mock()) as factory:
                 first = api.get_search_engine()
                 self.assertIs(first, api.get_search_engine())
-                catalog.write_text(json.dumps(PRODUCTS + [
-                    {"id": 3, "title": "Laptop", "representation_text": "laptop computer"},
-                ]))
+                self.assertEqual(catalog.call_count, 1)
+                manifest.update(sha256="second", updated_at="2")
                 refreshed = api.get_search_engine()
                 self.assertIsNot(first, refreshed)
-                self.assertEqual(refreshed.search("laptop")["results"][0]["id"], 3)
+                self.assertEqual(catalog.call_count, 2)
+                self.assertEqual(factory.call_count, 2)
+                self.assertEqual(semantic.fit.call_count, 2)
 
     def test_missing_catalog_returns_service_error(self):
         handler = object.__new__(api.ApiHandler)
         handler.path = "/api/search?q=laptop"
         handler.write_json = Mock()
-        with patch.object(api, "get_search_engine", side_effect=FileNotFoundError("Missing catalog")):
+        ready = Event()
+        ready.set()
+        with patch.object(api, "_search_ready", ready), \
+                patch.object(api, "get_search_engine", side_effect=FileNotFoundError("Missing catalog")):
             handler.do_GET()
         self.assertEqual(handler.write_json.call_args.args, (503, {"error": "Missing catalog"}))
 

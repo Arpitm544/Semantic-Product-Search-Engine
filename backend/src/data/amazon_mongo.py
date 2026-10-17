@@ -18,6 +18,8 @@ def version():
 def load_products():
     manifest = version()
     products = list(database()[COLLECTION].find({}, {'_id': 0}).sort('id', 1))
+    if version() != manifest:
+        raise ValueError('MongoDB catalog changed while loading; retry after the import completes.')
     if len(products) != manifest['product_count']:
         raise ValueError('MongoDB catalog count differs from its manifest; reimport the catalog.')
     return products

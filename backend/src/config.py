@@ -2,10 +2,12 @@
 Configuration constants and directory paths for Semantic Product Search Engine.
 """
 import os
+from dotenv import load_dotenv
 from pathlib import Path
 
 # Base Paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_PATH = DATA_DIR / "raw" / "products.json"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"

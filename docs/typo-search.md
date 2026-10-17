@@ -102,7 +102,7 @@ SEMANTIC_MODEL_PATH=models/typo-minilm-candidate python api/main.py
 Or start both the website and API:
 
 ```bash
-cd frontend
+cd ../frontend
 SEMANTIC_MODEL_PATH=models/typo-minilm-candidate npm run dev
 ```
 
@@ -113,12 +113,11 @@ combines old product embeddings with a new query model. Training also writes
 separate `faiss_index.bin` and `faiss_id_map.pkl` artifacts inside the candidate
 model directory for standalone use.
 
-Without `SEMANTIC_MODEL_PATH`, the API tries the cached original MiniLM. If its
-dependencies or cached weights are unavailable, search uses BM25 with fuzzy
-matching and returns `searchMode: "bm25-fuzzy"`. A configured model that fails
-to load returns a service error so configuration mistakes are visible. Serving
-does not download weights. To deliberately run lexical search, set
-`SEARCH_SEMANTIC=0`.
+The API defaults to `models/esci-minilm-20k`, or the path in
+`SEMANTIC_MODEL_PATH`, and requires the local reranker. Prepare both models using
+[the backend setup guide](amazon-backend.md). Missing models or dependencies cause
+initialization to fail and health/search endpoints to return 503. Serving does
+not download weights. `SEARCH_SEMANTIC=0` is not supported.
 
 Example API request:
 

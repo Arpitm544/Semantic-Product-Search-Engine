@@ -88,6 +88,7 @@ class TestTrainingProtocol(unittest.TestCase):
         self.assertNotIn(0, train_ids)
         self.assertNotIn(20, train_ids)
         self.assertEqual(prepare_data(products, queries), (data, manifest))
+        self.assertEqual(prepare_data(list(reversed(products)), queries), (data, manifest))
         train_queries = {row["query"].lower() for row in data["train"]}
         held_queries = {row["query"].lower() for split in ("validation", "test") for row in data[split]}
         self.assertFalse(train_queries & held_queries)
@@ -102,6 +103,19 @@ class TestTrainingProtocol(unittest.TestCase):
             used.extend(batch)
         self.assertEqual(len(used), len(set(used)))
         self.assertEqual(len(used), 40)
+
+    def test_esci_batches_consume_uneven_remainder(self):
+        rows = [{"negative_group": group} for group in ["a"] * 15 + ["b"] * 2]
+        batches = grouped_batches(rows, 4, 42, include_remainder=True)
+        used = [index for batch in batches for index in batch]
+        self.assertEqual(sorted(used), list(range(len(rows))))
+        self.assertTrue(all(1 <= len(batch) <= 4 for batch in batches))
+
+    def test_metric_labels_follow_requested_cutoff(self):
+        metrics = retrieval_metrics([99, 1], [1], k=1)
+        self.assertEqual(metrics["recall@1"], 0)
+        self.assertEqual(metrics["hit_rate@1"], 0)
+        self.assertNotIn("recall@5", metrics)
 
     def test_typo_generation_keeps_model_number(self):
         for kind in ("deletion", "transposition", "substitution", "repetition"):

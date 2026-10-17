@@ -26,7 +26,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 EVAL_PATH = DATA_DIR / "eval" / "eval_set.json"
 BM25_REPORT_PATH = REPORTS_DIR / "baseline_metrics.json"
-SEMANTIC_REPORT_PATH = REPORTS_DIR / "dense_metrics.json"
+SEMANTIC_REPORT_PATH = REPORTS_DIR / "semantic_metrics.json"
 FRONTEND_ORIGINS = {
     origin.strip()
     for origin in os.environ.get(
@@ -55,7 +55,7 @@ def get_search_engine():
     global _search_engine, _search_signature
     with _search_lock:
         manifest = version()
-        model_path = os.environ.get("SEMANTIC_MODEL_PATH", "models/colab-export/esci-minilm-20k")
+        model_path = os.environ.get("SEMANTIC_MODEL_PATH", "models/esci-minilm-20k")
         reranker_path = os.environ.get("RERANKER_MODEL_PATH", "models/ms-marco-MiniLM-L6-v2")
         signature = (manifest["sha256"], manifest["updated_at"], model_path, reranker_path)
         if _search_engine is not None and signature == _search_signature:
@@ -103,9 +103,9 @@ def get_search_engine():
 
 def dashboard_data():
     products = load_products()
-    queries = []
-    bm25 = None
-    semantic = None
+    queries = read_json(EVAL_PATH, [])
+    bm25 = read_json(BM25_REPORT_PATH)
+    semantic = read_json(SEMANTIC_REPORT_PATH)
     if not isinstance(products, list):
         raise FileNotFoundError(
             "Amazon catalog could not be loaded from MongoDB."
@@ -133,9 +133,9 @@ def dashboard_data():
         },
         "sources": {
             "catalog": f"MongoDB/{COLLECTION}",
-            "queries": None,
+            "queries": "data/eval/eval_set.json" if queries else None,
             "bm25": "reports/baseline_metrics.json" if bm25 else None,
-            "semantic": "reports/dense_metrics.json" if semantic else None,
+            "semantic": "reports/semantic_metrics.json" if semantic else None,
         },
         "generatedAt": datetime.now(timezone.utc).isoformat(),
     }

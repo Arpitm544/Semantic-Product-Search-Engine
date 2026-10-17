@@ -6,6 +6,32 @@ The serving catalog is MongoDB `semantic_product_search.amazon_products`.
 There is no JSON fallback in the API. The prepared JSON is only an import artifact.
 The existing raw and processed collections are preserved.
 
+## Prepare data and models
+
+From a fresh checkout, follow [Colab preparation and training](colab-training.md)
+to create `data/esci/prepared/products.json` and download `esci_minilm_model.zip`.
+The model archive is produced by that workflow; it is not included in Git.
+With the backend virtual environment activated, extract the archive and prepare
+the reranker once (this step downloads weights; serving never does):
+
+```bash
+mkdir -p models
+unzip /absolute/path/to/esci_minilm_model.zip -d models
+python - <<'MODEL'
+from sentence_transformers import CrossEncoder
+model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
+model.save_pretrained("models/ms-marco-MiniLM-L6-v2")
+MODEL
+cp .env.example .env
+python scripts/import_amazon_mongo.py
+```
+
+Replace the archive path with your downloaded file. The encoder must contain
+`models/esci-minilm-20k/modules.json` and its weights; the reranker must contain
+`models/ms-marco-MiniLM-L6-v2/config.json` and its weights. Both directories are
+Git ignored. Configure MongoDB in `.env` before importing; shell exports take
+precedence. Start MongoDB before the import.
+
 ## Start
 
 Ensure MongoDB is running, then from the Python project directory:
@@ -23,9 +49,10 @@ Amazon ESCI has no reliable price, stock, or rating fields; missing values are n
 
 ## Search configuration
 
-- Fine-tuned model: `models/colab-export/esci-minilm-20k`.
+- Fine-tuned model: `models/esci-minilm-20k`.
 - Reranker: `models/ms-marco-MiniLM-L6-v2`, maximum length 256.
-- Keyword matching: brand and title.
+- Keyword matching: full `representation_text`, including product details.
+- Spelling vocabulary: brand and title.
 - Spelling: frequency-based tie handling; common known words preserved.
 - Query expansion: original query plus up to four alternatives.
 - Retrieval: 50 candidates per alternative, reciprocal-rank fusion.

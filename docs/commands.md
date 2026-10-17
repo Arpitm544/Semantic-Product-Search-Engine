@@ -9,7 +9,7 @@ Keep this guide beside the [Study Notes](study-notes.md). Each command below tel
 From the repository root, enter the Python project:
 
 ```bash
-cd semantic-product-search
+cd backend
 ```
 
 All module, notebook, and test commands below run from this folder. Use `python -m src...` so Python can find the project's imports.
@@ -28,9 +28,11 @@ The embedding library may download the MiniLM model the first time you use seman
 
 ## Start the backend API
 
-From the `backend/frontend` folder, install and start both the API and website:
+From the repository root, enter `frontend/`, install and start both services
+after completing [backend preparation](amazon-backend.md):
 
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
@@ -124,9 +126,10 @@ It then searches the example query `wireless Bluetooth headphones` and prints up
 python -m src.semantic.evaluate_semantic
 ```
 
-Loads the saved FAISS index and metadata, or builds them if either is missing, and evaluates the same labeled queries. Prints metrics and timing, then writes `reports/semantic_metrics.json`.
+This legacy processed-catalog benchmark rebuilds its index on each run, warms the encoder, and retrieves the full ranking for MAP. It does not measure the Amazon serving pipeline. It evaluates the same legacy labeled queries. Prints metrics and timing, then writes `reports/semantic_metrics.json`.
 
-Evaluation reuses existing indexes. After changing searchable product text or the embedding model, rebuild the corresponding index before evaluating that search method.
+The keyword evaluator reuses its saved index; rebuild it after changing product text.
+The legacy semantic evaluator always rebuilds, so it cannot reuse stale product vectors.
 
 ## A simple learning sequence
 
@@ -181,7 +184,7 @@ After checking the results, start the backend with a selected model:
 SEMANTIC_MODEL_PATH=models/typo-minilm-candidate python api/main.py
 ```
 
-The candidate model is not activated automatically. The API uses cached original MiniLM weights by default, with BM25 and fuzzy matching as a fallback if semantic dependencies or weights are unavailable.
+The candidate model is not activated automatically. The API requires a local encoder and reranker; see [backend preparation](amazon-backend.md). Missing weights cause service errors.
 
 ## Run existing tests
 

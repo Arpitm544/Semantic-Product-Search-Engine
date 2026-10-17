@@ -101,7 +101,7 @@ def prepare_data(products, eval_queries, seed=42):
         raise ValueError("Evaluation labels reference IDs absent from the catalog.")
     # Duplicate titles are the same family even if their IDs differ.
     families = defaultdict(list)
-    for product in products:
+    for product in sorted(products, key=lambda product: str(product["id"])):
         family = " ".join(product["title"].lower().split())
         families[family].append(product)
     available = [

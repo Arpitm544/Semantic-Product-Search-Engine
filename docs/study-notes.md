@@ -2,7 +2,7 @@
 
 > Commands and artifact paths in this guide are relative to `backend/`, unless stated otherwise.
 
-These notes explain the code in `semantic-product-search` as it stood on 6 October 2026. Read the project as a story: a shop gives us its products, we prepare them, and a customer searches for something.
+These historical learning notes describe the baseline and semantic modules now under `backend/`. See [Architecture](architecture.md) for the current serving pipeline. Read the project as a story: a shop gives us its products, we prepare them, and a customer searches for something.
 
 Imagine the customer types **“eyewear for sunny days.”** A product might be called **“sunglasses.”** Our job is to find suitable products and put the strongest matches first. This is a teaching example; a specific result depends on the catalog and the model.
 
@@ -221,7 +221,7 @@ Those are the default weights; the API lets the semantic weight change. This is 
 
 The demo also provides explicit category and maximum-price filters. For a request such as “under 50,” the core semantic engine compares text; a numeric price condition needs an explicit filter. Price is stored in the product record but is absent from the text we embed.
 
-The demo has its own metadata and index files. The `semantic-product-search` folder builds and evaluates keyword and semantic search separately.
+The demo has its own metadata and index files. The `backend` folder builds and evaluates keyword and semantic search separately.
 
 **Remember:** hybrid combines scores; filters enforce product conditions.
 
@@ -229,6 +229,8 @@ The demo has its own metadata and index files. The `semantic-product-search` fol
 
 ```text
 backend/
+├── api/                    HTTP API and startup initialization
+├── scripts/                Startup, import, and packaging commands
 ├── data/                   The inputs
 │   ├── raw/                Original product records
 │   ├── processed/          Prepared product records
@@ -242,6 +244,7 @@ backend/
 │   │   ├── load_data.py    Load database or file records
 │   │   ├── validation.py   Check records
 │   │   └── preprocess.py   Prepare searchable text
+│   ├── search/             Serving spelling, hybrid retrieval, and reranking
 │   ├── baseline/
 │   │   ├── bm25.py         Keyword search
 │   │   └── evaluate_baseline.py
@@ -270,7 +273,7 @@ The code has a few defaults that are easy to miss:
 
 The model's default limit is 256 word pieces. Ordinary word counts do not prove that a description fits the model token limit. [Model card](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
 
-From the `semantic-product-search` folder, run each executable module with its command below:
+From the `backend/` folder, run each executable module with its command below:
 
 | File | Run command |
 | --- | --- |

@@ -103,7 +103,7 @@ def evaluation_records(groups, families, seed):
     records = []
     for family in sorted(families):
         group = groups[family]
-        relevant = sorted(pid for pid, grade in group["grades"].items() if grade == 3)
+        relevant = sorted(pid for pid, grade in group["grades"].items() if grade > 0)
         query_id = "esci-" + hashlib.sha256(family.encode()).hexdigest()[:16]
         for record in query_records(query_id, group["query"], relevant, rng, "amazon-esci"):
             records.append({
