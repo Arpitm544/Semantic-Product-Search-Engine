@@ -46,7 +46,7 @@ refund an upstream request that already started.
 - After the original hero, desktop scrolling advances through four chapters: a scripted search, the AirPods Max reveal/details, a schematic meaning map, and an illustrative match.
 - The query “Apple headphones for a quieter commute” is typed as the visitor scrolls through the first chapter. “Find my headphones” advances to the product reveal without submitting a request. Mobile and reduced motion show the full query before the product image.
 - The AirPods Max model is loaded from a local, optimized GLB with creator attribution. Drag it or use the arrow buttons; detail buttons and green/silver color studies are local visual controls. The story refers to the original generation, independently of the sample catalog.
-- Mobile screens, reduced-motion preferences, and browsers without WebGL use shorter chapters with a still image of the same 3D model. The canvas loads near the story and pauses rendering off screen.
+- Mobile screens and reduced-motion preferences use shorter chapters with a still image of the same 3D model. Browsers without WebGL keep the full chapters and show the still image with a "3D view unavailable" message. The canvas loads near the story and pauses rendering off screen.
 - The final keyword / semantic / hybrid comparison uses one scripted query. It explains the approaches; it is not a live ranking or performance benchmark.
 
 ## Styling
