@@ -2,7 +2,7 @@
 
 import unittest
 
-from src.baseline.bm25 import fit_bm25, search_bm25
+from src.keyword_search.bm25 import fit_bm25, search_bm25
 from src.semantic.prepare_esci import (
     choose_training_pairs, normalize_query, select_splits, group_judgments, evaluation_records,
 )

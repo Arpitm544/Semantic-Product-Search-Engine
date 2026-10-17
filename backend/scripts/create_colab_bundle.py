@@ -6,7 +6,7 @@ from pathlib import Path
 import zipfile
 
 PROJECT = Path(__file__).resolve().parents[1]
-DATA = PROJECT / "data" / "esci" / "prepared"
+DATA = PROJECT / "data" / "dataset" / "prepared"
 
 
 def sha256(path):
@@ -27,11 +27,20 @@ def cell(kind, source):
 
 
 def notebook(bundle_sha):
+    """Build the Colab cells in the order a user runs them."""
     cells = [
         cell("markdown", """# Fine tune MiniLM on all 40,000 Amazon ESCI examples
 
 Open this notebook in Google Colab and choose **Runtime → Change runtime type → GPU**.
 Then run the cells in order. Training and evaluation run on Google's computer.
+
+Before opening Colab, follow the repository's `docs/colab-training.md` preparation
+steps from a fresh checkout: install backend requirements, run
+`python -m src.semantic.download_esci`,
+`python -m src.semantic.prepare_esci --pairs 20000 --validation-queries 200 --test-queries 200 --seed 42`,
+then `python scripts/create_colab_bundle.py` from `backend/`.
+Use the regenerated notebook and `colab/esci_colab_bundle.zip` together; the ZIP
+is generated locally and is not included in the repository.
 
 The bundle contains 20,000 human-labeled English Exact pairs, 20,000 typo views,
 and labeled Irrelevant negatives. Validation and official test query families
@@ -64,7 +73,7 @@ MODEL_DIR = DRIVE_ROOT / "models" / RUN_NAME
 REPORTS_DIR = DRIVE_ROOT / "reports" / RUN_NAME
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 PROJECT = Path("/content/esci_runtime/semantic-product-search")
-DATA_DIR = PROJECT / "data/esci/prepared"
+DATA_DIR = PROJECT / "data/dataset/prepared"
 """),
         cell("markdown", """## 3. Upload and verify the prepared bundle
 Upload **esci_colab_bundle.zip** when the file picker opens. On reconnect, the
@@ -119,9 +128,8 @@ sys.path.insert(0, str(PROJECT))
 This checks query leakage and relevant-product protection before training.
 It confirms that batching uses every example and prints the number of steps per epoch.
 """),
-        cell("code", """from src.semantic.prepare_training import read_jsonl, catalog_fingerprint
+        cell("code", """from src.semantic.dataset import read_jsonl, catalog_fingerprint, grouped_batches
 from src.semantic.train_esci import validate_training_rows
-from src.semantic.fine_tune import grouped_batches
 
 manifest = json.loads((DATA_DIR / "manifest.json").read_text())
 rows = read_jsonl(DATA_DIR / "train.jsonl")
@@ -137,7 +145,7 @@ print("Training examples:", len(rows), "| Steps:", len(batches))
 print("Product catalog:", len(products))
 del rows, held, products, batches
 subprocess.run([sys.executable, "-m", "pytest",
-    "tests/test_esci_training.py", "tests/test_typo_search.py", "tests/test_baseline.py", "-q"
+    "tests/test_esci_training.py", "tests/test_typo_search.py", "tests/test_keyword_search.py", "-q"
 ], check=True)
 """),
         cell("markdown", """## 6. Train on the Colab GPU
@@ -281,11 +289,14 @@ def main():
     manifest = json.loads((DATA / "manifest.json").read_text())
     if manifest["clean_training_pairs"] != 20000 or manifest["augmented_training_pairs"] != 40000:
         raise ValueError("This notebook is configured for the prepared 20k + 20k dataset.")
+    # Include source, tests, API files, prepared data, and dataset license.
     paths = sorted((PROJECT / "src").rglob("*.py"))
     paths += sorted((PROJECT / "tests").rglob("*.py"))
-    paths += [PROJECT / "api" / "main.py", PROJECT / "requirements.txt"]
+    paths += sorted((PROJECT / "api").glob("*.py"))
+    paths += [PROJECT / "requirements.txt"]
     paths += [DATA / name for name in ("manifest.json", "train.jsonl", "validation.jsonl", "test.jsonl", "products.json")]
-    paths += [PROJECT / "data/esci/raw" / name for name in ("LICENSE", "NOTICE", "source.json")]
+    paths += [PROJECT / "data/dataset/raw" / name for name in ("LICENSE", "NOTICE", "source.json")]
+    # Hash every input so the notebook can verify the uploaded bundle.
     hashes = {path.relative_to(PROJECT).as_posix(): sha256(path) for path in paths}
     directory = PROJECT / "colab"
     directory.mkdir(exist_ok=True)
@@ -296,6 +307,7 @@ def main():
         archive.writestr("semantic-product-search/colab_bundle_manifest.json",
                          json.dumps({"sha256": hashes, "source_revision": manifest["source_revision"]}, indent=2))
     bundle_sha = sha256(bundle)
+    # Keep the notebook and ZIP together by recording the ZIP hash in a cell.
     notebook_path = PROJECT / "notebooks" / "02_colab_esci_fine_tuning.ipynb"
     notebook_path.parent.mkdir(exist_ok=True)
     notebook_path.write_text(json.dumps(notebook(bundle_sha), indent=2) + "\n")

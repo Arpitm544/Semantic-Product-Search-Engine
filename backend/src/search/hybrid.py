@@ -1,8 +1,8 @@
-"""Fuse ranked lists without mixing BM25 and cosine score scales."""
+"""Combine keyword matches, spelling corrections, and meaning-based matches."""
 
 from collections import defaultdict
 
-from src.baseline.bm25 import fit_bm25, search_bm25, tokenize
+from src.keyword_search.bm25 import fit_bm25, search_bm25, tokenize
 from src.search.typos import CatalogSpelling
 
 
@@ -28,6 +28,7 @@ class HybridSearch:
         if not tokenize(query) or limit <= 0:
             return payload
 
+        # Collect a separate ranked list from each search method.
         rankings = [("keyword", 1.0, search_bm25(self.lexical, query, len(self.products)))]
         if corrections:
             rankings.append((
@@ -41,6 +42,7 @@ class HybridSearch:
                     "semantic-corrected", 0.5, self.semantic.search(corrected, candidate_k),
                 ))
 
+        # Higher-ranked matches earn more points; repeated matches add up.
         scores = defaultdict(float)
         sources = defaultdict(list)
         products_by_id = {}
@@ -51,6 +53,7 @@ class HybridSearch:
                 scores[product_id] += weight / (60 + rank)
                 sources[product_id].append(source)
 
+        # Sort by combined score and attach the matching methods to each result.
         ids = sorted(scores, key=lambda product_id: (-scores[product_id], str(product_id)))
         payload["total"] = len(ids)
         payload["results"] = [

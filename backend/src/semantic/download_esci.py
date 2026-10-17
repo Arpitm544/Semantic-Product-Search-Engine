@@ -7,9 +7,8 @@ from pathlib import Path
 import re
 from urllib.request import Request, urlopen
 
-from src.config import PROJECT_ROOT
+from src.config import DATASET_DIR
 
-ESCI_DIR = PROJECT_ROOT / "data" / "esci"
 REPOSITORY = "amazon-science/esci-data"
 FILES = (
     "shopping_queries_dataset_examples.parquet",
@@ -18,12 +17,14 @@ FILES = (
 
 
 def fetch_bytes(url):
+    """Download a small source or metadata file."""
     request = Request(url, headers={"User-Agent": "semantic-product-search-training"})
     with urlopen(request, timeout=60) as response:
         return response.read()
 
 
 def file_sha256(path):
+    """Hash a file in chunks without loading the whole file into memory."""
     digest = hashlib.sha256()
     with Path(path).open("rb") as source:
         for chunk in iter(lambda: source.read(4 * 1024 * 1024), b""):
@@ -32,6 +33,7 @@ def file_sha256(path):
 
 
 def download_verified(url, destination, expected_sha, expected_size):
+    """Reuse verified downloads or check a new file before accepting it."""
     if (destination.exists() and destination.stat().st_size == expected_size
             and file_sha256(destination) == expected_sha):
         print(f"Verified cached {destination.name}", flush=True)
@@ -58,11 +60,16 @@ def download_verified(url, destination, expected_sha, expected_size):
     print(f"Downloaded and verified {destination.name} ({written / 1024**2:.1f} MiB)", flush=True)
 
 
-def main():
+def parse_arguments():
+    """Read options supplied after the command name."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path, default=ESCI_DIR / "raw")
+    parser.add_argument("--output-dir", type=Path, default=DATASET_DIR / "raw")
     parser.add_argument("--revision", default=None, help="Pinned Git commit; defaults to the cached revision, or current main when no manifest exists.")
-    args = parser.parse_args()
+    return parser, parser.parse_args()
+
+
+def download_dataset(args, parser):
+    """Choose a source revision, download verified files, and save source information."""
     args.output_dir.mkdir(parents=True, exist_ok=True)
     metadata_path = args.output_dir / "source.json"
     existing = json.loads(metadata_path.read_text()) if metadata_path.exists() else None
@@ -96,8 +103,15 @@ def main():
             destination.write_bytes(fetch_bytes(
                 f"https://raw.githubusercontent.com/{REPOSITORY}/{revision}/{name}",
             ))
-    metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
+    temporary_metadata = metadata_path.with_suffix(metadata_path.suffix + ".part")
+    temporary_metadata.write_text(json.dumps(metadata, indent=2) + "\n")
+    temporary_metadata.replace(metadata_path)
     print(f"Source manifest: {metadata_path}", flush=True)
+
+
+def main():
+    parser, args = parse_arguments()
+    download_dataset(args, parser)
 
 
 if __name__ == "__main__":

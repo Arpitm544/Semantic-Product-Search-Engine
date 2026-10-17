@@ -1,232 +1,91 @@
-# Run Commands — Semantic Product Search
+# Run commands
 
-> Commands and artifact paths in this guide are relative to `backend/`, unless stated otherwise.
+Run Python commands from backend/. Run website commands from frontend/.
 
-Keep this guide beside the [Study Notes](study-notes.md). Each command below tells you which file it runs, what it does, and where its results go.
+## Start the application
 
-## Start in the right folder
+From backend/, with MongoDB and the local models ready:
 
-From the repository root, enter the Python project:
+~~~sh
+sh scripts/start_backend.sh
+~~~
 
-```bash
-cd backend
-```
+From frontend/, in another terminal:
 
-All module, notebook, and test commands below run from this folder. Use `python -m src...` so Python can find the project's imports.
+~~~sh
+npm run dev:frontend
+~~~
 
-## Set up Python once
+The website uses port 3001; the API uses port 8000.
+See [backend setup](backend.md) for model paths and database settings.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-```
+## Dataset
 
-On later visits, activate the environment with `source .venv/bin/activate` before running the modules. On Windows, the activation command is `.venv\Scripts\activate`.
+All local source and prepared data live under data/dataset/ inside backend/:
 
-The embedding library may download the MiniLM model the first time you use semantic search. An internet connection is needed for API ingestion and for an uncached model download.
+- raw/: original Amazon products, labeled queries, source information, and license.
+- prepared/: products.json, train.jsonl, validation.jsonl, test.jsonl, and manifest.json.
 
-## Start the backend API
+Download the original dataset only when it is missing:
 
-From the repository root, enter `frontend/`, install and start both services
-after completing [backend preparation](amazon-backend.md):
+~~~sh
+python -m src.semantic.download_esci
+~~~
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+Prepare the dataset only when prepared/ is missing:
 
-The website is at `http://localhost:3001`; the API listens on `http://127.0.0.1:8000` and provides `/api/health`, `/api/dashboard`, and `/api/search?q=...`. Both stop with `Ctrl+C`.
+~~~sh
+python -m src.semantic.prepare_esci
+~~~
 
-To run them separately, start the API from `backend/`:
+The preparation command refuses to overwrite an existing manifest.
+For a separate experiment, supply another --output-dir.
 
-```bash
-python3 api/main.py
-```
+## Import the catalog into MongoDB
 
-Then start the frontend with `npm run dev:frontend` from `frontend/`. To use another backend URL, set `NEXT_PUBLIC_API_URL` before starting Next.js. The backend accepts local frontend origins on port 3001; `FRONTEND_ORIGINS` can override that allowlist.
+~~~sh
+python scripts/import_catalog.py
+~~~
 
-## Commands for each executable module
+The default input is data/dataset/prepared/products.json.
+Serving reads the imported MongoDB catalog.
 
-### 1. Fetch products — `src/ingestion.py`
+## Training
 
-```bash
-python -m src.ingestion
-```
+Use the [Colab guide](colab-training.md) for GPU training.
+To regenerate the matching upload ZIP and notebook after code changes:
 
-Fetches the DummyJSON catalog and attempts to upsert records into MongoDB's `products_raw` collection. It does not update `data/raw/products.json`. With MongoDB unavailable, it logs that persistence was skipped.
+~~~sh
+python scripts/create_colab_bundle.py
+~~~
 
-The default MongoDB server is `mongodb://localhost:27017/`. The `MONGO_URI` and `MONGO_DB_NAME` environment variables can change the connection settings. If you are learning from the saved local catalog, you can skip API ingestion.
+Local training uses the same prepared dataset:
 
-### 2. Check the catalog — `src/data/validation.py`
+~~~sh
+python -m src.semantic.train_esci --output-dir models/new-run
+~~~
 
-```bash
-python -m src.data.validation
-```
+Training requires the embedding model and training libraries. Use a new output
+directory for a new run; --resume continues a compatible checkpoint.
 
-Loads raw records from MongoDB or the saved JSON file, then prints a validation result and a report of missing fields, duplicate IDs, and invalid prices. It does not create an index.
+## Evaluate search
 
-### 3. Prepare searchable text — `src/data/preprocess.py`
+Compare keyword and spelling-aware retrieval on the prepared validation split:
 
-```bash
-python -m src.data.preprocess
-```
+~~~sh
+python -m src.semantic.evaluate_typos --lexical-only
+~~~
 
-Loads raw products, prints their validation status, prepares `representation_text`, and attempts to save processed records to MongoDB's `products_processed` collection. The default command does not update `data/processed/products_cleaned.json` because `save_json_backup` defaults to `False`. Validation failure is printed but does not stop this command.
+Use --split test for the held-out test split. Model comparisons and metrics are
+described in [search evaluation](typo-search.md).
 
-To read the saved raw JSON and write a fresh cleaned JSON file, use this alternative:
+## Tests
 
-```bash
-python - <<'PY'
-from src.data.load_data import load_raw_products
-from src.data.preprocess import preprocess_catalog
-from src.data.validation import validate_catalog
+From the repository root, with development dependencies installed:
 
-raw = load_raw_products(prefer_mongo=False)
-valid, report = validate_catalog(raw)
-if not valid:
-    raise ValueError(report)
+~~~sh
+pytest
+~~~
 
-preprocess_catalog(raw, save_to_mongo=False, save_json_backup=True)
-PY
-```
-
-This version explicitly stops on failed validation and writes `data/processed/products_cleaned.json`. It is a shell example for macOS/Linux.
-
-### 4. Build keyword search — `src/baseline/bm25.py`
-
-```bash
-python -m src.baseline.bm25
-```
-
-Builds a BM25 index from processed products, writes `indexes/bm25_index.pkl`, then searches the example query `warm winter jacket` and prints up to three results. Running it again rebuilds the saved index.
-
-### 5. Evaluate keyword search — `src/baseline/evaluate_baseline.py`
-
-```bash
-python -m src.baseline.evaluate_baseline
-```
-
-Loads the saved BM25 index, or builds one if absent, and searches the queries in `data/eval/eval_set.json`. Prints retrieval metrics and query timing, then writes `reports/baseline_metrics.json`.
-
-### 6. Build semantic search — `src/semantic/vector_search.py`
-
-```bash
-python -m src.semantic.vector_search
-```
-
-Loads processed products, generates MiniLM embeddings, normalizes them, and builds a FAISS `IndexFlatIP` index. Writes both `indexes/faiss_index.bin` and `indexes/faiss_id_map.pkl`.
-
-It then searches the example query `wireless Bluetooth headphones` and prints up to three results. Running it again rebuilds both index artifacts.
-
-### 7. Evaluate semantic search — `src/semantic/evaluate_semantic.py`
-
-```bash
-python -m src.semantic.evaluate_semantic
-```
-
-This legacy processed-catalog benchmark rebuilds its index on each run, warms the encoder, and retrieves the full ranking for MAP. It does not measure the Amazon serving pipeline. It evaluates the same legacy labeled queries. Prints metrics and timing, then writes `reports/semantic_metrics.json`.
-
-The keyword evaluator reuses its saved index; rebuild it after changing product text.
-The legacy semantic evaluator always rebuilds, so it cannot reuse stale product vectors.
-
-## A simple learning sequence
-
-With dependencies installed and the saved raw catalog available, you can use the local JSON preprocessing example above, then run:
-
-```bash
-python -m src.baseline.bm25
-python -m src.semantic.vector_search
-```
-
-Loaders normally prefer nonempty MongoDB collections when available. For an explicitly local-only experiment in Python, call `load_raw_products(prefer_mongo=False)` or `load_cleaned_products(prefer_mongo=False)`. The existing module commands do not expose a local-only command-line flag.
-
-## Search with your own query
-
-After building the indexes, this example loads both and prints their results without rebuilding:
-
-```bash
-python - <<'PY'
-from src.baseline.bm25 import load_bm25, search_bm25
-from src.semantic.vector_search import SemanticVectorSearch
-
-query = "eyewear for sunny days"
-keyword = load_bm25()
-semantic = SemanticVectorSearch.load()
-searches = [
-    ("Keyword", search_bm25(keyword, query, top_k=3)),
-    ("Semantic", semantic.search(query, top_k=3)),
-]
-for name, results in searches:
-    print(f"\n{name}: {query}")
-    for product, score in results:
-        print(product["id"], product["title"], score)
-PY
-```
-
-Edit `query` to try other searches. Scores from the two methods have different scales.
-
-## Fine tune for misspelled queries
-
-Follow [Fine tuning and fuzzy search](typo-search.md) for the data split, evaluation metrics, and model activation details. From the Python project folder:
-
-```bash
-python -m src.semantic.prepare_training
-python -m src.semantic.fine_tune
-python -m src.semantic.evaluate_typos --model models/typo-minilm-candidate --split validation
-python -m src.semantic.evaluate_typos --model models/typo-minilm-candidate --split test
-```
-
-After checking the results, start the backend with a selected model:
-
-```bash
-SEMANTIC_MODEL_PATH=models/typo-minilm-candidate python api/main.py
-```
-
-The candidate model is not activated automatically. The API requires a local encoder and reranker; see [backend preparation](amazon-backend.md). Missing weights cause service errors.
-
-## Run existing tests
-
-Run all existing tests:
-
-```bash
-python -m pytest tests/
-```
-
-Or select one file:
-
-| Test file | Command |
-| --- | --- |
-| `tests/test_data_pipeline.py` | `python -m pytest tests/test_data_pipeline.py` |
-| `tests/test_db.py` | `python -m pytest tests/test_db.py` |
-| `tests/test_baseline.py` | `python -m pytest tests/test_baseline.py` |
-| `tests/test_semantic_search.py` | `python -m pytest tests/test_semantic_search.py` |
-
-Semantic search tests use a real encoder and may need the model download. `tests/conftest.py` supplies fixtures to pytest; it is not a standalone test command.
-
-## Open the notebook
-
-The notebook is `notebooks/01_eda.ipynb`. Jupyter is an optional extra for reading it interactively:
-
-```bash
-python -m pip install notebook
-python -m notebook notebooks/01_eda.ipynb
-```
-
-Choose the Python environment where you installed this project's dependencies.
-
-## Files without a standalone pipeline command
-
-| File or folder | How it is used |
-| --- | --- |
-| `src/config.py` | Imported for paths and settings |
-| `src/data/db.py` | Imported for MongoDB operations |
-| `src/data/load_data.py` | Imported for loading records |
-| `__init__.py` | Package marker used by Python imports |
-| `tests/conftest.py` | Automatically loaded by pytest |
-| `data/` | Input records and evaluation labels |
-| `indexes/` | Artifacts loaded by the search engines |
-| `reports/` | Outputs to read after running the pipeline |
-
-Generated results depend on your catalog and model. The typo search guide includes the local starter experiment and instructions for reproducing its training and evaluation.
+The tests use small in-memory fixtures; they do not require the retired sample
+catalog or its data folders.

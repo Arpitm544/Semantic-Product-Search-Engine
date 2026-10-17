@@ -7,11 +7,9 @@ from pathlib import Path
 import random
 import time
 
-from src.config import EMBEDDING_MODEL_NAME, PROJECT_ROOT
-from src.semantic.download_esci import ESCI_DIR
-from src.semantic.fine_tune import grouped_batches
+from src.config import DATASET_DIR, EMBEDDING_MODEL_NAME, PROJECT_ROOT
+from src.semantic.dataset import grouped_batches, read_jsonl
 from src.semantic.prepare_esci import normalize_query
-from src.semantic.prepare_training import read_jsonl
 
 
 def negative_mask(rows):
@@ -30,6 +28,7 @@ def negative_mask(rows):
 
 
 def contrastive_loss(query_vectors, positive_vectors, negative_vectors, rows):
+    """Teach queries to favor the correct product over allowed negative products."""
     import torch
     import torch.nn.functional as functional
 
@@ -44,6 +43,7 @@ def contrastive_loss(query_vectors, positive_vectors, negative_vectors, rows):
 
 
 def validate_training_rows(rows, manifest, held_rows):
+    """Reject query leakage, incorrect labels, and unexpected row counts."""
     held = set(manifest["reserved_validation_families"]) | set(manifest["official_test_families"])
     held.update(normalize_query(row["query"]) for row in held_rows)
     for row in rows:
@@ -58,9 +58,10 @@ def validate_training_rows(rows, manifest, held_rows):
         raise ValueError("Prepared row counts differ from the dataset manifest.")
 
 
-def main():
+def parse_arguments():
+    """Read options supplied after the command name."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-dir", type=Path, default=ESCI_DIR / "prepared")
+    parser.add_argument("--data-dir", type=Path, default=DATASET_DIR / "prepared")
     parser.add_argument("--model", default=EMBEDDING_MODEL_NAME)
     parser.add_argument("--output-dir", type=Path, default=PROJECT_ROOT / "models" / "esci-minilm-20k")
     parser.add_argument("--epochs", type=int, default=1)
@@ -72,7 +73,37 @@ def main():
     parser.add_argument("--device", default=None)
     parser.add_argument("--local-files-only", action="store_true")
     parser.add_argument("--resume", action="store_true")
-    args = parser.parse_args()
+    return parser, parser.parse_args()
+
+
+def train_batch(model, optimizer, scheduler, rows):
+    """Encode one batch, calculate loss, and update the model weights."""
+    import torch
+    from sentence_transformers import InputExample
+    from sentence_transformers.util import batch_to_device
+
+    examples = [
+        InputExample(texts=[row["query"], row["positive"], row["negative"]])
+        for row in rows
+    ]
+    features, _ = model.smart_batching_collate(examples)
+    features = [batch_to_device(feature, model.device) for feature in features]
+    optimizer.zero_grad()
+    query_vectors, positive_vectors, negative_vectors = [
+        model(feature)["sentence_embedding"] for feature in features
+    ]
+    loss = contrastive_loss(query_vectors, positive_vectors, negative_vectors, rows)
+    if not torch.isfinite(loss):
+        raise RuntimeError("Training loss is not finite.")
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    optimizer.step()
+    scheduler.step()
+    return float(loss.detach().cpu())
+
+
+def train_model(args, parser):
+    """Validate the data, train or resume the model, then save weights and reports."""
     if min(args.epochs, args.batch_size, args.max_length, args.threads, args.checkpoint_every) < 1:
         parser.error("Epoch, batch, token, thread, and checkpoint counts must be positive.")
     if args.batch_size < 2 or not (0 < args.learning_rate < float("inf")):
@@ -80,6 +111,7 @@ def main():
     output = args.output_dir.resolve()
     if (output / "modules.json").exists() and not args.resume:
         parser.error("A model already exists at the output. Choose another directory.")
+    # 1. Validate the prepared data before loading a model.
     manifest_bytes = (args.data_dir / "manifest.json").read_bytes()
     manifest = json.loads(manifest_bytes)
     rows = read_jsonl(args.data_dir / "train.jsonl")
@@ -104,9 +136,9 @@ def main():
     }
 
     import torch
-    from sentence_transformers import InputExample, SentenceTransformer
-    from sentence_transformers.util import batch_to_device
+    from sentence_transformers import SentenceTransformer
 
+    # 2. Set up the model, optimizer, and learning-rate schedule.
     torch.set_num_threads(args.threads)
     torch.manual_seed(manifest["seed"])
     random.seed(manifest["seed"])
@@ -127,6 +159,7 @@ def main():
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = checkpoint_dir / "latest.pt"
     step, loss_sum, trained_examples = 0, 0.0, 0
+    # 3. Restore the saved state when resuming a previous run.
     if args.resume:
         state = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         if state["config"] != config:
@@ -172,33 +205,20 @@ def main():
 
     print(f"Training {len(rows):,} examples ({manifest['clean_training_pairs']:,} clean + typo views), "
           f"{total_steps} steps on {model.device}.", flush=True)
+    # 4. Train each batch and save progress regularly.
     model.train()
     try:
         while step < total_steps:
             batch_rows = [rows[index] for index in batches[step]]
-            examples = [InputExample(texts=[row["query"], row["positive"], row["negative"]])
-                        for row in batch_rows]
-            features, _ = model.smart_batching_collate(examples)
-            features = [batch_to_device(feature, model.device) for feature in features]
-            optimizer.zero_grad()
-            query, positive, negative = [
-                model(feature)["sentence_embedding"] for feature in features
-            ]
-            loss = contrastive_loss(query, positive, negative, batch_rows)
-            if not torch.isfinite(loss):
-                raise RuntimeError("Training loss is not finite.")
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step()
-            scheduler.step()
+            loss_value = train_batch(model, optimizer, scheduler, batch_rows)
             step += 1
-            loss_sum += float(loss.detach().cpu())
+            loss_sum += loss_value
             trained_examples += len(batch_rows)
             if step == 1 or step % 25 == 0 or step == total_steps:
                 status = progress("training")
                 (output / "progress.json").write_text(json.dumps(status, indent=2) + "\n")
                 eta = status["estimated_seconds_remaining"] or 0
-                print(f"Step {step}/{total_steps}, loss {float(loss.detach().cpu()):.4f}, "
+                print(f"Step {step}/{total_steps}, loss {loss_value:.4f}, "
                       f"remaining approximately {eta / 60:.1f} minutes", flush=True)
             if step % args.checkpoint_every == 0 or step == total_steps:
                 save_checkpoint()
@@ -212,6 +232,7 @@ def main():
         (output / "progress.json").write_text(json.dumps(progress("interrupted"), indent=2) + "\n")
         print(f"Saved resumable checkpoint after step {step}.", flush=True)
         raise
+    # 5. Save the finished model and its training report.
     model.eval()
     model.save_pretrained(str(output))
     report = {
@@ -224,6 +245,11 @@ def main():
     (output / "training_report.json").write_text(json.dumps(report, indent=2) + "\n")
     (output / "progress.json").write_text(json.dumps(progress("trained"), indent=2) + "\n")
     print(f"Saved fine tuned model at {output}", flush=True)
+
+
+def main():
+    parser, args = parse_arguments()
+    train_model(args, parser)
 
 
 if __name__ == "__main__":

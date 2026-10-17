@@ -1,90 +1,42 @@
-"""
-Unit tests for MongoDB helpers and data loader fallbacks.
-"""
+"""Verify MongoDB catalog reads and import readiness without a live database."""
+
 import unittest
 from unittest.mock import MagicMock, patch
-from src.data.db import (
-    get_raw_collection,
-    get_processed_collection,
-    save_raw_products,
-    load_raw_products,
-    save_processed_products,
-    load_processed_products,
-    get_products_by_ids,
-)
-from src.data.load_data import load_raw_products as load_raw_data
+
+from src.data import catalog as catalog
 
 
-class TestMongoDBHelpers(unittest.TestCase):
+class TestCatalog(unittest.TestCase):
+    def setUp(self):
+        self.db = MagicMock()
+        self.manifest = {"status": "ready", "product_count": 2}
+        self.db["catalog_manifests"].find_one.return_value = self.manifest
+        self.products = [{"id": "esci:us:1"}, {"id": "esci:us:2"}]
+        self.db[catalog.COLLECTION].find.return_value.sort.return_value = self.products
+        self.database_patch = patch.object(catalog, "database", return_value=self.db)
+        self.database_patch.start()
+        self.addCleanup(self.database_patch.stop)
 
-    def test_save_and_load_raw_products_mock(self):
-        mock_collection = MagicMock()
-        mock_db = {"products_raw": mock_collection}
+    def test_only_the_configured_catalog_is_loaded(self):
+        self.assertEqual(catalog.load_products(), self.products)
+        self.db[catalog.COLLECTION].find.assert_called_once_with({}, {"_id": 0})
+        self.db[catalog.COLLECTION].find.return_value.sort.assert_called_once_with("id", 1)
 
-        sample_products = [
-            {"id": 1, "title": "Product 1", "price": 10.0},
-            {"id": 2, "title": "Product 2", "price": 20.0},
-        ]
+    def test_missing_manifest_prevents_serving(self):
+        self.db["catalog_manifests"].find_one.return_value = None
+        with self.assertRaisesRegex(ValueError, "not ready"):
+            catalog.load_products()
+        self.db[catalog.COLLECTION].find.assert_not_called()
 
-        mock_bulk_result = MagicMock()
-        mock_bulk_result.upserted_count = 2
-        mock_bulk_result.modified_count = 0
-        mock_bulk_result.matched_count = 0
-        mock_collection.bulk_write.return_value = mock_bulk_result
+    def test_incomplete_import_prevents_serving(self):
+        self.manifest["status"] = "importing"
+        with self.assertRaisesRegex(catalog.CatalogUpdatingError, "in progress"):
+            catalog.load_products()
 
-        # Test save
-        count = save_raw_products(sample_products, db=mock_db)
-        self.assertEqual(count, 2)
-        mock_collection.bulk_write.assert_called_once()
-
-        # Test load
-        mock_collection.find.return_value = sample_products
-        loaded = load_raw_products(db=mock_db)
-        self.assertEqual(len(loaded), 2)
-        self.assertEqual(loaded[0]["title"], "Product 1")
-
-    def test_get_products_by_ids_mock(self):
-        mock_collection = MagicMock()
-        mock_db = {"products_processed": mock_collection}
-
-        sample_products = [
-            {"id": 1, "title": "Product 1"},
-            {"id": 2, "title": "Product 2"},
-        ]
-        mock_collection.find.return_value = sample_products
-
-        results = get_products_by_ids([2, 1], processed=True, db=mock_db)
-        self.assertEqual(len(results), 2)
-        # Check ordering is preserved according to request ids
-        self.assertEqual(results[0]["id"], 2)
-        self.assertEqual(results[1]["id"], 1)
-
-    @patch("src.data.load_data.is_mongo_available", return_value=False)
-    def test_load_data_fallback_to_file(self, mock_is_mongo):
-        """When MongoDB is unreachable, load_raw_products falls back to a JSON file."""
-        import json
-        import tempfile
-        import os
-        from pathlib import Path
-
-        sample = [
-            {"id": 1, "title": "Fallback Product A", "price": 9.99},
-            {"id": 2, "title": "Fallback Product B", "price": 19.99},
-        ]
-
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False, encoding="utf-8"
-        ) as f:
-            json.dump(sample, f)
-            tmp_path = Path(f.name)
-
-        try:
-            data = load_raw_data(path=tmp_path, prefer_mongo=False)
-            self.assertEqual(len(data), 2)
-            self.assertIn("title", data[0])
-            self.assertEqual(data[0]["title"], "Fallback Product A")
-        finally:
-            os.unlink(tmp_path)
+    def test_catalog_count_must_match_the_import_manifest(self):
+        self.manifest["product_count"] = 3
+        with self.assertRaisesRegex(ValueError, "count differs"):
+            catalog.load_products()
 
 
 if __name__ == "__main__":

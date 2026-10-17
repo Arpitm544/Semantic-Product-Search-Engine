@@ -1,14 +1,15 @@
-"""Amazon retrieval pipeline reproduced from the Colab validation experiment."""
+"""Find product candidates, score query/product pairs, then return ranked matches."""
 from collections import Counter, defaultdict
 from functools import lru_cache
 import re
 from threading import Lock
-from src.baseline.bm25 import fit_bm25
+from src.keyword_search.bm25 import fit_bm25
 from src.search.hybrid import HybridSearch
 from src.search.typos import CatalogSpelling, STOP_WORDS, edit_distance
 
 
 def brand_title(product):
+    """Build keyword-search text using the product brand and title."""
     match = re.search(r'\[Brand\]\s*([^|]+)', product.get('representation_text', ''))
     brand = match.group(1).strip() if match else product.get('brand', '')
     return f"{brand} {product.get('title', '')}"
@@ -30,7 +31,8 @@ class FrequencySpelling(CatalogSpelling):
         for length in range(len(word)-edits, len(word)+edits+1):
             for candidate in self.by_length.get(length, []):
                 distance = edit_distance(word, candidate)
-                if distance <= edits and 1-distance/max(len(word), length) >= .8:
+                threshold = .75 if len(word) == length == 4 else .8
+                if distance <= edits and 1-distance/max(len(word), length) >= threshold:
                     candidates.append((distance, candidate))
         if not candidates:
             return None
@@ -56,7 +58,8 @@ class FrequencySpelling(CatalogSpelling):
                     frequency = self.frequency[candidate]
                     if (candidate != word and frequency >= 5
                             and edit_distance(word, candidate) == 1
-                            and 1-1/max(len(word), len(candidate)) >= .8):
+                            and 1-1/max(len(word), len(candidate)) >=
+                            (.75 if len(word) == len(candidate) == 4 else .8)):
                         candidates.append((frequency, candidate))
             candidates.sort(key=lambda item: (-item[0], item[1]))
             for _, candidate in candidates[:2]:
@@ -68,7 +71,7 @@ class FrequencySpelling(CatalogSpelling):
         return variants
 
 
-class AmazonSearch:
+class ProductSearch:
     def __init__(self, products, semantic, reranker):
         self.products = products
         self.by_id = {p['id']: p for p in products}
@@ -91,33 +94,46 @@ class AmazonSearch:
         variants = self.spelling.alternatives(query) if fuzzy else [query]
         payload = dict(query=query, correctedQuery=corrected if corrections else None,
                        corrections=corrections, queryAlternatives=variants,
-                       searchMode='expanded-hybrid-reranked', semanticModel=getattr(self.semantic, 'model_name', None),
+                       searchMode=('expanded-hybrid-reranked' if self.semantic is not None
+                                   else 'expanded-keyword-reranked'),
+                       semanticModel=getattr(self.semantic, 'model_name', None),
                        total=0, results=[])
         if not query or limit <= 0:
             return payload
         with self.lock:
-            retrieval = defaultdict(float)
-            sources = defaultdict(set)
-            for variant in variants:
-                result = self.hybrid.search(variant, 50, fuzzy=False)
-                for rank, product in enumerate(result['results'], 1):
-                    retrieval[product['id']] += 1/(60+rank)
-                    sources[product['id']].update(product['matchSources'])
-                    if variant != query:
-                        sources[product['id']].add('fuzzy')
-            ids = sorted(retrieval, key=lambda pid: (-retrieval[pid], pid))
-            if not ids:
+            candidate_ids, sources = self.find_candidates(variants, query)
+            if not candidate_ids:
                 return payload
-            retrieval_ranks = {pid: rank for rank, pid in enumerate(ids, 1)}
-            pairs = [(corrected, self.by_id[pid].get('representation_text')
-                      or self.by_id[pid].get('title', '')) for pid in ids]
-            scores = self.reranker.predict(pairs, batch_size=32, show_progress_bar=False)
-            reranked = sorted(range(len(ids)), key=lambda i: (-float(scores[i]), retrieval_ranks[ids[i]]))
-            reranker_ranks = {ids[i]: rank for rank, i in enumerate(reranked, 1)}
-            blended = {pid: .25/(60+retrieval_ranks[pid])+.75/(60+reranker_ranks[pid]) for pid in ids}
-            final = sorted(ids, key=lambda pid: (-blended[pid], retrieval_ranks[pid]))
+            final, blended = self.rank_candidates(corrected, candidate_ids)
             payload['total'] = len(final)
             payload['results'] = [{**self.by_id[pid], 'score': blended[pid],
                                    'matchSources': sorted(sources[pid]) + ['reranker']}
                                   for pid in final[:limit]]
         return payload
+
+    def find_candidates(self, variants, query):
+        """Combine keyword and semantic matches from each query variation."""
+        retrieval = defaultdict(float)
+        sources = defaultdict(set)
+        for variant in variants:
+            result = self.hybrid.search(variant, 50, fuzzy=False)
+            for rank, product in enumerate(result['results'], 1):
+                retrieval[product['id']] += 1/(60+rank)
+                sources[product['id']].update(product['matchSources'])
+                if variant != query:
+                    sources[product['id']].add('fuzzy')
+        ids = sorted(retrieval, key=lambda pid: (-retrieval[pid], pid))
+        return ids, sources
+
+    def rank_candidates(self, corrected, ids):
+        """Blend model ranking (75%) with retrieval ranking (25%)."""
+        retrieval_ranks = {pid: rank for rank, pid in enumerate(ids, 1)}
+        pairs = [(corrected, self.by_id[pid].get('representation_text')
+                  or self.by_id[pid].get('title', '')) for pid in ids]
+        scores = self.reranker.predict(pairs, batch_size=32, show_progress_bar=False)
+        reranked = sorted(range(len(ids)), key=lambda i: (-float(scores[i]), retrieval_ranks[ids[i]]))
+        reranker_ranks = {ids[i]: rank for rank, i in enumerate(reranked, 1)}
+        blended = {pid: .25/(60+retrieval_ranks[pid])+.75/(60+reranker_ranks[pid]) for pid in ids}
+        final = sorted(ids, key=lambda pid: (-blended[pid], retrieval_ranks[pid]))
+
+        return final, blended

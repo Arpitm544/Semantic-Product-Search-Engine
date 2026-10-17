@@ -51,15 +51,15 @@ checksum and each packaged file before training.
 
 **File → Upload notebook** accepts the `.ipynb` notebook, not the data ZIP.
 Open `02_colab_esci_fine_tuning.ipynb` there first. The ZIP belongs in the
-file picker shown by notebook cell 3.
+file picker under **3. Upload and verify the prepared bundle**.
 
 You can also bypass that picker using Google Drive:
 
 1. Open Google Drive and create `semantic-product-search` inside **My Drive**.
 2. Open that folder and use **New → File upload** to upload
    `esci_colab_bundle.zip`. Keep the filename unchanged.
-3. In Colab, run cells 1 and 2 and authorize Drive access.
-4. Run cell 3. It automatically reads the ZIP from Drive and verifies it.
+3. In Colab, run all cells through **2. Connect Google Drive** and authorize access.
+4. Run all cells under **3. Upload and verify the prepared bundle** to read and verify the ZIP.
 5. Continue running the remaining cells in order.
 
 The expected location is
@@ -90,7 +90,7 @@ use the estimate after 50–100 steps to judge the remaining time.
 
 ## If Colab disconnects
 
-Reconnect to a GPU and rerun cells 1–6 with the same `RUN_NAME` and settings.
+Reconnect to a GPU and rerun all cells through **6. Train on the Colab GPU** with the same `RUN_NAME` and settings.
 The bundle is reused from Drive, and training resumes from
 `checkpoints/latest.pt`. A completed run is detected and is not trained again.
 

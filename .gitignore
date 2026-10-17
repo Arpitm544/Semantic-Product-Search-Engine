@@ -10,10 +10,6 @@ __pycache__/
 venv/
 .venv/
 
-# Data files — MongoDB is the source of truth; no local data files in git
-backend/data/processed/
-backend/data/raw/
-
 # Generated reports (re-created by running evaluations)
 backend/reports/
 
@@ -22,8 +18,7 @@ backend/indexes/*.bin
 backend/indexes/*.pkl
 
 # Local training datasets and model checkpoints
-backend/data/training/
-backend/data/esci/
+backend/data/dataset/
 backend/models/
 backend/colab/*.zip
 backend/colab/bundle_build_manifest.json

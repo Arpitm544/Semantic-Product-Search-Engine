@@ -5,15 +5,16 @@ from collections import defaultdict
 import json
 from pathlib import Path
 
-from src.baseline.bm25 import fit_bm25, search_bm25
-from src.config import EMBEDDING_MODEL_NAME, PROJECT_ROOT, PROCESSED_DATA_PATH
+from src.keyword_search.bm25 import fit_bm25, search_bm25
+from src.config import DATASET_DIR, EMBEDDING_MODEL_NAME, PROJECT_ROOT
 from src.search.hybrid import HybridSearch
-from src.semantic.prepare_training import (
-    TRAINING_DIR, catalog_fingerprint, load_catalog, read_jsonl,
+from src.semantic.dataset import (
+    catalog_fingerprint, load_catalog, read_jsonl,
 )
 
 
 def retrieval_metrics(retrieved_ids, relevant_ids, k=5):
+    """Measure relevant matches in the top five and the first match in the top ten."""
     relevant = set(relevant_ids)
     hits = len(set(retrieved_ids[:k]) & relevant)
     first = next((rank for rank, product_id in enumerate(retrieved_ids[:10], 1)
@@ -62,6 +63,7 @@ class CachedSemantic:
 
 
 def evaluate_systems(systems, queries):
+    """Run each search method and summarize scores for clean and typo queries."""
     summary = {}
     details = []
     for name, search in systems.items():
@@ -86,10 +88,11 @@ def evaluate_systems(systems, queries):
     return summary, details
 
 
-def main():
+def parse_arguments():
+    """Read options supplied after the command name."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-dir", type=Path, default=TRAINING_DIR)
-    parser.add_argument("--catalog", type=Path, default=PROCESSED_DATA_PATH)
+    parser.add_argument("--data-dir", type=Path, default=DATASET_DIR / "prepared")
+    parser.add_argument("--catalog", type=Path, default=DATASET_DIR / "prepared" / "products.json")
     parser.add_argument("--split", choices=("validation", "test"), default="validation")
     parser.add_argument("--base-model", default=EMBEDDING_MODEL_NAME)
     parser.add_argument("--model", type=Path, default=None, help="Candidate model directory.")
@@ -97,7 +100,43 @@ def main():
     parser.add_argument("--local-files-only", action="store_true")
     parser.add_argument("--device", default=None)
     parser.add_argument("--output", type=Path, default=None)
-    args = parser.parse_args()
+    return parser, parser.parse_args()
+
+
+def load_evaluation_index(engine, products, model_ref, catalog_hash, data_dir, name):
+    """Reuse product vectors only when both the catalog and model match."""
+    from src.semantic.vector_search import SemanticVectorSearch
+
+    model = engine.model
+    model_directory = Path(model_ref)
+    signature = {
+        "catalog_sha256": catalog_hash,
+        "model_ref": str(model_ref),
+        "max_seq_length": model.max_seq_length,
+        "base_revision": getattr(model[0].auto_model.config, "_commit_hash", None),
+        "local_weights": {
+            str(path.relative_to(model_directory)): [path.stat().st_size, path.stat().st_mtime_ns]
+            for pattern in ("*.safetensors", "*.bin", "modules.json", "config.json")
+            for path in model_directory.rglob(pattern)
+        } if model_directory.is_dir() else {},
+    }
+    cache = data_dir / "evaluation_indexes" / name
+    cache_manifest = cache / "signature.json"
+    index_path, map_path = cache / "faiss_index.bin", cache / "faiss_id_map.pkl"
+    if (index_path.exists() and map_path.exists()
+            and cache_matches(cache_manifest, signature)):
+        engine = SemanticVectorSearch.load(index_path, map_path)
+        engine._model = model
+        print(f"Using cached {name} product embeddings.", flush=True)
+    else:
+        engine.fit(products)
+        engine.save(index_path, map_path)
+        cache_manifest.write_text(json.dumps(signature, indent=2) + "\n")
+    return engine
+
+
+def evaluate_models(args, parser):
+    """Load evaluation data, compare search methods, and save their scores."""
     products = load_catalog(args.catalog)
     manifest = json.loads((args.data_dir / "manifest.json").read_text())
     if manifest["catalog_sha256"] != catalog_fingerprint(products):
@@ -123,31 +162,9 @@ def main():
             engine = SemanticVectorSearch(
                 str(model_ref), local_files_only=args.local_files_only, device=args.device,
             )
-            model = engine.model
-            model_directory = Path(model_ref)
-            signature = {
-                "catalog_sha256": manifest["catalog_sha256"],
-                "model_ref": str(model_ref),
-                "max_seq_length": model.max_seq_length,
-                "base_revision": getattr(model[0].auto_model.config, "_commit_hash", None),
-                "local_weights": {
-                    str(path.relative_to(model_directory)): [path.stat().st_size, path.stat().st_mtime_ns]
-                    for pattern in ("*.safetensors", "*.bin", "modules.json", "config.json")
-                    for path in model_directory.rglob(pattern)
-                } if model_directory.is_dir() else {},
-            }
-            cache = args.data_dir / "evaluation_indexes" / name
-            cache_manifest = cache / "signature.json"
-            index_path, map_path = cache / "faiss_index.bin", cache / "faiss_id_map.pkl"
-            if (index_path.exists() and map_path.exists()
-                    and cache_matches(cache_manifest, signature)):
-                engine = SemanticVectorSearch.load(index_path, map_path)
-                engine._model = model
-                print(f"Using cached {name} product embeddings.", flush=True)
-            else:
-                engine.fit(products)
-                engine.save(index_path, map_path)
-                cache_manifest.write_text(json.dumps(signature, indent=2) + "\n")
+            engine = load_evaluation_index(
+                engine, products, model_ref, manifest["catalog_sha256"], args.data_dir, name,
+            )
             cached = CachedSemantic(engine)
             expanded_queries = [row["query"] for row in queries]
             expanded_queries.extend(fuzzy.spelling.correct(row["query"])[0] for row in queries)
@@ -175,6 +192,11 @@ def main():
                 print(f"{name:20} {bucket:5} Recall@5={value['recall@5']:.3f} "
                       f"Hit@5={value['hit_rate@5']:.3f} MRR@10={value['mrr@10']:.3f}")
     print(f"Report: {output}")
+
+
+def main():
+    parser, args = parse_arguments()
+    evaluate_models(args, parser)
 
 
 if __name__ == "__main__":

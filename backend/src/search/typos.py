@@ -58,7 +58,8 @@ class CatalogSpelling:
         for length in range(len(word) - max_edits, len(word) + max_edits + 1):
             for candidate in self.by_length.get(length, []):
                 distance = edit_distance(word, candidate)
-                if distance <= max_edits and 1 - distance / max(len(word), length) >= 0.8:
+                threshold = 0.75 if len(word) == length == 4 else 0.8
+                if distance <= max_edits and 1 - distance / max(len(word), length) >= threshold:
                     candidates.append((distance, candidate))
         if not candidates:
             return None
