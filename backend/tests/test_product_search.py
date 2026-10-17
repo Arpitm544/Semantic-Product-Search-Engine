@@ -23,9 +23,11 @@ class TestProductSearch(unittest.TestCase):
         self.assertAlmostEqual(scores["a"], 0.25 / 61 + 0.75 / 62)
 
     def test_search_returns_ranked_results_and_match_sources(self):
-        self.reranker.predict.return_value = [0.1, 0.9]
+        self.reranker.predict.side_effect = lambda pairs, **kwargs: [
+            0.9 if text == "wireless headphones" else 0.1 for _, text in pairs
+        ]
         result = self.engine.search("headphones", fuzzy=False)
-        self.assertEqual(result["total"], 2)
+        self.assertEqual(result["candidateCount"], 2)
         self.assertEqual([item["id"] for item in result["results"]], ["b", "a"])
         self.assertEqual(result["queryAlternatives"], ["headphones"])
         for product in result["results"]:

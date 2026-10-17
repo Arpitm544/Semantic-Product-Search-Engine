@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "test": "node --test scripts/dev.test.mjs",
     "dev": "node scripts/dev.mjs",
     "dev:frontend": "next dev -p 3001",
     "build": "next build",

@@ -1,6 +1,7 @@
 """Simple keyword search over the processed product catalog."""
 from collections import Counter
 import math
+from heapq import nsmallest
 import pickle
 import re
 from pathlib import Path
@@ -53,8 +54,8 @@ def search_bm25(
             scores[i] = scores.get(i, 0.0) + (
                 index["idf"][word] * frequency * (k1 + 1) / (frequency + k1)
             )
-    ranked = sorted(scores.items(), key=lambda result: (-result[1], result[0]))
-    return [(index["products"][i], score) for i, score in ranked[:top_k]]
+    ranked = nsmallest(max(0, top_k), scores.items(), key=lambda result: (-result[1], result[0]))
+    return [(index["products"][i], score) for i, score in ranked[:max(0, top_k)]]
 
 
 def save_bm25(index: Dict[str, Any], path: Optional[Path] = None) -> Path:
