@@ -139,7 +139,7 @@ export default function LandingPage({ catalog }) {
             <span className="hero-eyebrow"><span className="tiny-star">✳</span> PRODUCT DISCOVERY, WITH A LITTLE MORE MEANING</span>
             <h1 id="hero-title">A little <em>meaning.</em><br />A better find.</h1>
             <p>You know what you’re looking for.<br className="mobile-break" /> You just don’t always know its name.</p>
-            <div className="hero-landing-actions"><a className="hero-primary-cta" href="/dashboard">Dashboard <Icon name="diagonal" size={18} /></a><a className="hero-primary-cta" href="#how-it-works">Follow the story <Icon name="arrow" size={20} /></a><a className="hero-secondary-cta" href="#the-idea">Meet the idea <Icon name="diagonal" size={16} /></a></div>
+            <div className="hero-landing-actions"><a className="hero-secondary-cta" href="/dashboard">Dashboard <Icon name="diagonal" size={18} /></a><a className="hero-primary-cta" href="#how-it-works">Follow the story <Icon name="arrow" size={20} /></a><a className="hero-secondary-cta" href="#the-idea">Meet the idea <Icon name="diagonal" size={16} /></a></div>
             <div className="query-presets"><span>A little inspiration:</span>{inspirations.map((item) => <a key={item.label} href="#discover" onClick={() => chooseCollection(item.collection)}>{item.label}<Icon name="diagonal" size={12} /></a>)}</div>
           </div>
           <div className="hero-bottom"><div><span className="hero-bottom-label">LESS SCROLLING. MORE FINDING.</span><p>Made for the way you think.</p></div><a href="#discover" className="hero-scroll" aria-label="Explore product inspiration"><span>EXPLORE A LITTLE</span><span className="scroll-circle"><Icon name="down" size={20} /></span></a></div>

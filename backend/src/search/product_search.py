@@ -11,6 +11,7 @@ from threading import Lock
 from src.keyword_search.bm25 import fit_bm25
 from src.search.hybrid import HybridSearch
 from src.search.typos import FrequencySpelling
+from src.search.ranking import blend_ranks
 
 
 def brand_title(product):
@@ -66,7 +67,7 @@ class ProductSearch:
             "searchMode": ("expanded-hybrid-reranked" if self.semantic is not None
                            else "expanded-keyword-reranked"),
             "semanticModel": getattr(self.semantic, "model_name", None),
-            "total": 0,
+            "candidateCount": 0,
             "results": [],
         }
         if not query or limit <= 0:
@@ -81,7 +82,7 @@ class ProductSearch:
 
             # 3. Put the best matches first, then build the response.
             ranked_ids, scores = self.rank_candidates(corrected_query, candidate_ids)
-            response["total"] = len(ranked_ids)
+            response["candidateCount"] = len(ranked_ids)
             for product_id in ranked_ids[:limit]:
                 product = self.by_id[product_id]
                 response["results"].append({
@@ -134,11 +135,7 @@ class ProductSearch:
         for position, index in enumerate(reranked_indexes, start=1):
             reranker_positions[candidate_ids[index]] = position
 
-        combined_scores = {}
-        for product_id in candidate_ids:
-            retrieval_score = 0.25 / (60 + retrieval_positions[product_id])
-            reranker_score = 0.75 / (60 + reranker_positions[product_id])
-            combined_scores[product_id] = retrieval_score + reranker_score
+        combined_scores = blend_ranks(retrieval_positions, reranker_positions)
 
         ranked_ids = sorted(
             candidate_ids,

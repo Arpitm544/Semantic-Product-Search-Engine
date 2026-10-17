@@ -32,6 +32,10 @@ The API loads `.env`; exported shell settings take precedence.
 
 ## Google Shopping search (optional)
 
+MongoDB search returns `candidateCount`: the bounded candidate pool considered
+for ranking, not an exhaustive catalog match count. `results` contains at most
+20 of those candidates.
+
 Get an API key from your [SerpApi dashboard](https://serpapi.com/manage-api-key).
 Add these settings to `backend/.env`, then restart the backend:
 
@@ -75,7 +79,8 @@ rank them on each search without modifying the cached records. Concurrent identi
 request. Errors are not cached and no automatic retries consume extra quota.
 HTTP 503 reports missing/rejected credentials or a connection failure, 429 reports
 a quota/throughput limit, 504 reports a timeout, and 502 reports provider or response
-errors. Error bodies include a stable `code` and a readable `error`; provider
+errors. Shopping provider and configuration errors include a stable `code` and
+a readable `error`. HTTP 400 validation errors contain only `error`; provider
 response bodies and credential-bearing URLs are never sent to the frontend.
 See [SerpApi's documentation](https://serpapi.com/google-shopping-api) for product
 fields and [error codes](https://serpapi.com/api-status-and-error-codes).

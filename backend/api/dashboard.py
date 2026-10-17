@@ -1,7 +1,19 @@
 """Build the catalog summary shown on the dashboard."""
 
 from datetime import datetime, timezone
+from math import isfinite
 from src.data.catalog import load_products, COLLECTION
+
+
+def stock_value(value):
+    """Normalize numeric stock while retaining unknown and invalid values."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+        return number if isfinite(number) and number >= 0 else None
+    except (ValueError, TypeError):
+        return None
 
 
 def dashboard_data():
@@ -17,6 +29,7 @@ def dashboard_data():
         sum(item["rating"] for item in rated_products) / len(rated_products)
         if rated_products else None
     )
+    stocks = [stock_value(item.get("stock")) for item in products]
     return {
         "products": products[:100],
         "displayedProductCount": min(100, len(products)),
@@ -24,10 +37,7 @@ def dashboard_data():
         "productCount": len(products),
         "averageRating": average_rating,
         "ratedProductCount": len(rated_products),
-        "totalStock": (sum(item["stock"] for item in products)
-                       if products and all(isinstance(item.get("stock"), (int, float))
-                                           and not isinstance(item.get("stock"), bool)
-                                           for item in products) else None),
+        "totalStock": sum(stocks) if stocks and all(value is not None for value in stocks) else None,
         "sources": {
             "catalog": f"MongoDB/{COLLECTION}",
         },

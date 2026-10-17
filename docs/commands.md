@@ -26,11 +26,21 @@ All local source and prepared data live under data/dataset/ inside backend/:
 - raw/: original Amazon products, labeled queries, source information, and license.
 - prepared/: products.json, train.jsonl, validation.jsonl, test.jsonl, and manifest.json.
 
-The original dataset is already stored in `data/dataset/raw/`.
+A fresh checkout contains no dataset. From `backend/`, install
+`requirements.txt`, then run the following preparation commands before importing.
+The downloader obtains the official Amazon ESCI files and attribution metadata
+in `data/dataset/raw/`; preparation creates `prepared/products.json`.
 Source information and file hashes are recorded in `raw/source.json`.
+The downloader also writes `raw/LICENSE` and `raw/NOTICE`. These attribution
+and provenance files are allowed by Git; the large dataset files stay ignored.
 
-Use `python -m src.semantic.download_esci` and
-`python -m src.semantic.prepare_esci --pairs 20000` to rebuild the prepared data.
+```sh
+python -m src.semantic.download_esci
+python -m src.semantic.prepare_esci --pairs 20000
+```
+
+See [Colab preparation](colab-training.md#prepare-the-bundle-from-a-fresh-checkout)
+for environment setup, download size, and complete preparation options.
 
 ## Import the catalog into MongoDB
 

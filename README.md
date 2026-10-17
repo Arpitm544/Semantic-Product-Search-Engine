@@ -92,7 +92,6 @@ results come from the external provider and do not use the MongoDB search index.
 Local weights and vector caches are separate from the product database.
 All local dataset files are under backend/data/dataset/, with raw/ and prepared/ subfolders.
 
-The latest reported Colab validation top-5 success was 79.88% for generated typo
-queries and 86.50% for clean queries. These are experiment results, not a fresh
-benchmark of the integrated backend. Amazon ESCI source attribution and license
+See [Colab training and evaluation](docs/colab-training.md) for reproducible
+validation and test comparisons. Amazon ESCI source attribution and license
 are included with the prepared dataset.

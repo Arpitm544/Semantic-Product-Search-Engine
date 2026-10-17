@@ -9,6 +9,8 @@ from src.data import catalog as catalog
 class TestCatalog(unittest.TestCase):
     def setUp(self):
         self.db = MagicMock()
+        collections = {"catalog_manifests": MagicMock(), catalog.COLLECTION: MagicMock()}
+        self.db.__getitem__.side_effect = collections.__getitem__
         self.manifest = {"status": "ready", "product_count": 2}
         self.db["catalog_manifests"].find_one.return_value = self.manifest
         self.products = [{"id": "esci:us:1"}, {"id": "esci:us:2"}]

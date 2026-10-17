@@ -23,6 +23,10 @@ export function backendIsRunning(port) {
           const health = JSON.parse(body);
           // A 503 response also identifies our backend while models are loading.
           if (health.service === 'semantic-product-search') {
+            if (health.status === 'error') {
+              reject(new Error(`The backend on port ${port} failed to load search. ${health.message} Stop it, then run npm run dev again.`));
+              return;
+            }
             resolve(true);
             return;
           }
@@ -59,6 +63,7 @@ async function main() {
   const frontend = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '-p', '3001'], {
     cwd: frontendDir,
     stdio: 'inherit',
+    env: { ...process.env, NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || `http://127.0.0.1:${port}` },
   });
 
   let stopping = false;

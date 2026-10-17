@@ -133,7 +133,8 @@ def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
                 "error": str(error), "code": error.code, "source": "serpapi",
             })
 
-    if not _search_ready.is_set() and search_service._search_engine is None:
+    if (not _search_ready.is_set() and search_service._search_engine is None
+            and not (_search_error or search_service._search_error)):
         message = _search_error or "Search is initializing. Wait for indexing to finish."
         return JSONResponse(status_code=503, content={"error": message})
 

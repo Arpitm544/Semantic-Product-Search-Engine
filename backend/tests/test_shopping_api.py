@@ -114,16 +114,25 @@ class TestShoppingSearch(unittest.TestCase):
         self.assertEqual(len(shopping.normalize_products({'shopping_results': [row, {'title': 'Other'}]}, 1)), 1)
 
     def test_concurrent_identical_queries_share_one_provider_request(self):
-        entered, release = Event(), Event()
+        entered, release, waiting = Event(), Event(), Event()
+        class ObservedFuture(shopping.Future):
+            def result(self, timeout=None):
+                waiting.set()
+                return super().result(timeout=timeout)
+
         def fetch(_):
             entered.set()
             release.wait(3)
             return {'shopping_results': [{'title': 'Phone'}]}
-        with patch.object(shopping, 'fetch_products', side_effect=fetch) as get, ThreadPoolExecutor(2) as pool:
+        with patch.object(shopping, 'Future', ObservedFuture), \
+                patch.object(shopping, 'fetch_products', side_effect=fetch) as get, ThreadPoolExecutor(2) as pool:
             first = pool.submit(shopping.search_shopping, 'phone')
             self.assertTrue(entered.wait(3))
             second = pool.submit(shopping.search_shopping, 'phone')
-            release.set()
+            try:
+                self.assertTrue(waiting.wait(3), 'Second request must wait on the shared future')
+            finally:
+                release.set()
             self.assertEqual(first.result()['results'], second.result()['results'])
             get.assert_called_once()
 

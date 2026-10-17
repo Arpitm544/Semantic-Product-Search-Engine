@@ -127,6 +127,7 @@ class SemanticVectorSearch:
         cls,
         index_path: Path = FAISS_INDEX_PATH,
         map_path: Path = FAISS_ID_MAP_PATH,
+        local_files_only: bool = False, device: Optional[str] = None,
     ) -> "SemanticVectorSearch":
         """Loads serialized FAISS index and product metadata payload."""
         if not index_path.exists() or not map_path.exists():
@@ -138,7 +139,7 @@ class SemanticVectorSearch:
         model_name = meta.get("model_name", EMBEDDING_MODEL_NAME)
         if meta.get("model_relative_path") is not None:
             model_name = str((map_path.parent / meta["model_relative_path"]).resolve())
-        engine = cls(model_name=model_name)
+        engine = cls(model_name=model_name, local_files_only=local_files_only, device=device)
         engine.products = meta["products"]
         engine.dimension = meta["dimension"]
         engine.index = faiss.read_index(str(index_path))

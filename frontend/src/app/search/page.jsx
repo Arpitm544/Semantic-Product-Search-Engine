@@ -12,7 +12,7 @@ function money(product) {
   try {
     // SerpApi prices without a currency label must not be assigned a guessed currency.
     if (product.matchSources?.includes('google-shopping')) return new Intl.NumberFormat('en-IN').format(Number(product.price));
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: product.currency || 'USD' }).format(Number(product.price));
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: product.currency || 'INR', maximumFractionDigits: 0 }).format(Number(product.price));
   } catch {
     return 'Price unavailable';
   }
@@ -43,6 +43,7 @@ export default function SearchPage() {
   const [input, setInput] = useState('');
   const [source, setSource] = useState('mongo');
   const [searched, setSearched] = useState('');
+  const [lastFuzzy, setLastFuzzy] = useState(true);
   const [results, setResults] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -80,6 +81,7 @@ export default function SearchPage() {
     let timedOut = false;
     const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 45000);
     setSearched(query);
+    setLastFuzzy(fuzzy);
     setLoading(true);
     setResults([]);
     setTotal(0);
@@ -101,7 +103,7 @@ export default function SearchPage() {
       }
       if (pending.current !== controller) return;
       setResults(payload.results);
-      setTotal(Number.isFinite(payload.total) ? payload.total : payload.results.length);
+      setTotal(Number.isFinite(payload.candidateCount) ? payload.candidateCount : payload.results.length);
       setCorrectedQuery(typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null);
       setWarning(typeof payload.warning === 'string' ? payload.warning : '');
     } catch (reason) {
@@ -138,15 +140,15 @@ export default function SearchPage() {
           <input autoFocus maxLength={512} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Try ‘wireless headphones’ or ‘mascara’" aria-label="Search products" />
           <button type="submit" disabled={!input.trim() || loading}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
         </form>
-        <span className="search-data-note">{shopping ? 'Google Shopping products ranked by our search engine. Prices and availability can change.' : 'Semantic catalog search with spelling suggestions. Images and prices may be unavailable.'}</span>
+        <span className="search-data-note">{shopping ? 'Google Shopping products, ranked when our search models are available. Prices and availability can change.' : 'Semantic catalog search with spelling suggestions. Images and prices may be unavailable.'}</span>
       </section>
 
       <section className="search-results-section" aria-live="polite" aria-busy={loading}>
-        {error && <div className="search-error" role="alert"><span>{error}</span><button type="button" onClick={() => runSearch(searched)}>Try again</button></div>}
+        {error && <div className="search-error" role="alert"><span>{error}</span><button type="button" onClick={() => runSearch(searched, lastFuzzy)}>Try again</button></div>}
         {loading && <div className="search-state">Searching {SOURCES[source]}…</div>}
         {!loading && !error && !searched && <div className="search-state search-empty-start"><span>✳</span><strong>Start with a product or a need</strong><small>Enter a product, brand, or category to search {SOURCES[source]}.</small></div>}
         {!loading && !error && searched && <>
-          <div className="search-results-heading"><div><span className="search-page-eyebrow">{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span>{shopping ? `${results.length} products shown` : `${total} matching products`}</span></div>
+          <div className="search-results-heading"><div><span className="search-page-eyebrow">{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span>{shopping ? `${results.length} products shown` : `${results.length} products shown from ${total} ranked candidates`}</span></div>
           {warning && <div className="search-ranking-warning" role="status">{warning}</div>}
           {correctedQuery && <div className="search-spelling-note"><span>Also searching for <strong>“{correctedQuery}”</strong>.</span><button type="button" onClick={() => runSearch(searched, false)}>Use original spelling</button></div>}
           {results.length ? <div className="search-result-list">{results.map((product, index) => {

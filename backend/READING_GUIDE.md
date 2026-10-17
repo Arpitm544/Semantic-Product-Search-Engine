@@ -9,7 +9,7 @@ In `api/main.py`:
 
 ```python
 @app.get("/api/search")
-def search_products(q: str = "", fuzzy: str = "1"):
+def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
 ```
 
 Opening `/api/search?q=headphones` makes FastAPI call
@@ -34,7 +34,7 @@ JSON results returned to the frontend
 while the catalog and model settings stay the same. This line creates the engine:
 
 ```python
-_search_engine = ProductSearch(products, semantic, reranker)
+_search_engine = ProductSearch(products, semantic, reranker, model_lock=get_candidate_ranker().lock)
 ```
 
 `ProductSearch.search()` has three steps:
