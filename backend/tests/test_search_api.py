@@ -102,6 +102,36 @@ class TestSearchAPI(unittest.TestCase):
         engine.search.side_effect = ValueError("Missing catalog")
         self.assertEqual(request("/api/search?q=laptop", engine), (503, {"error": "Missing catalog"}))
 
+    def test_catalog_change_before_index_initialization_is_retryable(self):
+        from src.data.catalog import CatalogUpdatingError
+        with patch.object(search_service, "version", side_effect=[
+                {"sha256": "first", "updated_at": "1"},
+                {"sha256": "second", "updated_at": "2"}]), \
+                patch.object(search_service, "_search_engine", None), \
+                patch.object(search_service, "load_products", return_value=PRODUCTS), \
+                patch.object(search_service, "load_semantic_search") as load:
+            with self.assertRaises(CatalogUpdatingError):
+                search_service.get_search_engine()
+            load.assert_not_called()
+
+    def test_catalog_indexes_are_reused_and_refreshed_after_a_change(self):
+        manifest = {"sha256": "first", "updated_at": "1"}
+        with patch.object(search_service, "version", side_effect=lambda: dict(manifest)), \
+                patch.object(search_service, "load_products", return_value=PRODUCTS) as catalog, \
+                patch.object(search_service, "_search_engine", None), \
+                patch.object(search_service, "_search_signature", None), \
+                patch.object(search_service, "load_semantic_search") as semantic, \
+                patch.object(search_service, "load_reranker"), \
+                patch.object(search_service, "ProductSearch", side_effect=lambda *args: Mock()) as factory:
+            first = search_service.get_search_engine()
+            self.assertIs(first, search_service.get_search_engine())
+            self.assertEqual(catalog.call_count, 1)
+            manifest.update(sha256="second", updated_at="2")
+            self.assertIsNot(first, search_service.get_search_engine())
+            self.assertEqual(catalog.call_count, 2)
+            self.assertEqual(factory.call_count, 2)
+            self.assertEqual(semantic.call_count, 2)
+
     def test_initializing_search_is_unavailable(self):
         with patch.object(api._search_ready, "is_set", return_value=False), \
                 patch.object(api, "_search_error", None), \

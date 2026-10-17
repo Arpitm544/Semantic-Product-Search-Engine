@@ -101,6 +101,7 @@ class SemanticVectorSearch:
         self,
         index_path: Path = FAISS_INDEX_PATH,
         map_path: Path = FAISS_ID_MAP_PATH,
+        *, model_relative_path: Optional[str] = None,
     ) -> None:
         """Saves serialized FAISS index and product metadata payload."""
         if self.index is None:
@@ -113,7 +114,8 @@ class SemanticVectorSearch:
             pickle.dump(
                 {
                     "products": self.products,
-                    "model_name": self.model_name,
+                    "model_name": model_relative_path if model_relative_path is not None else self.model_name,
+                    "model_relative_path": model_relative_path,
                     "dimension": self.dimension,
                 },
                 f,
@@ -133,7 +135,10 @@ class SemanticVectorSearch:
         with open(map_path, "rb") as f:
             meta = pickle.load(f)
 
-        engine = cls(model_name=meta.get("model_name", EMBEDDING_MODEL_NAME))
+        model_name = meta.get("model_name", EMBEDDING_MODEL_NAME)
+        if meta.get("model_relative_path") is not None:
+            model_name = str((map_path.parent / meta["model_relative_path"]).resolve())
+        engine = cls(model_name=model_name)
         engine.products = meta["products"]
         engine.dimension = meta["dimension"]
         engine.index = faiss.read_index(str(index_path))

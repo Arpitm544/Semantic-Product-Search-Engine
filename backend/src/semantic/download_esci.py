@@ -64,7 +64,7 @@ def parse_arguments():
     """Read options supplied after the command name."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=DATASET_DIR / "raw")
-    parser.add_argument("--revision", default=None, help="Pinned Git commit; defaults to current main.")
+    parser.add_argument("--revision", default=None, help="Pinned Git commit; defaults to the cached revision, or current main when no manifest exists.")
     return parser, parser.parse_args()
 
 

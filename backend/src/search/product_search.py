@@ -77,12 +77,10 @@ class ProductSearch:
         self.reranker = reranker
         self.lock = Lock()
         frequency = Counter()
-        keyword_products = []
         for product in products:
             text = brand_title(product)
             frequency.update(set(re.findall(r'\b[a-z]+\b', text.lower())))
-            keyword_products.append({**product, 'representation_text': text})
-        lexical = fit_bm25(keyword_products)
+        lexical = fit_bm25(products)
         lexical['products'] = products
         self.hybrid = HybridSearch(products, semantic, lexical=lexical)
         self.spelling = FrequencySpelling(frequency)
@@ -94,12 +92,12 @@ class ProductSearch:
         variants = self.spelling.alternatives(query) if fuzzy else [query]
         payload = dict(query=query, correctedQuery=corrected if corrections else None,
                        corrections=corrections, queryAlternatives=variants,
-                       searchMode='expanded-hybrid-reranked', semanticModel='fine-tuned',
+                       searchMode='expanded-hybrid-reranked', semanticModel=getattr(self.semantic, 'model_name', None),
                        total=0, results=[])
         if not query or limit <= 0:
             return payload
         with self.lock:
-            candidate_ids, sources = self.find_candidates(variants, fuzzy)
+            candidate_ids, sources = self.find_candidates(variants, query)
             if not candidate_ids:
                 return payload
             final, blended = self.rank_candidates(corrected, candidate_ids)
@@ -109,15 +107,17 @@ class ProductSearch:
                                   for pid in final[:limit]]
         return payload
 
-    def find_candidates(self, variants, fuzzy):
+    def find_candidates(self, variants, query):
         """Combine keyword and semantic matches from each query variation."""
         retrieval = defaultdict(float)
         sources = defaultdict(set)
         for variant in variants:
-            result = self.hybrid.search(variant, 50, fuzzy=fuzzy)
+            result = self.hybrid.search(variant, 50, fuzzy=False)
             for rank, product in enumerate(result['results'], 1):
                 retrieval[product['id']] += 1/(60+rank)
                 sources[product['id']].update(product['matchSources'])
+                if variant != query:
+                    sources[product['id']].add('fuzzy')
         ids = sorted(retrieval, key=lambda pid: (-retrieval[pid], pid))
         return ids, sources
 

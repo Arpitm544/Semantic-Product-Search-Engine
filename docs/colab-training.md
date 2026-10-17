@@ -2,7 +2,27 @@
 
 > Commands and artifact paths in this guide are relative to `backend/`, unless stated otherwise.
 
-Use these two files from this project:
+## Prepare the bundle from a fresh checkout
+
+The ZIP and prepared dataset are generated artifacts, not tracked files. From
+`backend/`, create and activate the environment before downloading the official
+Amazon ESCI data (roughly 1 GB; allow disk space for raw and prepared copies):
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m src.semantic.download_esci
+python -m src.semantic.prepare_esci --pairs 20000 --validation-queries 200 --test-queries 200 --seed 42
+python scripts/create_colab_bundle.py
+```
+
+The downloader records its pinned revision and verifies source hashes. Reruns
+reuse that revision; preparation refuses to overwrite an existing manifest.
+Packaging regenerates the notebook with the matching ZIP checksum. Use the ZIP
+and notebook generated together. Preparation runs locally; training runs in Colab.
+
+Use these two generated files:
 
 * Notebook: `notebooks/02_colab_esci_fine_tuning.ipynb`
 * Prepared data and code: `colab/esci_colab_bundle.zip` (about 54 MiB)
@@ -23,9 +43,8 @@ The local partial training checkpoint is excluded from the upload. This starts
 a fresh cloud run from the original MiniLM. No training runs on your Mac when
 you execute the notebook in a Colab hosted GPU runtime.
 
-The supplied ZIP includes the prepared catalog, labels, training code, tests,
-and Amazon's license and notice. You do not need to clone the GitHub repository
-or download the original 1 GB product file. The notebook verifies the bundle's
+The generated ZIP includes the prepared catalog, labels, training code, tests,
+and Amazon's license and notice. The Colab runtime does not need the raw download; the local preparation above does. The notebook verifies the bundle's
 checksum and each packaged file before training.
 
 ## If Colab rejects the ZIP upload
@@ -44,14 +63,14 @@ You can also bypass that picker using Google Drive:
 5. Continue running the remaining cells in order.
 
 The expected location is
-`My Drive/backend/esci_colab_bundle.zip`.
+`My Drive/semantic-product-search/esci_colab_bundle.zip`.
 
 ## Where outputs are saved
 
 The notebook creates a dedicated Google Drive folder:
 
 ```text
-MyDrive/backend/
+MyDrive/semantic-product-search/
   esci_colab_bundle.zip
   models/esci-minilm-20k/
     checkpoints/latest.pt
@@ -64,7 +83,7 @@ MyDrive/backend/
   esci_minilm_model.zip
 ```
 
-Training uses batch size 32, sequence length 128, and one epoch (1,250 steps).
+Training uses batch size 32, sequence length 128, and one epoch. The verification cell reports the step count, which depends on group sizes.
 It writes a resumable checkpoint every 100 steps and reports the estimated
 remaining time every 25 steps. The early estimate includes setup overhead;
 use the estimate after 50–100 steps to judge the remaining time.

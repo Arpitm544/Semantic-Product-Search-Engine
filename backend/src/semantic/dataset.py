@@ -96,8 +96,8 @@ def read_jsonl(path):
     return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
 
 
-def grouped_batches(rows, batch_size, seed):
-    """Use at most one row from each query group in a batch."""
+def grouped_batches(rows, batch_size, seed, include_remainder=False):
+    """Separate query groups; include remainder only with a masked loss."""
     if batch_size < 2:
         raise ValueError("Contrastive learning requires a batch size of at least two.")
     groups = defaultdict(list)
@@ -117,4 +117,8 @@ def grouped_batches(rows, batch_size, seed):
         # Use larger groups first so fewer rows are left without a second group.
         active.sort(key=lambda group: len(groups[group]), reverse=True)
         batches.append([groups[group].pop() for group in active[:batch_size]])
+    if include_remainder:
+        remaining = [index for indices in groups.values() for index in indices]
+        batches.extend(remaining[offset:offset + batch_size]
+                       for offset in range(0, len(remaining), batch_size))
     return batches

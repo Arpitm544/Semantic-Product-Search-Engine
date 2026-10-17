@@ -1,7 +1,7 @@
 # Semantic Product Search Engine
 
 Product search over a prepared Amazon ESCI catalog stored in MongoDB. The backend
-combines a fine-tuned MiniLM encoder, brand/title keyword retrieval, spelling
+combines a fine-tuned MiniLM encoder, full-text keyword retrieval, spelling
 correction, query expansion, and a blended cross-encoder reranker.
 
 ## Repository layout
@@ -33,10 +33,12 @@ correction, query expansion, and a blended cross-encoder reranker.
 ## Local startup
 
 From the repository root, with MongoDB running and the project virtual environment
-and model weights prepared:
+and model weights prepared using [the backend setup guide](docs/backend.md),
+and the prepared Amazon catalog imported into MongoDB:
 
 ```sh
 cd backend
+.venv/bin/python scripts/import_catalog.py
 sh scripts/start_backend.sh
 ```
 

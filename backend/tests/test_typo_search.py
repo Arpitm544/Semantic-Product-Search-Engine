@@ -83,6 +83,19 @@ class TestTrainingProtocol(unittest.TestCase):
         self.assertEqual(len(used), len(set(used)))
         self.assertEqual(len(used), 40)
 
+    def test_esci_batches_consume_uneven_remainder(self):
+        rows = [{"negative_group": group} for group in ["a"] * 15 + ["b"] * 2]
+        batches = grouped_batches(rows, 4, 42, include_remainder=True)
+        used = [index for batch in batches for index in batch]
+        self.assertEqual(sorted(used), list(range(len(rows))))
+        self.assertTrue(all(1 <= len(batch) <= 4 for batch in batches))
+
+    def test_metric_labels_follow_requested_cutoff(self):
+        metrics = retrieval_metrics([99, 1], [1], k=1)
+        self.assertEqual(metrics["recall@1"], 0)
+        self.assertEqual(metrics["hit_rate@1"], 0)
+        self.assertNotIn("recall@5", metrics)
+
     def test_typo_generation_keeps_model_number(self):
         for kind in ("deletion", "transposition", "substitution", "repetition"):
             changed = typo_query("Samsung Galaxy S24", kind, random.Random(42))

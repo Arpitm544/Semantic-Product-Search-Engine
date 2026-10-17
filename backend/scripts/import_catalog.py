@@ -22,6 +22,8 @@ def read_products(source):
     """Read the prepared catalog and reject duplicate or unexpected IDs."""
     raw = source.read_bytes()
     products = json.loads(raw)
+    if not isinstance(products, list) or not products:
+        raise ValueError('Expected a nonempty list of Amazon ESCI products.')
     ids = [p['id'] for p in products]
     if len(ids) != len(set(ids)) or not all(str(pid).startswith('esci:') for pid in ids):
         raise ValueError('Expected unique Amazon ESCI product IDs.')

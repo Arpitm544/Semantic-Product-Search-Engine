@@ -4,7 +4,7 @@ import unittest
 
 from src.keyword_search.bm25 import fit_bm25, search_bm25
 from src.semantic.prepare_esci import (
-    choose_training_pairs, normalize_query, select_splits,
+    choose_training_pairs, normalize_query, select_splits, group_judgments, evaluation_records,
 )
 from src.semantic.train_esci import (
     contrastive_loss, negative_mask, validate_training_rows,
@@ -25,13 +25,24 @@ class TestESCISplits(unittest.TestCase):
             f"query {i}": group(f"Query {i}", {f"p{i}": 3, f"n{i}": 0})
             for i in range(20)
         }
-        test = {"query 1": train["query 1"]}
+        import pandas as pd
+        examples = pd.DataFrame([
+            {"query": "Query 1", "product_id": "p1", "esci_label": "E", "query_id": 1},
+            {"query": "  Ｑｕｅｒｙ-1! ", "product_id": "p1", "esci_label": "E", "query_id": 2},
+        ])
+        train.update(group_judgments(examples.iloc[:1]))
+        test = group_judgments(examples.iloc[1:])
         training, reserved, validation, selected_test = select_splits(train, test, 2, 1, 42)
         self.assertNotIn("query 1", training)
         self.assertNotIn("query 1", reserved)
         self.assertFalse(set(training) & set(reserved))
         self.assertTrue(set(validation) <= set(reserved))
         self.assertEqual(selected_test, ["query 1"])
+
+    def test_evaluation_keeps_substitute_and_complement_labels(self):
+        groups = {"phone": group("phone", {"e": 3, "s": 2, "c": 1, "i": 0})}
+        for row in evaluation_records(groups, ["phone"], 42):
+            self.assertEqual(set(row["relevant_doc_ids"]), {"e", "s", "c"})
 
     def test_only_exact_positives_and_irrelevant_negatives_are_selected(self):
         groups = {

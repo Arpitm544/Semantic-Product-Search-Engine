@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sys
 from threading import Event, Thread
+from time import sleep
 
 # Load settings before importing the database and search modules.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +22,7 @@ import uvicorn
 
 from api.dashboard import dashboard_data
 from api.search_service import get_search_engine
+from src.data.catalog import CatalogUpdatingError
 
 PORT = int(os.environ.get("PORT", "8000"))
 FRONTEND_ORIGINS = [
@@ -34,16 +36,25 @@ _search_ready = Event()
 _search_error = None
 
 
-def initialize_search():
-    """Load models in the background so health requests can report progress."""
+def initialize_search(max_attempts=150, retry_delay=2):
+    """Retry catalog publication while health requests report startup progress."""
     global _search_error
-    try:
-        get_search_engine()
-        _search_ready.set()
-        print("Search is ready.", flush=True)
-    except Exception as error:
-        _search_error = f"Search initialization failed: {error}"
-        print(_search_error, flush=True)
+    _search_ready.clear()
+    _search_error = None
+    for attempt in range(max_attempts):
+        try:
+            get_search_engine()
+            _search_ready.set()
+            print("Search is ready.", flush=True)
+            return
+        except Exception as error:
+            if isinstance(error, CatalogUpdatingError) and attempt + 1 < max_attempts:
+                print(f"Waiting for catalog import: {error}", flush=True)
+                sleep(retry_delay)
+                continue
+            _search_error = f"Search initialization failed: {error}"
+            print(_search_error, flush=True)
+            return
 
 
 @asynccontextmanager

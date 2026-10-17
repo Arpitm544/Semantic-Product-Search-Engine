@@ -6,7 +6,7 @@ from pathlib import Path
 from threading import Lock
 
 from src.config import PROJECT_ROOT
-from src.data.catalog import load_products, version
+from src.data.catalog import load_products, version, CatalogUpdatingError
 from src.search.product_search import ProductSearch
 
 _search_engine = None
@@ -32,6 +32,8 @@ def get_search_engine():
 
         print("Loading catalog from MongoDB...", flush=True)
         products = load_products()
+        if version() != catalog_version:
+            raise CatalogUpdatingError("Catalog changed before index initialization.")
         semantic = load_semantic_search(products, model_path, catalog_version["sha256"])
         reranker = load_reranker(reranker_path)
 

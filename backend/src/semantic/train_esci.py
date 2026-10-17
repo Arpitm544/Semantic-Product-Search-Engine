@@ -106,7 +106,7 @@ def train_model(args, parser):
     """Validate the data, train or resume the model, then save weights and reports."""
     if min(args.epochs, args.batch_size, args.max_length, args.threads, args.checkpoint_every) < 1:
         parser.error("Epoch, batch, token, thread, and checkpoint counts must be positive.")
-    if args.batch_size < 2 or args.learning_rate <= 0:
+    if args.batch_size < 2 or not (0 < args.learning_rate < float("inf")):
         parser.error("Use a batch size >= 2 and a positive learning rate.")
     output = args.output_dir.resolve()
     if (output / "modules.json").exists() and not args.resume:
@@ -119,13 +119,17 @@ def train_model(args, parser):
     validate_training_rows(rows, manifest, held_rows)
     batches = [
         batch for epoch in range(args.epochs)
-        for batch in grouped_batches(rows, args.batch_size, manifest["seed"] + epoch)
+        for batch in grouped_batches(rows, args.batch_size, manifest["seed"] + epoch, include_remainder=True)
     ]
     total_steps = len(batches)
     if not total_steps:
         parser.error("No usable training batches.")
     config = {
         "dataset_manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "dataset_files_sha256": {
+            name: hashlib.sha256((args.data_dir / name).read_bytes()).hexdigest()
+            for name in ("train.jsonl", "validation.jsonl", "test.jsonl")
+        },
         "base_model": args.model, "epochs": args.epochs, "batch_size": args.batch_size,
         "learning_rate": args.learning_rate, "max_length": args.max_length,
         "seed": manifest["seed"], "total_steps": total_steps,
