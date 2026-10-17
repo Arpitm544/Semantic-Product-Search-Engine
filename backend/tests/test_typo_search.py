@@ -90,6 +90,13 @@ class TestTrainingProtocol(unittest.TestCase):
         self.assertEqual(sorted(used), list(range(len(rows))))
         self.assertTrue(all(1 <= len(batch) <= 4 for batch in batches))
 
+    def test_unmasked_batches_reject_imbalanced_groups_instead_of_dropping_rows(self):
+        rows = [{"negative_group": "0" if i < 31 else str(i % 3 + 1)} for i in range(40)]
+        with self.assertRaisesRegex(ValueError, "unused rows"):
+            grouped_batches(rows, 4, 42)
+        batches = grouped_batches(rows, 4, 42, include_remainder=True)
+        self.assertEqual(sorted(i for batch in batches for i in batch), list(range(40)))
+
     def test_metric_labels_follow_requested_cutoff(self):
         metrics = retrieval_metrics([99, 1], [1], k=1)
         self.assertEqual(metrics["recall@1"], 0)

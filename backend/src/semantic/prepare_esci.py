@@ -236,7 +236,7 @@ def prepare_dataset(args, parser):
     examples = pd.read_parquet(
         args.raw_dir / "shopping_queries_dataset_examples.parquet",
         columns=["query", "query_id", "product_id", "esci_label", "split"],
-        filters=[("product_locale", "=", "us"), ("small_version", "=", 1)],
+        filters=[("product_locale", "=", "us"), ("small_version", "=", True)],
     )
     print(f"Loaded {len(examples):,} official English ranking judgments.", flush=True)
     train_groups = group_judgments(examples[examples["split"] == "train"])

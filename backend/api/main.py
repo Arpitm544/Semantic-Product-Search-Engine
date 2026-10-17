@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import os
 from pathlib import Path
 import sys
-from threading import Event, Thread
+from threading import Thread
 from time import sleep
 
 # Load settings before importing the database and search modules.
@@ -21,7 +21,8 @@ from pymongo.errors import PyMongoError
 import uvicorn
 
 from api.dashboard import dashboard_data
-from api.search_service import get_search_engine
+from api import search_service
+from api.search_service import get_search_engine, _search_ready
 from src.data.catalog import CatalogUpdatingError
 
 PORT = int(os.environ.get("PORT", "8000"))
@@ -32,7 +33,6 @@ FRONTEND_ORIGINS = [
     ).split(",")
     if origin.strip()
 ]
-_search_ready = Event()
 _search_error = None
 
 
@@ -88,10 +88,11 @@ async def prevent_cached_results(request: Request, call_next):
 def check_health():
     """Report whether the search models are ready."""
     ready = _search_ready.is_set()
+    error = search_service._search_error or _search_error
     if ready:
         status, message = "ready", "Search is ready."
-    elif _search_error:
-        status, message = "error", _search_error
+    elif error:
+        status, message = "error", error
     else:
         status, message = "initializing", "Preparing the search index. Check terminal progress."
     return JSONResponse(status_code=200 if ready else 503, content={
@@ -115,7 +116,7 @@ def get_dashboard():
 @app.get("/api/search")
 def search_products(q: str = "", fuzzy: str = "1"):
     """Search for q. Set fuzzy=0 to turn off spelling correction."""
-    if not _search_ready.is_set():
+    if not _search_ready.is_set() and search_service._search_engine is None:
         message = _search_error or "Search is initializing. Wait for indexing to finish."
         return JSONResponse(status_code=503, content={"error": message})
 

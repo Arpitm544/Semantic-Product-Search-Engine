@@ -103,7 +103,9 @@ def download_dataset(args, parser):
             destination.write_bytes(fetch_bytes(
                 f"https://raw.githubusercontent.com/{REPOSITORY}/{revision}/{name}",
             ))
-    metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
+    temporary_metadata = metadata_path.with_suffix(metadata_path.suffix + ".part")
+    temporary_metadata.write_text(json.dumps(metadata, indent=2) + "\n")
+    temporary_metadata.replace(metadata_path)
     print(f"Source manifest: {metadata_path}", flush=True)
 
 

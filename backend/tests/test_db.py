@@ -30,7 +30,7 @@ class TestCatalog(unittest.TestCase):
 
     def test_incomplete_import_prevents_serving(self):
         self.manifest["status"] = "importing"
-        with self.assertRaisesRegex(ValueError, "not ready"):
+        with self.assertRaisesRegex(catalog.CatalogUpdatingError, "in progress"):
             catalog.load_products()
 
     def test_catalog_count_must_match_the_import_manifest(self):

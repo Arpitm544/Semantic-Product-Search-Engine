@@ -31,7 +31,8 @@ class FrequencySpelling(CatalogSpelling):
         for length in range(len(word)-edits, len(word)+edits+1):
             for candidate in self.by_length.get(length, []):
                 distance = edit_distance(word, candidate)
-                if distance <= edits and 1-distance/max(len(word), length) >= .8:
+                threshold = .75 if len(word) == length == 4 else .8
+                if distance <= edits and 1-distance/max(len(word), length) >= threshold:
                     candidates.append((distance, candidate))
         if not candidates:
             return None
@@ -57,7 +58,8 @@ class FrequencySpelling(CatalogSpelling):
                     frequency = self.frequency[candidate]
                     if (candidate != word and frequency >= 5
                             and edit_distance(word, candidate) == 1
-                            and 1-1/max(len(word), len(candidate)) >= .8):
+                            and 1-1/max(len(word), len(candidate)) >=
+                            (.75 if len(word) == len(candidate) == 4 else .8)):
                         candidates.append((frequency, candidate))
             candidates.sort(key=lambda item: (-item[0], item[1]))
             for _, candidate in candidates[:2]:
@@ -92,7 +94,9 @@ class ProductSearch:
         variants = self.spelling.alternatives(query) if fuzzy else [query]
         payload = dict(query=query, correctedQuery=corrected if corrections else None,
                        corrections=corrections, queryAlternatives=variants,
-                       searchMode='expanded-hybrid-reranked', semanticModel=getattr(self.semantic, 'model_name', None),
+                       searchMode=('expanded-hybrid-reranked' if self.semantic is not None
+                                   else 'expanded-keyword-reranked'),
+                       semanticModel=getattr(self.semantic, 'model_name', None),
                        total=0, results=[])
         if not query or limit <= 0:
             return payload

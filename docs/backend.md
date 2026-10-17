@@ -14,8 +14,8 @@ With the backend virtual environment activated, extract the archive and prepare
 the reranker once (this step downloads weights; serving never does):
 
 ```bash
-mkdir -p models/colab-export
-unzip /absolute/path/to/esci_minilm_model.zip -d models/colab-export
+mkdir -p models
+unzip /absolute/path/to/esci_minilm_model.zip -d models
 python - <<'MODEL'
 from sentence_transformers import CrossEncoder
 model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
@@ -26,7 +26,7 @@ python scripts/import_catalog.py
 ```
 
 Replace the archive path with your downloaded file. The encoder must contain
-`models/colab-export/esci-minilm-20k/modules.json` and its weights; the reranker must contain
+`models/esci-minilm-20k/modules.json` and its weights; the reranker must contain
 `models/ms-marco-MiniLM-L6-v2/config.json` and its weights. Both directories are
 Git ignored. Configure MongoDB in `.env` before importing; shell exports take
 precedence. Start MongoDB before the import.
@@ -42,13 +42,13 @@ sh scripts/start_backend.sh
 The first startup embeds 42,617 products using the fine-tuned MiniLM on CPU.
 It can take several minutes. Later startups reuse vectors under `indexes/catalog`.
 These caches contain only vectors and product IDs; product documents come from MongoDB.
-The API remains at `http://127.0.0.1:8000`. Start the existing frontend separately.
+The API listens at `http://127.0.0.1:8000` by default; set `PORT` to use another port. Start the existing frontend separately.
 The dashboard displays the first 100 records and the full product count.
 Amazon ESCI has no reliable price, stock, or rating fields; missing values are not invented.
 
 ## Search configuration
 
-- Fine-tuned model: `models/colab-export/esci-minilm-20k`.
+- Fine-tuned model: `models/esci-minilm-20k`.
 - Reranker: `models/ms-marco-MiniLM-L6-v2`, maximum length 256.
 - Keyword matching: full `representation_text`, including product details.
 - Spelling vocabulary: brand and title.
@@ -76,6 +76,14 @@ or importing when using a different database. Defaults are localhost port 27017,
 The importer upserts by product ID, records a catalog version, and does not delete
 existing data. If unrelated IDs exist in the selected collection, it stops.
 A partial import marks the catalog unavailable until a successful reimport.
+Imports acquire a MongoDB lock in `catalog_import_locks` before modifying the
+catalog. A concurrent importer stops without writing. The lock is released on
+normal completion or an exception. If a process is killed, first stop or confirm
+the old importer is no longer running, then remove only its lock document
+(`_id` equal to `MONGO_COLLECTION`) from `catalog_import_locks` in the configured
+database and rerun the import. Locks do not expire while an importer may be active.
+Each import has a unique manifest ID; readers reject a catalog if the manifest
+changes during their scan, including a reimport of identical input.
 At startup, the API retries in-progress or changing imports every two seconds
 for up to five minutes before reporting an initialization error. Other startup
 errors, such as missing model files, are reported immediately.

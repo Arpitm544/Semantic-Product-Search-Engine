@@ -121,4 +121,6 @@ def grouped_batches(rows, batch_size, seed, include_remainder=False):
         remaining = [index for indices in groups.values() for index in indices]
         batches.extend(remaining[offset:offset + batch_size]
                        for offset in range(0, len(remaining), batch_size))
+    elif any(groups.values()):
+        raise ValueError("Unbalanced groups leave unused rows; use a masked loss with include_remainder=True.")
     return batches

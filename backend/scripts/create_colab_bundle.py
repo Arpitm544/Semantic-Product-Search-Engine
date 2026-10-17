@@ -34,6 +34,14 @@ def notebook(bundle_sha):
 Open this notebook in Google Colab and choose **Runtime → Change runtime type → GPU**.
 Then run the cells in order. Training and evaluation run on Google's computer.
 
+Before opening Colab, follow the repository's `docs/colab-training.md` preparation
+steps from a fresh checkout: install backend requirements, run
+`python -m src.semantic.download_esci`,
+`python -m src.semantic.prepare_esci --pairs 20000 --validation-queries 200 --test-queries 200 --seed 42`,
+then `python scripts/create_colab_bundle.py` from `backend/`.
+Use the regenerated notebook and `colab/esci_colab_bundle.zip` together; the ZIP
+is generated locally and is not included in the repository.
+
 The bundle contains 20,000 human-labeled English Exact pairs, 20,000 typo views,
 and labeled Irrelevant negatives. Validation and official test query families
 are separate. This starts a fresh one-epoch cloud run from the original MiniLM.
