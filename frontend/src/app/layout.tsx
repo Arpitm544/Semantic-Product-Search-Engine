@@ -1,12 +1,13 @@
+import type { ReactNode } from 'react';
+import type { Metadata } from 'next';
 import './globals.css';
-import './story.css';
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Semantic — A little meaning. A better find.',
   description: 'An original landing page for a more thoughtful approach to product discovery. Explore everyday inspiration, outdoor adventures, and the idea behind Semantic.',
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
