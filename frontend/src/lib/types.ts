@@ -31,8 +31,5 @@ export interface DashboardData {
   displayedProductCount: number;
   categories: string[];
   totalStock: number | null;
-  averageRating: number | null;
-  ratedProductCount: number;
-  generatedAt: string;
   sources?: { catalog?: string };
 }
