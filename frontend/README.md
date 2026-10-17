@@ -69,3 +69,7 @@ Page and component styles use Tailwind utilities in the TSX files. Exact pixel v
 No 21st.dev template source was downloaded or copied.
 
 Development output is stored in `.next-dev/`; production builds use `.next/`. This allows `npm run build` while the development server is running without overwriting its generated chunks.
+
+### Color themes
+
+The header theme toggle switches between the original light palette (default) and dark mode. The preference is saved as `semantic-theme` in local storage and restored before paint; it also follows changes from another tab. Color tokens live in `src/app/globals.css`, with dark values scoped to `data-theme="dark"`. Layout, artwork, Three.js materials, and motion preferences are shared between themes.
