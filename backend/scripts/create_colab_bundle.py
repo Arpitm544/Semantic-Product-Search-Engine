@@ -101,7 +101,8 @@ def file_hash(path):
     return digest.hexdigest()
 
 assert file_hash(runtime_bundle) == EXPECTED_SHA256, "Wrong bundle. Replace the ZIP in Drive with the newly generated file."
-shutil.copy2(runtime_bundle, drive_bundle)
+if not drive_bundle.exists():
+    shutil.copy2(runtime_bundle, drive_bundle)
 extract_root = PROJECT.parent
 extract_root.mkdir(parents=True, exist_ok=True)
 with zipfile.ZipFile(runtime_bundle) as archive:

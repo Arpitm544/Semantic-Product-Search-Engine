@@ -1,8 +1,10 @@
 """Regression checks for PR 12 review repairs, without model downloads."""
 from collections import Counter
 import gc
+import hashlib
 from pathlib import Path
 import runpy
+import shutil
 import tempfile
 from threading import Lock
 import unittest
@@ -10,6 +12,7 @@ from unittest.mock import Mock, patch
 import weakref
 
 import numpy as np
+from fastapi.testclient import TestClient
 
 from api import dashboard, main as api, search_service
 from src.data import catalog
@@ -18,6 +21,65 @@ from src.search.typos import CatalogSpelling, FrequencySpelling
 
 
 class TestReviewFollowups(unittest.TestCase):
+    def test_initialization_import_error_returns_503_and_can_retry(self):
+        engine = Mock()
+        engine.search.return_value = {'results': []}
+        with patch.object(api._search_ready, 'is_set', return_value=False), \
+                patch.object(api, '_search_error', 'Previous startup failure'), \
+                patch.object(search_service, '_search_engine', None), \
+                patch.object(api, 'get_search_engine', side_effect=[ImportError('Missing model dependency'), engine]):
+            client = TestClient(api.app)
+            response = client.get('/api/search?q=phone')
+            self.assertEqual(response.status_code, 503)
+            self.assertIn('Missing model dependency', response.json()['error'])
+            self.assertEqual(client.get('/api/search?q=phone').status_code, 200)
+
+    def test_readable_malformed_vector_caches_are_rebuilt(self):
+        for payload in ({'vectors': [[1., 0.]]}, {'ids': ['p']},
+                        {'ids': ['p'], 'vectors': [1., 0.]}):
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'cache.npz'
+                np.savez_compressed(path, **payload)
+                semantic = Mock()
+                semantic.index.reconstruct_n.return_value = np.array([[1., 0.]], dtype='float32')
+                with patch('src.semantic.vector_search.SemanticVectorSearch', return_value=semantic), \
+                        patch.object(search_service, 'get_candidate_ranker', return_value=Mock(lock=Lock())), \
+                        patch.object(search_service, 'vector_cache_path', return_value=path):
+                    self.assertIs(search_service.load_semantic_search([{'id': 'p'}], 'model', 'hash'), semantic)
+                semantic.fit.assert_called_once()
+                with np.load(path) as cache:
+                    self.assertEqual(cache['vectors'].shape, (1, 2))
+
+    def test_colab_upload_is_verified_and_reconnect_does_not_rewrite_drive(self):
+        generator = runpy.run_path(str(api.PROJECT_ROOT / 'scripts/create_colab_bundle.py'))
+        digest = hashlib.sha256(b'verified bundle').hexdigest()
+        notebook = generator['notebook'](digest)
+        upload = next(''.join(cell['source']) for cell in notebook['cells']
+                      if 'EXPECTED_SHA256 =' in ''.join(cell['source']))
+        prefix = upload.split('extract_root =')[0].replace('from google.colab import files', '')
+        for existing, content in [(True, b'verified bundle'), (False, b'verified bundle'),
+                                  (False, b'wrong upload')]:
+            with self.subTest(existing=existing, content=content), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                drive, runtime = root / 'drive', root / 'runtime'
+                drive.mkdir()
+                runtime.mkdir()
+                name = 'esci_colab_bundle.zip'
+                ((drive if existing else runtime) / name).write_bytes(content)
+                scope = {'DRIVE_ROOT': drive, 'Path': lambda _: runtime, 'hashlib': hashlib,
+                         'shutil': shutil, 'files': Mock(upload=Mock(return_value={name: content}))}
+                with patch.object(shutil, 'copy2', wraps=shutil.copy2) as copy:
+                    if content == b'wrong upload':
+                        with self.assertRaises(AssertionError):
+                            exec(prefix, scope)
+                        copy.assert_not_called()
+                        self.assertFalse((drive / name).exists())
+                    else:
+                        exec(prefix, scope)
+                        source, target = (drive / name, runtime / name) if existing else (runtime / name, drive / name)
+                        copy.assert_called_once_with(source, target)
+                        self.assertEqual((drive / name).read_bytes(), content)
+
     def test_numeric_string_stock_and_invalid_values(self):
         for stocks, expected in [(['2', 3], 5), (['nan'], None),
                                  (['bad'], None), ([False], None), (['0'], 0)]:

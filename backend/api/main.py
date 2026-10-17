@@ -140,6 +140,10 @@ def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
 
     try:
         engine = get_search_engine()
+    except Exception as error:
+        # Initialization includes lazy model imports; all failures remain retryable.
+        return JSONResponse(status_code=503, content={"error": str(error)})
+    try:
         return engine.search(query, fuzzy=fuzzy != "0")
     except (ValueError, RuntimeError, OSError, PyMongoError) as error:
         return JSONResponse(status_code=503, content={"error": str(error)})

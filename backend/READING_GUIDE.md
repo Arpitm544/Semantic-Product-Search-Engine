@@ -22,10 +22,12 @@ The URL calls a function; folders organize the files that contain the code.
 /api/search?q=headphones
     ↓
 api/main.py → search_products()
-    ↓
-api/search_service.py → get_search_engine()
-    ↓
-src/search/product_search.py → ProductSearch.search()
+    ├─ source=mongo (default)
+    │  api/search_service.py → get_search_engine()
+    │  src/search/product_search.py → ProductSearch.search()
+    └─ source=serpapi
+       api/shopping_service.py → search_shopping() → rank_shopping_response()
+       api/ranking_service.py → shared encoder and reranker
     ↓
 JSON results returned to the frontend
 ```

@@ -28,7 +28,11 @@ def version():
     return manifest
 
 def load_products():
-    """Load products in ID order and verify the import count."""
+    """Return the verified catalog in ID order, shared until its manifest changes.
+
+    Treat the returned list and its product records as read-only. Callers that
+    need to sort or enrich records must create their own copies first.
+    """
     with _products_lock:
         return _load_products()
 

@@ -96,7 +96,7 @@ def load_semantic_search(products, model_path, catalog_hash):
         try:
             restore_vectors(semantic, products, cache_path)
             restored = True
-        except (OSError, ValueError, EOFError, BadZipFile):
+        except (OSError, ValueError, EOFError, BadZipFile, KeyError, IndexError):
             logging.getLogger(__name__).warning("Invalid vector cache; rebuilding.", exc_info=True)
     if not restored:
         print(f"Building vectors for {len(products):,} products on CPU. This may take several minutes.", flush=True)
