@@ -7,6 +7,8 @@ from src.search.typos import CatalogSpelling
 
 
 class HybridSearch:
+    """Combine word matching with meaning-based matching in one search."""
+
     def __init__(self, products, semantic=None, semantic_model=None, lexical=None):
         if len({product["id"] for product in products}) != len(products):
             raise ValueError("Catalog product IDs must be unique.")
@@ -17,31 +19,54 @@ class HybridSearch:
         self.semantic_model = semantic_model
 
     def search(self, query, limit=20, fuzzy=True):
+        """Prepare the query, collect ranked matches, and combine them."""
         query = query.strip()
-        corrected, corrections = self.spelling.correct(query) if fuzzy else (query, [])
-        mode = "hybrid" if self.semantic is not None else "bm25-fuzzy"
+        # 1. Correct the query when spelling correction is enabled.
+        corrected_query = query
+        corrections = []
+        if fuzzy:
+            corrected_query, corrections = self.spelling.correct(query)
+        mode = "hybrid" if self.semantic is not None else ("bm25-fuzzy" if fuzzy else "bm25")
         payload = {
-            "query": query, "correctedQuery": corrected if corrections else None,
-            "corrections": corrections, "searchMode": mode,
-            "semanticModel": self.semantic_model, "total": 0, "results": [],
+            "query": query,
+            "correctedQuery": corrected_query if corrections else None,
+            "corrections": corrections,
+            "searchMode": mode,
+            "semanticModel": self.semantic_model,
+            "candidateCount": 0,
+            "results": [],
         }
         if not tokenize(query) or limit <= 0:
             return payload
 
-        # Collect a separate ranked list from each search method.
-        rankings = [("keyword", 1.0, search_bm25(self.lexical, query, len(self.products)))]
+        # 2. Run keyword search and, when available, semantic search.
+        rankings = self.collect_rankings(query, corrected_query, corrections, limit)
+
+        # 3. Merge the lists into one score and result list per product.
+        ranked_ids, results = self.combine_rankings(rankings, limit)
+        payload["candidateCount"] = len(ranked_ids)
+        payload["results"] = results
+        return payload
+
+    def collect_rankings(self, query, corrected_query, corrections, limit):
+        """Keep the results of each search method with its scoring weight."""
+        rankings = [("keyword", 1.0, search_bm25(self.lexical, query, max(50, limit)))]
         if corrections:
             rankings.append((
-                "fuzzy", 0.85, search_bm25(self.lexical, corrected, len(self.products)),
+                "fuzzy", 0.85, search_bm25(self.lexical, corrected_query, max(50, limit)),
             ))
         if self.semantic is not None:
             candidate_k = min(len(self.products), max(50, limit))
             rankings.append(("semantic", 1.0, self.semantic.search(query, candidate_k)))
             if corrections:
                 rankings.append((
-                    "semantic-corrected", 0.5, self.semantic.search(corrected, candidate_k),
+                    "semantic-corrected", 0.5, self.semantic.search(corrected_query, candidate_k),
                 ))
 
+        return rankings
+
+    def combine_rankings(self, rankings, limit):
+        """Reward early matches and products found by multiple methods."""
         # Higher-ranked matches earn more points; repeated matches add up.
         scores = defaultdict(float)
         sources = defaultdict(list)
@@ -54,12 +79,11 @@ class HybridSearch:
                 sources[product_id].append(source)
 
         # Sort by combined score and attach the matching methods to each result.
-        ids = sorted(scores, key=lambda product_id: (-scores[product_id], str(product_id)))
-        payload["total"] = len(ids)
-        payload["results"] = [
+        ranked_ids = sorted(scores, key=lambda product_id: (-scores[product_id], str(product_id)))
+        results = [
             {**products_by_id[product_id], "score": scores[product_id],
              "matchSources": sources[product_id]}
-            for product_id in ids[:limit]
+            for product_id in ranked_ids[:limit]
         ]
-        return payload
+        return ranked_ids, results
 

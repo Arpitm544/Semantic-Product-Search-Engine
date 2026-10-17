@@ -89,7 +89,6 @@ runtime_bundle = Path("/content") / BUNDLE_NAME
 if not drive_bundle.exists():
     uploaded = files.upload()
     assert BUNDLE_NAME in uploaded, "Upload the generated esci_colab_bundle.zip."
-    shutil.copy2(runtime_bundle, drive_bundle)
     del uploaded
 else:
     shutil.copy2(drive_bundle, runtime_bundle)
@@ -102,6 +101,8 @@ def file_hash(path):
     return digest.hexdigest()
 
 assert file_hash(runtime_bundle) == EXPECTED_SHA256, "Wrong bundle. Replace the ZIP in Drive with the newly generated file."
+if not drive_bundle.exists():
+    shutil.copy2(runtime_bundle, drive_bundle)
 extract_root = PROJECT.parent
 extract_root.mkdir(parents=True, exist_ok=True)
 with zipfile.ZipFile(runtime_bundle) as archive:
@@ -199,6 +200,9 @@ if already_complete:
     assert report["status"] == "trained" and report["trained_examples"] == 40000
     print("This run is already complete. Proceed to evaluation.")
 else:
+    # Retraining invalidates reports from any earlier model under this run name.
+    for name in ("test_metrics.json", "validation_metrics.json", "selection.json"):
+        (REPORTS_DIR / name).unlink(missing_ok=True)
     command = [sys.executable, "-u", "-m", "src.semantic.train_esci",
         "--data-dir", str(DATA_DIR), "--output-dir", str(MODEL_DIR),
         "--device", "cuda", "--epochs", "1", "--batch-size", "32",

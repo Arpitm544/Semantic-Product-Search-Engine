@@ -341,7 +341,7 @@ html[data-motion="ready"] .reveal:not(.is-visible) { transform: translateY(14px)
   .auth-dialog[open] { animation: auth-arrive .22s ease-out; }
   @keyframes auth-arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 }
-.hero-landing-actions { display: flex; align-items: center; justify-content: center; gap: 25px; margin: 30px auto 20px; }
+.hero-landing-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 25px; margin: 30px auto 20px; }
 .hero-primary-cta { display: inline-flex; align-items: center; justify-content: center; gap: 25px; min-height: 53px; padding: 14px 25px; border-radius: 35px; background: #fbfaf4; color: #37483e; font-size: 12px; transition: background .2s, transform .2s; }
 .hero-primary-cta:hover { background: #e5ebdc; transform: translateY(-2px); }
 .hero-secondary-cta { display: inline-flex; align-items: center; gap: 12px; padding: 12px 0; color: white; font-size: 11px; border-bottom: 1px solid #ffffff50; }

@@ -24,6 +24,7 @@ from api.dashboard import dashboard_data
 from api import search_service
 from api.search_service import get_search_engine, _search_ready
 from src.data.catalog import CatalogUpdatingError
+from api.shopping_service import ShoppingError, search_shopping, rank_shopping_response
 
 PORT = int(os.environ.get("PORT", "8000"))
 FRONTEND_ORIGINS = [
@@ -114,19 +115,35 @@ def get_dashboard():
 
 
 @app.get("/api/search")
-def search_products(q: str = "", fuzzy: str = "1"):
-    """Search for q. Set fuzzy=0 to turn off spelling correction."""
-    if not _search_ready.is_set() and search_service._search_engine is None:
-        message = _search_error or "Search is initializing. Wait for indexing to finish."
-        return JSONResponse(status_code=503, content={"error": message})
-
+def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
+    """Choose MongoDB semantic search or Google Shopping via SerpApi."""
     query = q.strip()
+    if source not in ("mongo", "serpapi"):
+        return JSONResponse(status_code=400, content={"error": "Choose a valid search source: mongo or serpapi."})
     if len(query) > 512:
         return JSONResponse(status_code=400, content={
             "error": "Search queries must be 512 characters or fewer."
         })
+    # Shopping search does not depend on MongoDB or local model readiness.
+    if source == "serpapi":
+        try:
+            return rank_shopping_response(search_shopping(query))
+        except ShoppingError as error:
+            return JSONResponse(status_code=error.status, content={
+                "error": str(error), "code": error.code, "source": "serpapi",
+            })
+
+    if (not _search_ready.is_set() and search_service._search_engine is None
+            and not (_search_error or search_service._search_error)):
+        message = _search_error or "Search is initializing. Wait for indexing to finish."
+        return JSONResponse(status_code=503, content={"error": message})
+
     try:
         engine = get_search_engine()
+    except Exception as error:
+        # Initialization includes lazy model imports; all failures remain retryable.
+        return JSONResponse(status_code=503, content={"error": str(error)})
+    try:
         return engine.search(query, fuzzy=fuzzy != "0")
     except (ValueError, RuntimeError, OSError, PyMongoError) as error:
         return JSONResponse(status_code=503, content={"error": str(error)})

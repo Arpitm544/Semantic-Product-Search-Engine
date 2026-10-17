@@ -26,20 +26,21 @@ All local source and prepared data live under data/dataset/ inside backend/:
 - raw/: original Amazon products, labeled queries, source information, and license.
 - prepared/: products.json, train.jsonl, validation.jsonl, test.jsonl, and manifest.json.
 
-Download the original dataset only when it is missing:
+A fresh checkout contains no dataset. From `backend/`, install
+`requirements.txt`, then run the following preparation commands before importing.
+The downloader obtains the official Amazon ESCI files and attribution metadata
+in `data/dataset/raw/`; preparation creates `prepared/products.json`.
+Source information and file hashes are recorded in `raw/source.json`.
+The downloader also writes `raw/LICENSE` and `raw/NOTICE`. These attribution
+and provenance files are allowed by Git; the large dataset files stay ignored.
 
-~~~sh
+```sh
 python -m src.semantic.download_esci
-~~~
+python -m src.semantic.prepare_esci --pairs 20000
+```
 
-Prepare the dataset only when prepared/ is missing:
-
-~~~sh
-python -m src.semantic.prepare_esci
-~~~
-
-The preparation command refuses to overwrite an existing manifest.
-For a separate experiment, supply another --output-dir.
+See [Colab preparation](colab-training.md#prepare-the-bundle-from-a-fresh-checkout)
+for environment setup, download size, and complete preparation options.
 
 ## Import the catalog into MongoDB
 
@@ -52,21 +53,9 @@ Serving reads the imported MongoDB catalog.
 
 ## Training
 
-Use the [Colab guide](colab-training.md) for GPU training.
-To regenerate the matching upload ZIP and notebook after code changes:
-
-~~~sh
-python scripts/create_colab_bundle.py
-~~~
-
-Local training uses the same prepared dataset:
-
-~~~sh
-python -m src.semantic.train_esci --output-dir models/new-run
-~~~
-
-Training requires the embedding model and training libraries. Use a new output
-directory for a new run; --resume continues a compatible checkpoint.
+Use `scripts/create_colab_bundle.py` to package `src/semantic/train_esci.py`
+and the prepared data. Follow [Colab training](colab-training.md) to generate
+and run the matching training ZIP and notebook.
 
 ## Evaluate search
 

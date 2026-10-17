@@ -2,12 +2,16 @@
 
 import hashlib
 import os
+import logging
+import tempfile
+from zipfile import BadZipFile
 from pathlib import Path
 from threading import Event, Lock
 
 from src.config import PROJECT_ROOT
 from src.data.catalog import load_products, version, CatalogUpdatingError
 from src.search.product_search import ProductSearch
+from api.ranking_service import get_candidate_ranker
 
 _search_engine = None
 _search_signature = None
@@ -36,7 +40,7 @@ def build_search_engine():
     global _search_engine, _search_signature
 
     catalog_version = version()
-    model_path = os.environ.get("SEMANTIC_MODEL_PATH", "models/esci-minilm-20k")
+    model_path = os.environ.get("SEMANTIC_MODEL_PATH", "models/colab-export/esci-minilm-20k")
     reranker_path = os.environ.get("RERANKER_MODEL_PATH", "models/ms-marco-MiniLM-L6-v2")
 
     # This identifies the catalog and model settings used by the engine.
@@ -54,18 +58,23 @@ def build_search_engine():
     reranker = load_reranker(reranker_path)
 
     # ProductSearch combines spelling correction, retrieval, and ranking.
-    _search_engine = ProductSearch(products, semantic, reranker)
+    _search_engine = ProductSearch(products, semantic, reranker, model_lock=get_candidate_ranker().lock)
     _search_signature = signature
     return _search_engine
 
 
 def vector_cache_path(model_path, catalog_hash):
     """Choose a cache file for this catalog and this version of the model."""
-    weights = Path(model_path) / "model.safetensors"
-    cache_identity = catalog_hash + model_path + str(weights.stat().st_mtime_ns)
+    model_dir = Path(model_path)
+    weights = sorted(path for pattern in ("*.safetensors", "pytorch_model*.bin", "*.index.json")
+                     for path in model_dir.rglob(pattern))
+    if not weights:
+        raise FileNotFoundError(f"No supported checkpoint weights in {model_dir}")
+    fingerprint = [(str(path.relative_to(model_dir)), path.stat().st_size,
+                    path.stat().st_mtime_ns) for path in weights]
+    cache_identity = catalog_hash + str(model_path) + repr(fingerprint)
     cache_key = hashlib.sha256(cache_identity.encode()).hexdigest()
     cache_dir = PROJECT_ROOT / "indexes" / "catalog"
-    cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir / (cache_key + ".npz")
 
 
@@ -78,16 +87,38 @@ def load_semantic_search(products, model_path, catalog_hash):
     torch.set_num_threads(2)
     model_path = str((PROJECT_ROOT / model_path).resolve())
     semantic = SemanticVectorSearch(model_path, local_files_only=True, device="cpu")
+    ranker = get_candidate_ranker()
+    semantic._model = ranker.encoder
     cache_path = vector_cache_path(model_path, catalog_hash)
 
+    restored = False
     if cache_path.exists():
-        restore_vectors(semantic, products, cache_path)
-    else:
+        try:
+            restore_vectors(semantic, products, cache_path)
+            restored = True
+        except (OSError, ValueError, EOFError, BadZipFile, KeyError, IndexError):
+            logging.getLogger(__name__).warning("Invalid vector cache; rebuilding.", exc_info=True)
+    if not restored:
         print(f"Building vectors for {len(products):,} products on CPU. This may take several minutes.", flush=True)
-        semantic.fit(products)
+        with ranker.lock:
+            semantic.fit(products)
         vectors = semantic.index.reconstruct_n(0, len(products))
         product_ids = np.array([product["id"] for product in products])
-        np.savez_compressed(cache_path, ids=product_ids, vectors=vectors)
+        temporary = None
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(dir=cache_path.parent, suffix=".npz", delete=False) as stream:
+                temporary = Path(stream.name)
+                np.savez_compressed(stream, ids=product_ids, vectors=vectors)
+            temporary.replace(cache_path)
+        except OSError:
+            logging.getLogger(__name__).warning("Could not save vector cache; search remains available.", exc_info=True)
+        finally:
+            if temporary is not None:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    logging.getLogger(__name__).warning("Could not remove temporary vector cache.", exc_info=True)
 
     return semantic
 
@@ -111,9 +142,5 @@ def restore_vectors(semantic, products, cache_path):
 
 
 def load_reranker(model_path):
-    """Load the local model that puts the best matches first."""
-    from sentence_transformers import CrossEncoder
-
-    print("Loading reranker...", flush=True)
-    model_path = str((PROJECT_ROOT / model_path).resolve())
-    return CrossEncoder(model_path, local_files_only=True, device="cpu", max_length=256)
+    """Reuse the same cross-encoder as Google Shopping candidate ranking."""
+    return get_candidate_ranker().reranker

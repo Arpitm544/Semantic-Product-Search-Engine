@@ -122,7 +122,8 @@ class TestSearchAPI(unittest.TestCase):
                 patch.object(search_service, "_search_signature", None), \
                 patch.object(search_service, "load_semantic_search") as semantic, \
                 patch.object(search_service, "load_reranker"), \
-                patch.object(search_service, "ProductSearch", side_effect=lambda *args: Mock()) as factory:
+                patch.object(search_service, "get_candidate_ranker") as ranker, \
+                patch.object(search_service, "ProductSearch", side_effect=lambda *args, **kwargs: Mock()) as factory:
             first = search_service.get_search_engine()
             self.assertIs(first, search_service.get_search_engine())
             self.assertEqual(catalog.call_count, 1)
@@ -130,6 +131,7 @@ class TestSearchAPI(unittest.TestCase):
             self.assertIsNot(first, search_service.get_search_engine())
             self.assertEqual(catalog.call_count, 2)
             self.assertEqual(factory.call_count, 2)
+            self.assertIs(factory.call_args.kwargs["model_lock"], ranker.return_value.lock)
             self.assertEqual(semantic.call_count, 2)
 
     def test_initializing_search_is_unavailable(self):

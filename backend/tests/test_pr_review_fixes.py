@@ -100,6 +100,7 @@ class TestReviewFixes(unittest.TestCase):
                 patch.object(search_service, 'load_products', side_effect=[ValueError('importing'), []]), \
                 patch.object(search_service, 'load_semantic_search', side_effect=rebuild), \
                 patch.object(search_service, 'load_reranker'), \
+                patch.object(search_service, 'get_candidate_ranker'), \
                 patch.object(search_service, 'ProductSearch', return_value=new):
             self.assertEqual(api.search_products('coat').status_code, 503)
             self.assertFalse(ready.is_set())

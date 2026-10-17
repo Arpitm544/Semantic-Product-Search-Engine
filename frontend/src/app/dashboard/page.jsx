@@ -51,20 +51,20 @@ export default function DashboardPage() {
     <main className="dashboard-shell">
       <aside className="dashboard-sidebar">
         <a className="dashboard-brand" href="/"><span className="dashboard-brand-mark">✳</span><span>semantic<span>.</span></span></a>
-        <div className="dashboard-workspace"><span className="workspace-avatar">S</span><span><strong>Search workspace</strong><small>Local project data</small></span><span className="workspace-caret">⌄</span></div>
+        <div className="dashboard-workspace"><span className="workspace-avatar">S</span><span><strong>Search workspace</strong><small>MongoDB catalog</small></span><span className="workspace-caret">⌄</span></div>
         <span className="sidebar-label">WORKSPACE</span>
         <nav className="dashboard-nav" aria-label="Dashboard navigation">
           <a className="selected" href="/dashboard"><DashboardIcon name="grid" /> Overview</a>
           <a href="/search"><DashboardIcon name="search" /> Product search</a>
           <a href="#catalog"><DashboardIcon name="box" /> Catalog <span className="nav-count">{data?.productCount ?? '—'}</span></a>
         </nav>
-        <div className="sidebar-bottom"><div className="sidebar-tip"><span className="tip-star">✳</span><strong>Search the catalog</strong><p>Search products by words or meaning.</p><a href="/search">Open product search <DashboardIcon name="arrow" size={15} /></a></div><div className="sidebar-user"><span className="user-avatar">A</span><span><strong>Local workspace</strong><small>Project dataset</small></span><span className="user-more">···</span></div></div>
+        <div className="sidebar-bottom"><div className="sidebar-tip"><span className="tip-star">✳</span><strong>Search the catalog</strong><p>Search products by words or meaning.</p><a href="/search">Open product search <DashboardIcon name="arrow" size={15} /></a></div><div className="sidebar-user"><span className="user-avatar">A</span><span><strong>Local workspace</strong><small>Product catalog</small></span><span className="user-more">···</span></div></div>
       </aside>
 
       <section className="dashboard-main">
         <header className="dashboard-topbar"><div className="breadcrumb">Workspace <span>/</span> <strong>Overview</strong></div><div className="topbar-actions"><span className="data-live-label"><i/> Product catalog</span><span className="topbar-divider"/><span className="user-avatar small">A</span></div></header>
         <div className="dashboard-content">
-          <div className="dashboard-heading"><div><span className="dashboard-eyebrow">PROJECT DATA OVERVIEW</span><h1>Search, grounded in data<span>.</span></h1><p>Browse the product catalog and its categories.</p></div><span className="dataset-badge">Local dataset</span></div>
+          <div className="dashboard-heading"><div><span className="dashboard-eyebrow">PROJECT DATA OVERVIEW</span><h1>Search, grounded in data<span>.</span></h1><p>Browse the product catalog and its categories.</p></div><span className="dataset-badge">MongoDB catalog</span></div>
 
           {loadError && <div className="dashboard-error" role="alert">{loadError}</div>}
 

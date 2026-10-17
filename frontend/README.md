@@ -9,7 +9,9 @@ From the repository's `frontend/` folder, run:
     npm install
     npm run dev
 
-This starts both the API and website. Open http://localhost:3001. To run only the API, use `python3 api/main.py` from `backend/`; to run only the frontend, use `npm run dev:frontend`. The API listens at `http://127.0.0.1:8000`. Set `NEXT_PUBLIC_API_URL` before starting the frontend to use a different backend URL. For a production preview:
+This starts the API and website. If the project API is already running, it reuses
+that process and starts only the website. Stopping this command leaves a reused
+backend running. Open http://localhost:3001. To run only the API, use `python3 api/main.py` from `backend/`; to run only the frontend, use `npm run dev:frontend`. The API listens at `http://127.0.0.1:8000`. Set `NEXT_PUBLIC_API_URL` before starting the frontend to use a different backend URL. For a production preview:
 
     npm run build
     npm run start
@@ -17,6 +19,20 @@ This starts both the API and website. Open http://localhost:3001. To run only th
 `npm run start` serves only the frontend. Start the API separately with `python3 api/main.py` from `backend/` so the product search page can reach it.
 
 The frontend uses Next.js, React, and Three.js. The catalog search uses the MongoDB product catalog with keyword and semantic retrieval, spelling correction, and reranking. The scroll story and the approach comparison remain illustrative examples, not live search results.
+
+The `/search` page has a source selector for **MongoDB catalog** and **Google
+Shopping · SerpApi**. Configure `SERPAPI_API_KEY` in `backend/.env` and restart the
+backend to enable shopping requests (see the [backend setup](../backend/README.md#google-shopping-search-optional)).
+The key is never required in frontend environment variables. Shopping cards show
+images, original price labels, merchants, and external product links when
+available. Missing or failed images use a placeholder. Switching sources clears
+results and warnings. Google Shopping candidates pass through our semantic model
+and reranker; successfully ranked cards show **Engine ranked**. If model ranking
+fails, cards show **Google ranked** and a warning explains that Google's original
+order is being shown. Switching sources cancels the previous frontend request.
+Errors include a manual retry;
+search requests time out after 45 seconds. Cancelling a frontend request does not
+refund an upstream request that already started.
 
 ## Design behavior
 
