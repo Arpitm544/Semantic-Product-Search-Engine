@@ -1,10 +1,15 @@
 'use client';
+import { classes } from '@/lib/classes';
 
 import { useEffect, useRef, useState } from 'react';
-import AirPodsArtwork from './AirPodsArtwork';
+import type * as THREE from 'three';
+import type { GLTFLoader as Loader } from 'three/addons/loaders/GLTFLoader.js';
+import type { RoomEnvironment as Room } from 'three/addons/environments/RoomEnvironment.js';
+import type { MutableRefObject } from 'react';
+import HeadphonePoster from './HeadphonePoster';
 
 // AirPods Max by Mr.Philin, CC BY 4.0. See public/models/ATTRIBUTION.md.
-async function loadHeadphones(T, GLTFLoader) {
+async function loadHeadphones(T: typeof THREE, GLTFLoader: typeof Loader) {
   const gltf = await new GLTFLoader().loadAsync('/models/airpods-max.glb');
   const asset = gltf.scene;
   asset.updateMatrixWorld(true);
@@ -19,12 +24,14 @@ async function loadHeadphones(T, GLTFLoader) {
   model.add(normalized);
   const finish = { value: 1 };
   asset.traverse((object) => {
-    if (!object.isMesh) return;
-    const material = object.material;
+    if (!(object instanceof T.Mesh)) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) {
+    if (!(material instanceof T.MeshStandardMaterial)) continue;
     material.envMapIntensity = .7;
     material.roughness = Math.max(material.roughness, .42);
     for (const value of Object.values(material)) {
-      if (value?.isTexture) value.anisotropy = 4;
+      if (value instanceof T.Texture) value.anisotropy = 4;
     }
     // Preserve the artist's surface detail while offering a silver color study.
     // The green setting retains the original texture color.
@@ -38,33 +45,36 @@ async function loadHeadphones(T, GLTFLoader) {
       `);
     };
     material.customProgramCacheKey = () => 'airpods-finish-v1';
+    }
   });
   model.userData.finish = finish;
   return model;
 }
 
-function disposeObject(root) {
-  const geometries = new Set(), materials = new Set(), textures = new Set();
+function disposeObject(root: THREE.Object3D) {
+  const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>(), textures = new Set<THREE.Texture>();
   root.traverse((object) => {
-    if (object.geometry) geometries.add(object.geometry);
-    for (const material of [object.material].flat().filter(Boolean)) {
+    if (!('geometry' in object) || !('material' in object)) return;
+    const mesh = object as THREE.Mesh;
+    if (mesh.geometry) geometries.add(mesh.geometry);
+    for (const material of [mesh.material].flat().filter(Boolean)) {
       materials.add(material);
-      for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
+      for (const value of Object.values(material)) if (value && typeof value === 'object' && 'isTexture' in value) textures.add(value as THREE.Texture);
     }
   });
   geometries.forEach((geometry) => geometry.dispose());
   materials.forEach((material) => material.dispose());
-  textures.forEach((texture) => { texture.source?.data?.close?.(); texture.dispose(); });
+  textures.forEach((texture) => { const data: unknown = texture.source?.data; if (typeof ImageBitmap !== 'undefined' && data instanceof ImageBitmap) data.close(); texture.dispose(); });
 }
 
-function makeMeaningSpace(T) {
+function makeMeaningSpace(T: typeof THREE) {
   const field = new T.Group();
   const clusters = [
     { center: [1.2, .6, .3], color: '#658a9a', count: 45 },
     { center: [-1.1, -.65, -.5], color: '#9582ae', count: 35 },
     { center: [.9, -1.05, -.4], color: '#73946b', count: 35 },
   ];
-  const positions = [], colors = [];
+  const positions: number[] = [], colors: number[] = [];
   let seed = 39;
   const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
   clusters.forEach(({ center, color, count }) => {
@@ -81,7 +91,7 @@ function makeMeaningSpace(T) {
   field.add(dots);
   const query = new T.Mesh(new T.SphereGeometry(.09, 20, 16), new T.MeshBasicMaterial({ color: '#bd985a', transparent: true }));
   query.position.set(.05, .75, .9); field.add(query);
-  const connectionPositions = [];
+  const connectionPositions: number[] = [];
   [[1.2, .6, .3], [1.45, .83, .45], [.92, .3, .6]].forEach((point) => connectionPositions.push(...query.position.toArray(), ...point));
   const connections = new T.LineSegments(new T.BufferGeometry().setAttribute('position', new T.Float32BufferAttribute(connectionPositions, 3)), new T.LineBasicMaterial({ color: '#a18956', transparent: true, opacity: .85, toneMapped: false }));
   field.add(connections);
@@ -92,19 +102,41 @@ function makeMeaningSpace(T) {
   return field;
 }
 
-export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef, onUnavailable }) {
-  const mountRef = useRef(null);
+export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef }: { progressRef: MutableRefObject<number>; appearanceRef: MutableRefObject<string>; rotationRef: MutableRefObject<number> }) {
+  const mountRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let disposed = false, teardown = () => {};
+    setReady(false);
+    setFailed(false);
+    const fail = () => {
+      if (disposed) return;
+      disposed = true;
+      clearTimeout(timeout);
+      setReady(false);
+      setFailed(true);
+      if (mountRef.current) delete mountRef.current.dataset.sceneReady;
+      teardown();
+    };
+    const timeout = setTimeout(fail, 20000);
     const host = mountRef.current;
-    async function setup() {
-      let renderer, scene, pmrem, room, environment;
-      let resizeObserver, visibilityObserver, frame = 0;
-      let onVisibilityChange, pointerDown, pointerMove, pointerUp;
+    if (!host) { clearTimeout(timeout); return; }
+    async function setup(host: HTMLDivElement) {
+      let renderer: THREE.WebGLRenderer;
+      let scene: THREE.Scene;
+      let pmrem: THREE.PMREMGenerator | null;
+      let room: Room | null;
+      let environment: THREE.WebGLRenderTarget | undefined;
+      let resizeObserver: ResizeObserver | undefined, visibilityObserver: IntersectionObserver | undefined, frame = 0;
+      let onVisibilityChange: (() => void) | undefined;
+      let pointerDown: ((event: PointerEvent) => void) | undefined;
+      let pointerMove: ((event: PointerEvent) => void) | undefined;
+      let pointerUp: (() => void) | undefined;
       let cleaned = false;
+      const onContextLost = (event: Event) => { event.preventDefault(); fail(); };
       const cleanup = () => {
         if (cleaned) return;
         cleaned = true;
@@ -112,6 +144,7 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
         resizeObserver?.disconnect(); visibilityObserver?.disconnect();
         if (onVisibilityChange) document.removeEventListener('visibilitychange', onVisibilityChange);
         if (renderer?.domElement) {
+          renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
           if (pointerDown) renderer.domElement.removeEventListener('pointerdown', pointerDown);
           if (pointerMove) renderer.domElement.removeEventListener('pointermove', pointerMove);
           if (pointerUp) {
@@ -136,6 +169,7 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
         renderer.toneMappingExposure = 1.1;
         renderer.domElement.setAttribute('aria-hidden', 'true');
         host.appendChild(renderer.domElement);
+        renderer.domElement.addEventListener('webglcontextlost', onContextLost);
         scene = new T.Scene();
         const camera = new T.PerspectiveCamera(33, 1, .1, 50);
         camera.position.set(0, .05, 8.2);
@@ -175,9 +209,25 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
           field.visible = cloud > .01;
           field.rotation.y = -.2 + smoothed * .45;
           field.scale.setScalar(lerp(.4, 1.04, cloud));
-          field.traverse((object) => { if (object.material) { if (object.userData.originalOpacity === undefined) object.userData.originalOpacity = object.material.opacity; object.material.opacity = object.userData.originalOpacity * cloud; object.material.transparent = true; } });
-          renderer.render(scene, camera);
-          host.dataset.sceneReady = 'true';
+          field.traverse((object) => {
+            if (!(object instanceof T.Mesh || object instanceof T.Points || object instanceof T.Line)) return;
+            const materials = Array.isArray(object.material) ? object.material : [object.material];
+            for (const material of materials) {
+              if (material.userData.originalOpacity === undefined) material.userData.originalOpacity = material.opacity;
+              material.opacity = material.userData.originalOpacity * cloud;
+              material.transparent = true;
+            }
+          });
+          try {
+            renderer.render(scene, camera);
+          } catch {
+            fail();
+            return;
+          }
+          if (host.dataset.sceneReady !== 'true') {
+            host.dataset.sceneReady = 'true';
+            setReady(true);
+          }
           frame = requestAnimationFrame(animate);
         };
         const start = () => { cancelAnimationFrame(frame); if (visible && !document.hidden) frame = requestAnimationFrame(animate); };
@@ -192,19 +242,21 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
         renderer.domElement.addEventListener('pointercancel', pointerUp);
         onVisibilityChange = start;
         document.addEventListener('visibilitychange', onVisibilityChange);
-        setReady(true);
+        clearTimeout(timeout);
       } catch {
-        if (!disposed) { setFailed(true); teardown(); onUnavailable(); }
+        fail();
       }
     }
-    setup();
-    return () => { disposed = true; teardown(); };
-  }, [progressRef, appearanceRef, rotationRef, onUnavailable]);
+    setup(host);
+    return () => { disposed = true; clearTimeout(timeout); delete host.dataset.sceneReady; teardown(); };
+  }, [progressRef, appearanceRef, rotationRef, attempt]);
 
   return (
-    <div className={`headphone-scene ${ready && !failed ? 'is-ready' : ''}`} role="img" aria-label="AirPods Max 3D model transitioning into a schematic map of related product meanings">
-      {(!ready || failed) && <div className="scene-fallback"><AirPodsArtwork /></div>}
-      <div className="scene-canvas" ref={mountRef} />
+    <div className={classes(`headphone-scene ${ready && !failed ? 'is-ready' : ''}`)} role="group" aria-label="AirPods Max product preview">
+      <div className={`absolute inset-0 z-10 transition-opacity duration-500 motion-reduce:transition-none ${ready && !failed ? 'pointer-events-none opacity-0' : 'opacity-100'}`} aria-hidden={ready && !failed}>
+        <HeadphonePoster loading={!ready && !failed} failed={failed} onRetry={() => setAttempt(value => value + 1)} />
+      </div>
+      <div className={`scene-canvas ${ready && !failed ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500 motion-reduce:transition-none absolute [inset:0] [&_canvas]:block [&_canvas]:w-[100%] [&_canvas]:h-[100%] [&_canvas]:cursor-grab [&_canvas]:touch-pan-y [&_canvas:active]:cursor-grabbing`} ref={mountRef} />
     </div>
   );
 }
