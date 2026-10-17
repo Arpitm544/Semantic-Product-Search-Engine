@@ -14,7 +14,7 @@ function money(product: SearchProduct) {
   try {
     // SerpApi prices without a currency label must not be assigned a guessed currency.
     if (product.matchSources?.includes('google-shopping')) return new Intl.NumberFormat('en-IN').format(Number(product.price));
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: product.currency || 'USD' }).format(Number(product.price));
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: product.currency || 'INR', maximumFractionDigits: 0 }).format(Number(product.price));
   } catch {
     return 'Price unavailable';
   }
@@ -45,6 +45,7 @@ export default function SearchPage() {
   const [input, setInput] = useState('');
   const [source, setSource] = useState<keyof typeof SOURCES>('mongo');
   const [searched, setSearched] = useState('');
+  const [lastFuzzy, setLastFuzzy] = useState(true);
   const [results, setResults] = useState<SearchProduct[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -82,6 +83,7 @@ export default function SearchPage() {
     let timedOut = false;
     const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 45000);
     setSearched(query);
+    setLastFuzzy(fuzzy);
     setLoading(true);
     setResults([]);
     setTotal(0);
@@ -103,7 +105,7 @@ export default function SearchPage() {
       }
       if (pending.current !== controller) return;
       setResults(payload.results);
-      setTotal(Number.isFinite(payload.total) ? payload.total : payload.results.length);
+      setTotal(Number.isFinite(payload.candidateCount) ? payload.candidateCount : payload.results.length);
       setCorrectedQuery(typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null);
       setWarning(typeof payload.warning === 'string' ? payload.warning : '');
     } catch (reason) {
@@ -140,15 +142,15 @@ export default function SearchPage() {
           <input autoFocus maxLength={512} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Try ‘wireless headphones’ or ‘mascara’" aria-label="Search products" />
           <button type="submit" disabled={!input.trim() || loading}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
         </form>
-        <span className={"search-data-note block mt-[11px] text-[10px] [color:#a1a99f]"}>{shopping ? 'Google Shopping products ranked by our search engine. Prices and availability can change.' : 'Semantic catalog search with spelling suggestions. Images and prices may be unavailable.'}</span>
+        <span className={"search-data-note block mt-[11px] text-[10px] [color:#a1a99f]"}>{shopping ? 'Google Shopping products, ranked when our search models are available. Prices and availability can change.' : 'Semantic catalog search with spelling suggestions. Images and prices may be unavailable.'}</span>
       </section>
 
       <section className={"search-results-section max-w-[990px] min-h-[290px] mt-[0] mr-[auto] mb-[0] ml-[auto] pt-[0] pr-[24px] pb-[50px] pl-[24px] max-[600.01px]:pl-[17px] max-[600.01px]:pr-[17px]"} aria-live="polite" aria-busy={loading}>
-        {error && <div className={"search-error flex items-center justify-between gap-[12px] mt-[20px] mr-[0] mb-[20px] ml-[0] pt-[13px] pr-[13px] pb-[13px] pl-[13px] [border:1px_solid_#f0d5c8] rounded-[8px] [background:#fff9f5] [color:#945d45] text-[12px] [&_button]:shrink-[0] [&_button]:pt-[8px] [&_button]:pr-[10px] [&_button]:pb-[8px] [&_button]:pl-[10px] [&_button]:[background:#fff] [&_button]:[border:1px_solid_#dcbda9] [&_button]:rounded-[5px] [&_button]:[color:#804e36] [&_button]:cursor-pointer [&_button]:[font:inherit] max-[600.01px]:items-start max-[600.01px]:flex-col"} role="alert"><span>{error}</span><button type="button" onClick={() => runSearch(searched)}>Try again</button></div>}
+        {error && <div className={"search-error flex items-center justify-between gap-[12px] mt-[20px] mr-[0] mb-[20px] ml-[0] pt-[13px] pr-[13px] pb-[13px] pl-[13px] [border:1px_solid_#f0d5c8] rounded-[8px] [background:#fff9f5] [color:#945d45] text-[12px] [&_button]:shrink-[0] [&_button]:pt-[8px] [&_button]:pr-[10px] [&_button]:pb-[8px] [&_button]:pl-[10px] [&_button]:[background:#fff] [&_button]:[border:1px_solid_#dcbda9] [&_button]:rounded-[5px] [&_button]:[color:#804e36] [&_button]:cursor-pointer [&_button]:[font:inherit] max-[600.01px]:items-start max-[600.01px]:flex-col"} role="alert"><span>{error}</span><button type="button" onClick={() => runSearch(searched, lastFuzzy)}>Try again</button></div>}
         {loading && <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:#677567] text-[13px] [&_small]:text-[11px] [&_small]:[color:#929c91]"}>Searching {SOURCES[source]}…</div>}
         {!loading && !error && !searched && <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:#677567] text-[13px] [&_small]:text-[11px] [&_small]:[color:#929c91] search-empty-start [&>span]:w-[32px] [&>span]:h-[32px] [&>span]:rounded-[10px] [&>span]:[background:#edf3e9] [&>span]:[color:#759272] [&>span]:grid [&>span]:place-items-center [&>span]:mb-[4px] [&_strong]:text-[13px] [&_strong]:font-semibold"}><span>✳</span><strong>Start with a product or a need</strong><small>Enter a product, brand, or category to search {SOURCES[source]}.</small></div>}
         {!loading && !error && searched && <>
-          <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_#e7ebe5] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:#344035] [&>span]:text-[11px] [&>span]:[color:#8b958a] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:#859482]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span>{shopping ? `${results.length} products shown` : `${total} matching products`}</span></div>
+          <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_#e7ebe5] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:#344035] [&>span]:text-[11px] [&>span]:[color:#8b958a] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:#859482]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span>{shopping ? `${results.length} products shown` : `${results.length} products shown from ${total} ranked candidates`}</span></div>
           {warning && <div className={"search-ranking-warning mt-[15px] mr-[0] mb-[15px] ml-[0] pt-[12px] pr-[14px] pb-[12px] pl-[14px] [border:1px_solid_#e5d9b5] rounded-[8px] [background:#fffaf0] [color:#796338] text-[12px] leading-[1.5]"} role="status">{warning}</div>}
           {correctedQuery && <div className={"search-spelling-note flex items-center justify-between gap-[12px] mt-[15px] mr-[0] mb-[15px] ml-[0] pt-[12px] pr-[14px] pb-[12px] pl-[14px] [border:1px_solid_#dce4d9] rounded-[8px] [background:#edf3e9] [color:#455b48] text-[12px] leading-[1.5] [&_button]:[border:0] [&_button]:[background:transparent] [&_button]:[color:#4f7857] [&_button]:[font-style:normal] [&_button]:font-semibold [&_button]:text-[11px] [&_button]:leading-[normal] [&_button]:[font-family:'DM_Sans',sans-serif] [&_button]:underline [&_button]:cursor-pointer [&_button]:shrink-[0] [&_button:focus-visible]:[outline:2px_solid_#4f7857] [&_button:focus-visible]:[outline-offset:4px] max-[600.01px]:items-start max-[600.01px]:flex-col"}><span>Also searching for <strong>“{correctedQuery}”</strong>.</span><button type="button" onClick={() => runSearch(searched, false)}>Use original spelling</button></div>}
           {results.length ? <div className={"search-result-list grid"}>{results.map((product, index) => {
@@ -161,7 +163,7 @@ export default function SearchPage() {
                 {product.description && <p>{product.description}</p>}
                 <div className={"search-result-meta flex items-center gap-[13px] mt-[7px] text-[10px] [color:#828d81] [&_strong]:text-[11px] [&_strong]:[color:#455b48] max-[600.01px]:gap-[8px] max-[600.01px]:text-[9px] max-[600.01px]:flex-wrap"}><strong>{money(product)}</strong>{product.rating != null && <span>★ {Number(product.rating).toFixed(1)}{product.reviews != null ? ` (${Number(product.reviews).toLocaleString()} reviews)` : ''}</span>}{product.stock != null && <span>{product.stock} in stock</span>}</div>
               </div>
-              <span className={"relevance-score self-start mt-[3px] mr-[3px] mb-[0] ml-[0] rounded-[14px] pt-[5px] pr-[8px] pb-[5px] pl-[8px] [background:#f0f4ee] [color:#577658] text-[10px] font-bold whitespace-nowrap [&_small]:text-[8px] [&_small]:font-medium [&_small]:ml-[4px] [&_small]:[color:#82927f] max-[600.01px]:text-[9px] max-[600.01px]:pt-[4px] max-[600.01px]:pr-[6px] max-[600.01px]:pb-[4px] max-[600.01px]:pl-[6px] max-[600.01px]:ml-[66px] max-[600.01px]:[&_small]:hidden"}>{shopping ? product.matchSources?.includes('reranker') ? 'Engine ranked' : 'Google ranked' : product.matchSources?.includes('keyword') ? 'Product match' : product.matchSources?.includes('fuzzy') ? 'Spelling match' : 'Related match'}</span>
+              <span className={"relevance-score self-start mt-[3px] mr-[3px] mb-[0] ml-[0] rounded-[14px] pt-[5px] pr-[8px] pb-[5px] pl-[8px] [background:#f0f4ee] [color:#577658] text-[10px] font-bold whitespace-nowrap [&_small]:text-[8px] [&_small]:font-medium [&_small]:ml-[4px] [&_small]:[color:#82927f] max-[600.01px]:text-[9px] max-[600.01px]:pt-[4px] max-[600.01px]:pr-[6px] max-[600.01px]:pb-[4px] max-[600.01px]:pl-[6px] max-[600.01px]:ml-[66px] max-[600.01px]:[&_small]:hidden"}>{shopping ? product.matchSources?.includes('reranker') ? 'Engine ranked' : 'Google ranked' : product.matchSources?.some((source) => source === 'fuzzy' || source === 'semantic-corrected') ? 'Spelling match' : product.matchSources?.includes('keyword') ? 'Product match' : 'Related match'}</span>
             </article>;
           })}</div> : <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:#677567] text-[13px] [&_small]:text-[11px] [&_small]:[color:#929c91] search-no-results [&_strong]:text-[13px] [&_strong]:font-semibold"}><strong>No matching products found.</strong><small>Try a shorter query or choose another search source.</small></div>}
         </>}

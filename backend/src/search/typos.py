@@ -43,6 +43,8 @@ class CatalogSpelling:
     """Suggest corrections only when the catalog provides a clear match."""
 
     def __init__(self, vocabulary):
+        # The cache belongs to this instance and can be collected with its catalog.
+        self.suggestion = lru_cache(maxsize=8192)(self.suggestion)
         self.vocabulary = frozenset(vocabulary)
         self.by_length = {}
         for word in sorted(self.vocabulary):
@@ -65,12 +67,11 @@ class CatalogSpelling:
         for length in range(len(word) - max_edits, len(word) + max_edits + 1):
             for candidate in self.by_length.get(length, []):
                 distance = edit_distance(word, candidate)
-                similarity = 1 - distance / max(len(word), length)
-                if distance <= max_edits and similarity >= 0.8:
+                threshold = 0.75 if (len(word) == length == 4 or min(len(word), length) >= 8) else 0.8
+                if distance <= max_edits and 1 - distance / max(len(word), length) >= threshold:
                     candidates.append((distance, candidate))
         return candidates
 
-    @lru_cache(maxsize=8192)
     def suggestion(self, word):
         """Return (replacement, edit count), or None if no clear correction exists."""
         word = word.lower()
@@ -116,7 +117,6 @@ class FrequencySpelling(CatalogSpelling):
         super().__init__(frequency)
         self.frequency = frequency
 
-    @lru_cache(maxsize=8192)
     def suggestion(self, word):
         word = word.lower()
         if self.should_keep_word(word):

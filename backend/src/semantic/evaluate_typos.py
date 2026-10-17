@@ -20,10 +20,18 @@ def retrieval_metrics(retrieved_ids, relevant_ids, k=5):
     first = next((rank for rank, product_id in enumerate(retrieved_ids[:10], 1)
                   if product_id in relevant), None)
     return {
-        "recall@5": hits / len(relevant) if relevant else 0.0,
-        "hit_rate@5": float(hits > 0),
+        f"recall@{k}": hits / len(relevant) if relevant else 0.0,
+        f"hit_rate@{k}": float(hits > 0),
         "mrr@10": 1 / first if first else 0.0,
     }
+
+
+def cache_matches(path, signature):
+    """A missing or interrupted derived-cache manifest is stale."""
+    try:
+        return json.loads(path.read_text()) == signature
+    except (OSError, ValueError):
+        return False
 
 
 class CachedSemantic:
@@ -115,8 +123,8 @@ def load_evaluation_index(engine, products, model_ref, catalog_hash, data_dir, n
     cache = data_dir / "evaluation_indexes" / name
     cache_manifest = cache / "signature.json"
     index_path, map_path = cache / "faiss_index.bin", cache / "faiss_id_map.pkl"
-    if (cache_manifest.exists() and index_path.exists() and map_path.exists()
-            and json.loads(cache_manifest.read_text()) == signature):
+    if (index_path.exists() and map_path.exists()
+            and cache_matches(cache_manifest, signature)):
         engine = SemanticVectorSearch.load(index_path, map_path)
         engine._model = model
         print(f"Using cached {name} product embeddings.", flush=True)

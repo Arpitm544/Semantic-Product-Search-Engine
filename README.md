@@ -1,7 +1,7 @@
 # Semantic Product Search Engine
 
 Product search over a prepared Amazon ESCI catalog stored in MongoDB. The backend
-combines a fine-tuned MiniLM encoder, brand/title keyword retrieval, spelling
+combines a fine-tuned MiniLM encoder, full-text keyword retrieval, spelling
 correction, query expansion, and a blended cross-encoder reranker.
 
 ## Repository layout
@@ -32,10 +32,12 @@ correction, query expansion, and a blended cross-encoder reranker.
 ## Local startup
 
 From the repository root, with MongoDB running and the project virtual environment
-and model weights prepared:
+and model weights prepared using [the backend setup guide](docs/backend.md),
+and the prepared Amazon catalog imported into MongoDB:
 
 ```sh
 cd backend
+.venv/bin/python scripts/import_catalog.py
 sh scripts/start_backend.sh
 ```
 
@@ -90,7 +92,6 @@ results come from the external provider and do not use the MongoDB search index.
 Local weights and vector caches are separate from the product database.
 All local dataset files are under backend/data/dataset/, with raw/ and prepared/ subfolders.
 
-The latest reported Colab validation top-5 success was 79.88% for generated typo
-queries and 86.50% for clean queries. These are experiment results, not a fresh
-benchmark of the integrated backend. Amazon ESCI source attribution and license
+See [Colab training and evaluation](docs/colab-training.md) for reproducible
+validation and test comparisons. Amazon ESCI source attribution and license
 are included with the prepared dataset.

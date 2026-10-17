@@ -16,7 +16,7 @@ This compares BM25 keyword retrieval with spelling-aware retrieval.
 To evaluate a selected local model as well:
 
 ~~~sh
-python -m src.semantic.evaluate_typos --model models/colab-export/esci-minilm-20k --local-files-only
+python -m src.semantic.evaluate_typos --model models/esci-minilm-20k --local-files-only
 ~~~
 
 Use --split test for the held-out test split. The evaluator also compares the

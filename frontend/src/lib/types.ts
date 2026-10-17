@@ -29,6 +29,6 @@ export interface DashboardData {
   products: SearchProduct[];
   productCount: number;
   categories: string[];
-  totalStock: number;
+  totalStock: number | null;
   sources?: { catalog?: string };
 }
