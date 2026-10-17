@@ -1,8 +1,10 @@
 'use client';
+import { classes } from '@/lib/classes';
 
+import type { CatalogProduct } from '@/lib/types';
 import { useId } from 'react';
 
-export function artworkType(product) {
+export function artworkType(product: Pick<CatalogProduct, 'title'>) {
   const title = product.title.toLowerCase();
   if (/headphone|headset/.test(title)) return 'headphones';
   if (/backpack/.test(title)) return 'backpack';
@@ -18,16 +20,16 @@ export function artworkType(product) {
   return 'object';
 }
 
-export default function ProductArtwork({ product }) {
+export default function ProductArtwork({ product }: { product: Pick<CatalogProduct, 'title'> }) {
   const type = artworkType(product);
   const id = useId().replaceAll(':', '');
   if (['headphones', 'backpack', 'bottle', 'jacket'].includes(type)) {
-    return <div className={`product-art product-art--${type}`} role="img" aria-label={`Illustrative artwork for ${product.title}`} />;
+    return <div className={classes(`product-art product-art--${type}`)} role="img" aria-label={`Illustrative artwork for ${product.title}`} />;
   }
   const gradient = `url(#material-${id})`;
   const line = '#687776';
   return (
-    <div className={`product-art product-art--vector product-art--${type}`}>
+    <div className={classes(`product-art product-art--vector product-art--${type}`)}>
       <svg viewBox="0 0 280 280" role="img" aria-label={`Illustrative artwork for ${product.title}`}>
         <defs><linearGradient id={`material-${id}`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#f9faf7" /><stop offset=".5" stopColor="#a8b7ad" /><stop offset="1" stopColor="#788986" /></linearGradient></defs>
         <ellipse cx="140" cy="231" rx="76" ry="10" fill="#334b43" opacity=".09" />

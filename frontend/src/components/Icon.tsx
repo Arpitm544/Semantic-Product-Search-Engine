@@ -1,3 +1,5 @@
+import type { SVGProps } from 'react';
+
 const paths = {
   arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
   diagonal: <><path d="M6 18 18 6M6 6h12v12" /></>,
@@ -12,7 +14,7 @@ const paths = {
   sparkle: <><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z" /></>,
 };
 
-export default function Icon({ name, size = 20, ...props }) {
+export default function Icon({ name, size = 20, ...props }: SVGProps<SVGSVGElement> & { name: keyof typeof paths; size?: number }) {
   const icon = paths[name];
   if (!icon) {
     if (process.env.NODE_ENV !== 'production') console.warn(`Unknown icon name: ${name}`);
