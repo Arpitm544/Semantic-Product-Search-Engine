@@ -54,7 +54,7 @@ def search_bm25(
                 index["idf"][word] * frequency * (k1 + 1) / (frequency + k1)
             )
     ranked = sorted(scores.items(), key=lambda result: (-result[1], result[0]))
-    return [(index["products"][i], score) for i, score in ranked[:top_k]]
+    return [(index["products"][i], score) for i, score in ranked[:max(0, top_k)]]
 
 
 def save_bm25(index: Dict[str, Any], path: Optional[Path] = None) -> Path:

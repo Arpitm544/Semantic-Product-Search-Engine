@@ -103,10 +103,9 @@ python -m src.semantic.evaluate_typos --lexical-only
 
 Activate `.venv` before running these Python commands. Imports and evaluation use the existing prepared dataset.
 
-The local dataset downloader, preparation script, training script, and notebook
-have been removed.
-Previously uploaded Colab ZIPs retain their own code. Restore the training script
-before using the retained bundle generator to build another training package.
+The dataset downloader, preparation script, training script, and Colab notebook
+are available for reproducible training. See [Colab training](../docs/colab-training.md)
+to prepare the data and regenerate a matching notebook and bundle.
 
 More information: [root README](../README.md), [commands](../docs/commands.md), and
 [search evaluation](../docs/typo-search.md).

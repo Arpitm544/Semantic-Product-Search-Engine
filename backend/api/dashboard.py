@@ -24,7 +24,10 @@ def dashboard_data():
         "productCount": len(products),
         "averageRating": average_rating,
         "ratedProductCount": len(rated_products),
-        "totalStock": sum(item.get("stock", 0) or 0 for item in products),
+        "totalStock": (sum(item["stock"] for item in products)
+                       if products and all(isinstance(item.get("stock"), (int, float))
+                                           and not isinstance(item.get("stock"), bool)
+                                           for item in products) else None),
         "sources": {
             "catalog": f"MongoDB/{COLLECTION}",
         },

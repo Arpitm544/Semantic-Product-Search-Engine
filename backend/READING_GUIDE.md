@@ -89,8 +89,8 @@ vocabulary, and indexes together so requests can reuse them.
 | `vector_search.py` | Run meaning-based search |
 
 The prepared catalog and query splits already exist in `data/dataset/prepared/`.
-The preparation script has been removed. Restore it from Git history if you need
-to rebuild or change those files.
+Use `src/semantic/prepare_esci.py` to rebuild the prepared files after downloading
+the source with `src/semantic/download_esci.py`.
 
 A **query family** groups queries with the same normalized wording. Keeping
 families separate prevents training on evaluation questions. A **manifest**
@@ -113,8 +113,6 @@ and Irrelevant. Source labels and IDs remain compatible with the existing data.
 | `colab/` | Previously generated upload artifacts |
 | `.venv/` | Installed Python packages |
 
-The local downloader, preparation script, training script, and notebook have been
-removed. Existing
-uploaded Colab ZIPs contain their own code. Restore `src/semantic/train_data.py`
-before rebuilding a training bundle. The generator stops with a clear message
-while that file is absent. Recreate the notebook when it is requested.
+The downloader, preparation script, and `src/semantic/train_esci.py` support
+reproducible training. Follow [Colab training](../docs/colab-training.md) to
+regenerate the notebook and its matching ZIP with the bundle generator.

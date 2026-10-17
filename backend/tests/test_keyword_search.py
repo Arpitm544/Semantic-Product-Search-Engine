@@ -4,7 +4,7 @@ Addresses TR-003, TEST-006, BR-004.
 """
 import unittest
 from src.keyword_search.bm25 import fit_bm25, search_bm25
-from metrics_helpers import (
+from tests.metrics_helpers import (
     precision_at_k,
     recall_at_k,
     reciprocal_rank,

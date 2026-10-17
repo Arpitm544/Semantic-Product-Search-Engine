@@ -159,7 +159,7 @@ export default function SearchPage() {
                 {product.description && <p>{product.description}</p>}
                 <div className="search-result-meta"><strong>{money(product)}</strong>{product.rating != null && <span>★ {Number(product.rating).toFixed(1)}{product.reviews != null ? ` (${Number(product.reviews).toLocaleString()} reviews)` : ''}</span>}{product.stock != null && <span>{product.stock} in stock</span>}</div>
               </div>
-              <span className="relevance-score">{shopping ? product.matchSources?.includes('reranker') ? 'Engine ranked' : 'Google ranked' : product.matchSources?.includes('keyword') ? 'Product match' : product.matchSources?.includes('fuzzy') ? 'Spelling match' : 'Related match'}</span>
+              <span className="relevance-score">{shopping ? product.matchSources?.includes('reranker') ? 'Engine ranked' : 'Google ranked' : product.matchSources?.some((source) => source === 'fuzzy' || source === 'semantic-corrected') ? 'Spelling match' : product.matchSources?.includes('keyword') ? 'Product match' : 'Related match'}</span>
             </article>;
           })}</div> : <div className="search-state search-no-results"><strong>No matching products found.</strong><small>Try a shorter query or choose another search source.</small></div>}
         </>}

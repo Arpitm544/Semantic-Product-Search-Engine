@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 import os
 from pathlib import Path
 import sys
-from threading import Event, Thread
+from threading import Thread
+from time import sleep
 
 # Load settings before importing the database and search modules.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -20,7 +21,9 @@ from pymongo.errors import PyMongoError
 import uvicorn
 
 from api.dashboard import dashboard_data
-from api.search_service import get_search_engine
+from api import search_service
+from api.search_service import get_search_engine, _search_ready
+from src.data.catalog import CatalogUpdatingError
 from api.shopping_service import ShoppingError, search_shopping, rank_shopping_response
 
 PORT = int(os.environ.get("PORT", "8000"))
@@ -31,20 +34,28 @@ FRONTEND_ORIGINS = [
     ).split(",")
     if origin.strip()
 ]
-_search_ready = Event()
 _search_error = None
 
 
-def initialize_search():
-    """Load models in the background so health requests can report progress."""
+def initialize_search(max_attempts=150, retry_delay=2):
+    """Retry catalog publication while health requests report startup progress."""
     global _search_error
-    try:
-        get_search_engine()
-        _search_ready.set()
-        print("Search is ready.", flush=True)
-    except Exception as error:
-        _search_error = f"Search initialization failed: {error}"
-        print(_search_error, flush=True)
+    _search_ready.clear()
+    _search_error = None
+    for attempt in range(max_attempts):
+        try:
+            get_search_engine()
+            _search_ready.set()
+            print("Search is ready.", flush=True)
+            return
+        except Exception as error:
+            if isinstance(error, CatalogUpdatingError) and attempt + 1 < max_attempts:
+                print(f"Waiting for catalog import: {error}", flush=True)
+                sleep(retry_delay)
+                continue
+            _search_error = f"Search initialization failed: {error}"
+            print(_search_error, flush=True)
+            return
 
 
 @asynccontextmanager
@@ -78,10 +89,11 @@ async def prevent_cached_results(request: Request, call_next):
 def check_health():
     """Report whether the search models are ready."""
     ready = _search_ready.is_set()
+    error = search_service._search_error or _search_error
     if ready:
         status, message = "ready", "Search is ready."
-    elif _search_error:
-        status, message = "error", _search_error
+    elif error:
+        status, message = "error", error
     else:
         status, message = "initializing", "Preparing the search index. Check terminal progress."
     return JSONResponse(status_code=200 if ready else 503, content={
@@ -121,7 +133,7 @@ def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
                 "error": str(error), "code": error.code, "source": "serpapi",
             })
 
-    if not _search_ready.is_set():
+    if not _search_ready.is_set() and search_service._search_engine is None:
         message = _search_error or "Search is initializing. Wait for indexing to finish."
         return JSONResponse(status_code=503, content={"error": message})
 

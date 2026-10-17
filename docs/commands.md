@@ -29,8 +29,8 @@ All local source and prepared data live under data/dataset/ inside backend/:
 The original dataset is already stored in `data/dataset/raw/`.
 Source information and file hashes are recorded in `raw/source.json`.
 
-The preparation script has been removed. Use the existing prepared files; restore
-the script from Git history before changing the preparation process.
+Use `python -m src.semantic.download_esci` and
+`python -m src.semantic.prepare_esci --pairs 20000` to rebuild the prepared data.
 
 ## Import the catalog into MongoDB
 
@@ -43,9 +43,9 @@ Serving reads the imported MongoDB catalog.
 
 ## Training
 
-The local training script has been removed. Existing uploaded Colab ZIPs keep
-their own copy. Restore `src/semantic/train_data.py` before creating a new
-training ZIP or notebook with `scripts/create_colab_bundle.py`.
+Use `scripts/create_colab_bundle.py` to package `src/semantic/train_esci.py`
+and the prepared data. Follow [Colab training](colab-training.md) to generate
+and run the matching training ZIP and notebook.
 
 ## Evaluate search
 
