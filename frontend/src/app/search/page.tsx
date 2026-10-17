@@ -37,7 +37,7 @@ function ProductImage({ product, index }: { product: SearchProduct; index: numbe
     <div className={classes(`search-result-art art-${index % 5}`)}>
       {url && !failed
         ? <img src={url} alt={product.title} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
-        : <span aria-label="Product image unavailable">{product.title?.slice(0, 1) || 'P'}</span>}
+        : <span role="img" aria-label="Product image unavailable">{product.title?.slice(0, 1) || 'P'}</span>}
     </div>
   );
 }

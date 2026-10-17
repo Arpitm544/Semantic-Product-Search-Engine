@@ -102,7 +102,7 @@ function makeMeaningSpace(T: typeof THREE) {
   return field;
 }
 
-export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef }: { progressRef: MutableRefObject<number>; appearanceRef: MutableRefObject<string>; rotationRef: MutableRefObject<number> }) {
+export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef, onFailure }: { progressRef: MutableRefObject<number>; appearanceRef: MutableRefObject<string>; rotationRef: MutableRefObject<number>; onFailure: () => void }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -120,6 +120,7 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
       setFailed(true);
       if (mountRef.current) delete mountRef.current.dataset.sceneReady;
       teardown();
+      onFailure();
     };
     const timeout = setTimeout(fail, 20000);
     const host = mountRef.current;
@@ -249,7 +250,7 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
     }
     setup(host);
     return () => { disposed = true; clearTimeout(timeout); delete host.dataset.sceneReady; teardown(); };
-  }, [progressRef, appearanceRef, rotationRef, attempt]);
+  }, [progressRef, appearanceRef, rotationRef, attempt, onFailure]);
 
   return (
     <div className={classes(`headphone-scene ${ready && !failed ? 'is-ready' : ''}`)} role="group" aria-label="AirPods Max product preview">

@@ -4,7 +4,7 @@ An original, standalone ecommerce-inspired landing page for the Semantic Product
 
 ## Run
 
-From the repository's `frontend/` folder, run:
+Use Node.js 20 or newer (required by Tailwind CSS tooling). From the repository's `frontend/` folder, run:
 
     npm install
     npm run dev
@@ -18,7 +18,7 @@ backend running. Open http://localhost:3001. To run only the API, use `python3 a
 
 `npm run start` serves only the frontend. Start the API separately with `python3 api/main.py` from `backend/` so the product search page can reach it.
 
-The frontend uses Next.js 14, React 18, TypeScript, Tailwind CSS 4, and Three.js. Run `npm run typecheck` to check types without building. The catalog search uses the MongoDB product catalog with keyword and semantic retrieval, spelling correction, and reranking. The scroll story and the approach comparison remain illustrative examples, not live search results.
+The frontend uses Next.js 14, React 18, TypeScript, Tailwind CSS 4, and Three.js. Run `npm run typecheck` to check source types without building or reading generated `.next` / `.next-dev` output. Next validates its generated route types during build/dev. The catalog search uses the MongoDB product catalog with keyword and semantic retrieval, spelling correction, and reranking. The scroll story and the approach comparison remain illustrative examples, not live search results.
 
 The `/search` page has a source selector for **MongoDB catalog** and **Google
 Shopping · SerpApi**. Configure `SERPAPI_API_KEY` in `backend/.env` and restart the
@@ -53,7 +53,7 @@ refund an upstream request that already started.
 
 Page and component styles use Tailwind utilities in the TSX files. Exact pixel values and custom responsive breakpoints preserve the original design. `src/lib/classes.ts` contains complete utility strings for artwork variants and other classes selected by component state; avoid constructing Tailwind utilities from partial strings.
 
-`src/app/globals.css` is the single stylesheet entry point. It imports Tailwind and keeps document defaults, design tokens, reduced-motion accessibility rules, and the two original animation keyframes. Tailwind Preflight is intentionally omitted to preserve the existing browser form defaults. The Three.js scroll animation retains its existing behavior. The product preview shows a still with a loading indicator until the first 3D frame renders, then crossfades into the canvas. Failed loads (including a 20-second loading timeout) and lost WebGL contexts keep the preview and offer **Retry 3D**. If the preview image also fails, a headphone icon and product name replace it. Reduced-motion visitors receive a static preview without a loading indicator.
+`src/app/globals.css` is the single stylesheet entry point. It imports Tailwind and keeps document defaults, design tokens, reduced-motion accessibility rules, and the two original animation keyframes. Tailwind Preflight is intentionally omitted to preserve the existing browser form defaults. The Three.js scroll animation retains its existing behavior. The product preview shows a still with a loading indicator until the first 3D frame renders, then crossfades into the canvas. Failed loads (including a 20-second loading timeout) and lost WebGL contexts switch to the shorter still-image chapters and offer **Retry 3D**. If the preview image also fails, a headphone icon and product name replace it. Reduced-motion visitors receive a static preview without a loading indicator.
 
 ## Structure
 

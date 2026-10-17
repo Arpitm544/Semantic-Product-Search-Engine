@@ -21,7 +21,7 @@ export interface SearchProduct {
   merchant?: string;
   rating?: number | string | null;
   reviews?: number | string | null;
-  stock?: number | null;
+  stock?: number | string | null;
   matchSources?: string[];
 }
 
