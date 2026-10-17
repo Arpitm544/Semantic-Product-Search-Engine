@@ -28,6 +28,7 @@ export interface SearchProduct {
 export interface DashboardData {
   products: SearchProduct[];
   productCount: number;
+  displayedProductCount: number;
   categories: string[];
   totalStock: number | null;
   sources?: { catalog?: string };

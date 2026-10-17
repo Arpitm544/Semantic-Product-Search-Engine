@@ -46,7 +46,7 @@ refund an upstream request that already started.
 - After the original hero, desktop scrolling advances through four chapters: a scripted search, the AirPods Max reveal/details, a schematic meaning map, and an illustrative match.
 - The query “Apple headphones for a quieter commute” is typed as the visitor scrolls through the first chapter. “Find my headphones” advances to the product reveal without submitting a request. Mobile and reduced motion show the full query before the product image.
 - The AirPods Max model is loaded from a local, optimized GLB with creator attribution. Drag it or use the arrow buttons; detail buttons and green/silver color studies are local visual controls. The story refers to the original generation, independently of the sample catalog.
-- Mobile screens, reduced-motion preferences, and browsers without WebGL use shorter chapters with a still image of the same 3D model. The canvas loads near the story and pauses rendering off screen.
+- Mobile screens and reduced-motion preferences use shorter chapters with a still image of the same 3D model. If WebGL is unavailable or the 3D scene fails, the story also switches to these shorter chapters and shows the still image with a "3D view unavailable" message. The canvas loads near the story and pauses rendering off screen.
 - The final keyword / semantic / hybrid comparison uses one scripted query. It explains the approaches; it is not a live ranking or performance benchmark.
 
 ## Styling
@@ -69,3 +69,11 @@ Page and component styles use Tailwind utilities in the TSX files. Exact pixel v
 No 21st.dev template source was downloaded or copied.
 
 Development output is stored in `.next-dev/`; production builds use `.next/`. This allows `npm run build` while the development server is running without overwriting its generated chunks.
+
+### Color themes
+
+The header theme toggle switches between the warm light palette (default) and dark mode. The preference is saved as `semantic-theme` in local storage and restored before paint; it also follows changes from another tab. Color tokens live in `src/app/globals.css`, with dark values scoped to `data-theme="dark"`. Layout, artwork, Three.js materials, and motion preferences are shared between themes.
+
+The refined dark palette uses semantic `--night-*` tokens for canvas, panels, text, borders, and sage actions. Selected comparison cards, form actions, and dashboard navigation have distinct dark states. Product photographs retain a light studio background; preview failures use a readable dark card. Theme changes from another tab, including clearing the saved preference, remain synchronized.
+
+Light mode uses a warm ivory canvas, cream panels, sage section backgrounds and forest-green actions. The `--day-*` palette and its aliases are scoped to light mode; the dark palette and product photography are unchanged.
