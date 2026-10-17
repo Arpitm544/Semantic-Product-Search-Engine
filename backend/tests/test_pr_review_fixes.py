@@ -69,6 +69,8 @@ class TestReviewFixes(unittest.TestCase):
     def test_missing_and_partial_stock_are_unknown_but_zero_is_known(self):
         for products, expected in (([{'id': 'a'}], None),
                                    ([{'stock': 2}, {'stock': None}], None),
+                                   ([{'stock': True}], None),
+                                   ([{'stock': False}, {'stock': 2}], None),
                                    ([{'stock': 0}, {'stock': 2}], 2),
                                    ([{'stock': 0}], 0)):
             with patch.object(dashboard, 'load_products', return_value=products):
@@ -123,10 +125,37 @@ class TestReviewFixes(unittest.TestCase):
         owner = locks.insert_one.call_args.args[0]['owner']
         locks.delete_one.assert_called_once_with({'_id': importer['COLLECTION'], 'owner': owner})
 
+    def test_retryable_startup_errors_remain_initializing_until_recovery_or_exhaustion(self):
+        from src.data.catalog import CatalogUpdatingError
+
+        for recover in (True, False):
+            ready = Event()
+            failures = [CatalogUpdatingError('importing'),
+                        Mock() if recover else CatalogUpdatingError('still importing')]
+
+            def waiting(_delay):
+                response = api.check_health()
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(json.loads(response.body)['status'], 'initializing')
+                self.assertIsNone(search_service._search_error)
+
+            with patch.object(api, '_search_ready', ready), \
+                    patch.object(api, '_search_error', None), \
+                    patch.object(search_service, '_search_ready', ready), \
+                    patch.object(search_service, '_search_error', 'previous failure'), \
+                    patch.object(search_service, 'build_search_engine', side_effect=failures), \
+                    patch.object(api, 'sleep', side_effect=waiting) as wait:
+                api.initialize_search(max_attempts=2)
+                wait.assert_called_once()
+                response = api.check_health()
+                self.assertEqual(response.status_code, 200 if recover else 503)
+                self.assertEqual(json.loads(response.body)['status'], 'ready' if recover else 'error')
+
     def test_importer_loads_dotenv_before_reading_database_and_collection(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ('scripts/import_catalog.py', 'src/config.py',
+            for name in ('scripts/import_catalog.py', 'src/__init__.py',
+                         'src/data/__init__.py', 'src/config.py',
                          'src/data/catalog.py', 'src/data/db.py'):
                 target = root / name
                 target.parent.mkdir(parents=True, exist_ok=True)

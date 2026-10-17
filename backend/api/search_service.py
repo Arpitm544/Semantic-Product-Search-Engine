@@ -24,7 +24,7 @@ def get_search_engine():
             engine = build_search_engine()
         except Exception as error:
             _search_ready.clear()
-            _search_error = str(error)
+            _search_error = None if isinstance(error, CatalogUpdatingError) else str(error)
             raise
         _search_error = None
         _search_ready.set()
