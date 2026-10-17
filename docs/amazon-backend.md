@@ -77,6 +77,9 @@ or importing when using a different database. Defaults are localhost port 27017,
 The importer upserts by product ID, records a catalog version, and does not delete
 existing data. If unrelated IDs exist in the selected collection, it stops.
 A partial import marks the catalog unavailable until a successful reimport.
+At startup, the API retries in-progress or changing imports every two seconds
+for up to five minutes before reporting an initialization error. Other startup
+errors, such as missing model files, are reported immediately.
 Catalog changes should be published through this importer so the vector cache
 is rebuilt. Direct database edits do not automatically update the search index.
 An external application should use the same version-manifest protocol.

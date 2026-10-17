@@ -144,7 +144,7 @@ class TestTrainingPublication(unittest.TestCase):
                     save_candidate(model, [{"id": 1}], output, {"steps": 1})
                 self.assertFalse(output.exists())
                 self.assertEqual(list(Path(directory).iterdir()), [])
-                def save_index(index, mapping):
+                def save_index(index, mapping, **kwargs):
                     index.write_bytes(b"vectors")
                     mapping.write_bytes(b"metadata")
                 engine.save.side_effect = save_index
@@ -187,3 +187,75 @@ class TestTrainingPublication(unittest.TestCase):
                     train_esci.main()
                 self.assertEqual(error.exception.code, 2)
                 model.load_state_dict.assert_not_called()
+
+
+class TestRelocationAndStartup(unittest.TestCase):
+    def test_candidate_can_be_moved_before_loading_and_searching(self):
+        import shutil
+        import numpy as np
+        from src.semantic.fine_tune import save_candidate
+        from src.semantic.vector_search import SemanticVectorSearch
+
+        with tempfile.TemporaryDirectory() as directory:
+            original = Path(directory) / "original"
+            moved = Path(directory) / "moved"
+            model = Mock()
+            model.save_pretrained.side_effect = lambda path: (Path(path) / "modules.json").write_text("[]")
+            model.encode.return_value = np.array([[1., 0.]], dtype=np.float32)
+            save_candidate(model, [{"id": 1, "title": "phone"}], original, {})
+            shutil.move(str(original), moved)
+            engine = SemanticVectorSearch.load(moved / "faiss_index.bin", moved / "faiss_id_map.pkl")
+            self.assertEqual(engine.model_name, str(moved.resolve()))
+            with patch("src.semantic.vector_search.SentenceTransformer", return_value=model) as encoder:
+                self.assertEqual(engine.search("phone", 1)[0][0]["id"], 1)
+            encoder.assert_called_once_with(str(moved.resolve()), local_files_only=False, device=None)
+
+    def test_old_index_metadata_still_uses_its_model_reference(self):
+        import pickle
+        import faiss
+        from src.semantic.vector_search import SemanticVectorSearch
+        with tempfile.TemporaryDirectory() as directory:
+            index, mapping = Path(directory) / "index.bin", Path(directory) / "map.pkl"
+            faiss.write_index(faiss.IndexFlatIP(2), str(index))
+            mapping.write_bytes(pickle.dumps({"model_name": "legacy-model", "products": [], "dimension": 2}))
+            self.assertEqual(SemanticVectorSearch.load(index, mapping).model_name, "legacy-model")
+
+    def test_import_in_progress_is_retryable_but_missing_catalog_is_not(self):
+        database = Mock()
+        database.__getitem__ = Mock(return_value=Mock())
+        collection = database['catalog_manifests']
+        with patch.object(amazon_mongo, 'database', return_value=database):
+            collection.find_one.return_value = {'status': 'importing'}
+            with self.assertRaises(amazon_mongo.CatalogUpdatingError):
+                amazon_mongo.version()
+            collection.find_one.return_value = None
+            with self.assertRaises(ValueError) as error:
+                amazon_mongo.version()
+            self.assertNotIsInstance(error.exception, amazon_mongo.CatalogUpdatingError)
+
+    def test_startup_recovers_after_catalog_import(self):
+        from threading import Event
+        with patch.object(api, '_search_ready', Event()), patch.object(api, '_search_error', None), \
+                patch.object(api, 'sleep') as wait, \
+                patch.object(api, 'get_search_engine', side_effect=[
+                    amazon_mongo.CatalogUpdatingError('importing'),
+                    amazon_mongo.CatalogUpdatingError('changed during loading'), Mock(),
+                ]) as initialize:
+            api.initialize_search(max_attempts=3)
+            self.assertTrue(api._search_ready.is_set())
+            self.assertIsNone(api._search_error)
+            self.assertEqual(initialize.call_count, 3)
+            self.assertEqual(wait.call_count, 2)
+
+    def test_startup_retry_is_bounded_and_does_not_hide_model_errors(self):
+        from threading import Event
+        for error, expected_attempts in [(amazon_mongo.CatalogUpdatingError('importing'), 3),
+                                         (FileNotFoundError('missing encoder'), 1)]:
+            with patch.object(api, '_search_ready', Event()), patch.object(api, '_search_error', None), \
+                    patch.object(api, 'sleep') as wait, \
+                    patch.object(api, 'get_search_engine', side_effect=error) as initialize:
+                api.initialize_search(max_attempts=3)
+                self.assertFalse(api._search_ready.is_set())
+                self.assertIn(str(error), api._search_error)
+                self.assertEqual(initialize.call_count, expected_attempts)
+                self.assertEqual(wait.call_count, expected_attempts - 1)

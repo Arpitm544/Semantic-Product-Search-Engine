@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import sys
+from time import sleep
 from threading import Lock, Event, Thread
 from urllib.parse import parse_qs, urlparse
 
@@ -19,7 +20,7 @@ load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 from src.config import EMBEDDING_MODEL_NAME
 from src.search.amazon import AmazonSearch
-from src.data.amazon_mongo import load_products, version, COLLECTION
+from src.data.amazon_mongo import load_products, version, COLLECTION, CatalogUpdatingError
 from pymongo.errors import PyMongoError
 
 DATA_DIR = PROJECT_ROOT / "data"
@@ -62,6 +63,8 @@ def get_search_engine():
             return _search_engine
         print("Loading Amazon catalog from MongoDB...", flush=True)
         products = load_products()
+        if version() != manifest:
+            raise CatalogUpdatingError("Amazon catalog changed before index initialization.")
         import torch
         from sentence_transformers import CrossEncoder
         from src.semantic.vector_search import SemanticVectorSearch
@@ -211,15 +214,25 @@ class ApiHandler(BaseHTTPRequestHandler):
         print(f"[{self.log_date_time_string()}] {message}")
 
 
-def initialize_search():
+def initialize_search(max_attempts=150, retry_delay=2):
+    """Wait up to five minutes for catalog publication; fail other errors immediately."""
     global _search_error
-    try:
-        get_search_engine()
-        _search_ready.set()
-        print("Amazon search is ready.", flush=True)
-    except Exception as error:
-        _search_error = f"Search initialization failed: {error}"
-        print(_search_error, flush=True)
+    _search_ready.clear()
+    _search_error = None
+    for attempt in range(max_attempts):
+        try:
+            get_search_engine()
+            _search_ready.set()
+            print("Amazon search is ready.", flush=True)
+            return
+        except Exception as error:
+            if isinstance(error, CatalogUpdatingError) and attempt + 1 < max_attempts:
+                print(f"Waiting for Amazon catalog import: {error}", flush=True)
+                sleep(retry_delay)
+                continue
+            _search_error = f"Search initialization failed: {error}"
+            print(_search_error, flush=True)
+            return
 
 
 if __name__ == "__main__":

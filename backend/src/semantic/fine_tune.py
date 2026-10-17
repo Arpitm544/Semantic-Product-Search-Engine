@@ -53,7 +53,8 @@ def save_candidate(model, products, output, training_report):
         engine = SemanticVectorSearch(str(output))
         engine._model = model
         engine.fit(products)
-        engine.save(staging / "faiss_index.bin", staging / "faiss_id_map.pkl")
+        engine.save(staging / "faiss_index.bin", staging / "faiss_id_map.pkl",
+                    model_relative_path=".")
         staging.replace(output)
 
 
