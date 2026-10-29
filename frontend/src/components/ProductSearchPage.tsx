@@ -13,13 +13,23 @@ const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi
 
 function money(product: SearchProduct) {
   if (product.priceLabel) return product.priceLabel;
-  if (product.price == null) return 'Price unavailable';
-  if (product.price === '') return 'Price unavailable';
-  if (!Number.isFinite(Number(product.price))) return 'Price unavailable';
+  const price = numericPrice(product.price);
+  if (price === null) return 'Price unavailable';
+  return formatPrice(product, price);
+}
+
+function numericPrice(value: SearchProduct['price']) {
+  if (value == null) return null;
+  if (value === '') return null;
+  const price = Number(value);
+  return Number.isFinite(price) ? price : null;
+}
+
+function formatPrice(product: SearchProduct, price: number) {
   try {
     // SerpApi prices without a currency label must not be assigned a guessed currency.
-    if (product.matchSources?.includes('google-shopping')) return new Intl.NumberFormat('en-IN').format(Number(product.price));
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: product.currency || 'INR', maximumFractionDigits: 0 }).format(Number(product.price));
+    if (product.matchSources?.includes('google-shopping')) return new Intl.NumberFormat('en-IN').format(price);
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: product.currency || 'INR', maximumFractionDigits: 0 }).format(price);
   } catch {
     return 'Price unavailable';
   }
@@ -28,10 +38,16 @@ function money(product: SearchProduct) {
 function webUrl(value: string | undefined) {
   try {
     const url = new URL(value ?? '');
-    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
+    return isPublicWebUrl(url) ? url.href : null;
   } catch {
     return null;
   }
+}
+
+function isPublicWebUrl(url: URL) {
+  if (!['http:', 'https:'].includes(url.protocol)) return false;
+  if (url.username) return false;
+  return !url.password;
 }
 
 function searchParams(query: string, source: keyof typeof SOURCES, fuzzy: boolean) {
@@ -45,13 +61,25 @@ function isSearchProduct(product: unknown): product is SearchProduct {
   return typeof product.title === 'string';
 }
 
-async function readSearchResponse(response: Response) {
-  let payload;
-  try { payload = await response.json(); }
+async function readSearchJson(response: Response) {
+  try { return await response.json(); }
   catch { throw new Error('Search returned an unreadable response. Please try again shortly.'); }
-  if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'Search could not be completed. Please try again shortly.');
-  if (!Array.isArray(payload?.results)) throw new Error('Search returned an invalid response. Please try again shortly.');
-  if (!payload.results.every(isSearchProduct)) throw new Error('Search returned an invalid response. Please try again shortly.');
+}
+
+function responseError(payload: { error?: unknown } | null) {
+  if (typeof payload?.error === 'string') return payload.error;
+  return 'Search could not be completed. Please try again shortly.';
+}
+
+function validateSearchResults(results: unknown): asserts results is SearchProduct[] {
+  if (!Array.isArray(results)) throw new Error('Search returned an invalid response. Please try again shortly.');
+  if (!results.every(isSearchProduct)) throw new Error('Search returned an invalid response. Please try again shortly.');
+}
+
+async function readSearchResponse(response: Response) {
+  const payload = await readSearchJson(response);
+  if (!response.ok) throw new Error(responseError(payload));
+  validateSearchResults(payload?.results);
   return normalizeSearchResponse(payload);
 }
 
@@ -73,6 +101,10 @@ function searchWarning(payload: { warning?: unknown; historySaved?: boolean }) {
 function searchError(reason: unknown, timedOut: boolean) {
   if (timedOut) return 'Search took too long. Please try again.';
   if (reason instanceof TypeError) return 'Cannot reach the search service. Make sure the backend is running and try again.';
+  return reasonMessage(reason);
+}
+
+function reasonMessage(reason: unknown) {
   if (reason instanceof Error) return reason.message || 'Search could not be completed.';
   return 'Search could not be completed.';
 }

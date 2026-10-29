@@ -39,6 +39,29 @@ function appendHistory(old: PersonalData | null, result: { hasMore: boolean; ite
     recentSearches: [...old.recentSearches, ...result.items.filter(entry => !existing.has(entry.id))] };
 }
 
+type DashboardRequest = ReturnType<typeof useAuthenticatedFetch>;
+
+async function fetchDashboard(request: DashboardRequest): Promise<PersonalData> {
+  const response = await request(`${API_BASE}/api/personal-dashboard`);
+  if (!response.ok) throw new Error('Could not load your personal dashboard. Please try again.');
+  return response.json();
+}
+
+async function fetchHistoryPage(request: DashboardRequest, offset: number) {
+  const response = await request(`${API_BASE}/api/search-history?offset=${offset}&limit=6`);
+  if (!response.ok) throw new Error('Could not load more searches. Please try again.');
+  return response.json();
+}
+
+async function deleteHistory(request: DashboardRequest, id?: string) {
+  const response = await request(`${API_BASE}/api/search-history${id ? `/${encodeURIComponent(id)}` : ''}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error('Could not delete search history. Please try again.');
+}
+
+function deletionNotice(id?: string) {
+  return id ? 'Search removed from your history.' : 'Your search history has been cleared.';
+}
+
 export default function PersonalDashboard() {
   const request = useAuthenticatedFetch();
   const { user } = useUser();
@@ -54,9 +77,7 @@ export default function PersonalDashboard() {
     const current = ++version.current;
     setBusy(true); setError('');
     try {
-      const response = await request(`${API_BASE}/api/personal-dashboard`);
-      if (!response.ok) throw new Error('Could not load your personal dashboard. Please try again.');
-      const result = await response.json();
+      const result = await fetchDashboard(request);
       if (current === version.current) setData(result);
     } catch (reason) {
       if (current === version.current) setError(errorMessage(reason, 'Could not load your dashboard.'));
@@ -72,10 +93,9 @@ export default function PersonalDashboard() {
     if (mutation || busy) return;
     setMutation(id || 'clear'); setError(''); setNotice('');
     try {
-      const response = await request(`${API_BASE}/api/search-history${id ? `/${encodeURIComponent(id)}` : ''}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Could not delete search history. Please try again.');
+      await deleteHistory(request, id);
       setConfirmClear(false);
-      setNotice(id ? 'Search removed from your history.' : 'Your search history has been cleared.');
+      setNotice(deletionNotice(id));
       await load();
     } catch (reason) { setError(errorMessage(reason, 'Please try again.')); }
     finally { setMutation(null); }
@@ -87,9 +107,7 @@ export default function PersonalDashboard() {
     setBusy(true); setError('');
     const current = version.current;
     try {
-      const response = await request(`${API_BASE}/api/search-history?offset=${data.recentSearches.length}&limit=6`);
-      if (!response.ok) throw new Error('Could not load more searches. Please try again.');
-      const result = await response.json();
+      const result = await fetchHistoryPage(request, data.recentSearches.length);
       if (current === version.current) setData(old => appendHistory(old, result));
     } catch (reason) { if (current === version.current) setError(errorMessage(reason, 'Please try again.')); }
     finally { if (current === version.current) setBusy(false); }
