@@ -84,6 +84,11 @@ Clerk provides sign-in and sign-up modals in the desktop header and mobile menu,
 and a profile menu for signed-in users. Dedicated `/sign-in` and `/sign-up` routes
 are also available. The app uses `@clerk/nextjs` 6 for Next.js 14 compatibility.
 
+The linked development instance supports email and social authentication. Phone
+number sign-up and sign-in are disabled, and a phone number is not required to
+create an account. These settings are managed in Clerk; checking out this branch
+does not apply authentication settings to another Clerk application.
+
 Development keys are stored in the ignored `.env.local` file. Never commit keys or
 expose `CLERK_SECRET_KEY` to the browser. To restore configuration on another
 machine, authenticate with `npx -y clerk@latest auth login`, link the existing
