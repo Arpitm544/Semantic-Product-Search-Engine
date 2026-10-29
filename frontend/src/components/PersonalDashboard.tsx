@@ -7,7 +7,7 @@ import type { SearchProduct } from '@/lib/types';
 
 interface HistoryEntry {
   id: string; query: string; source: 'mongo' | 'serpapi'; fuzzy: boolean;
-  resultCount: number; searchedAt: string;
+  resultCount: number; searchedAt: string; usePreferences?: boolean;
 }
 interface PersonalData {
   searchCount: number; savedCount: number; recentSearches: HistoryEntry[];
@@ -18,7 +18,7 @@ const panel = 'rounded-xl border border-[var(--line)] bg-[var(--surface-fff)] p-
 const action = 'rounded-full border border-[var(--line)] px-3 py-2 text-xs font-medium transition hover:bg-[var(--sage)] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50';
 
 function repeatUrl(entry: HistoryEntry) {
-  return `/search?${new URLSearchParams({ q: entry.query, source: entry.source, fuzzy: entry.fuzzy ? '1' : '0' })}`;
+  return `/search?${new URLSearchParams({ q: entry.query, source: entry.source, fuzzy: entry.fuzzy ? '1' : '0', preferences: entry.usePreferences ? '1' : '0' })}`;
 }
 function SavedPreview({ product }: { product: SearchProduct }) {
   const [failed, setFailed] = useState(false);

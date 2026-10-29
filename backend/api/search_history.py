@@ -28,7 +28,7 @@ def public_entry(item):
     if date.tzinfo is None:
         date = date.replace(tzinfo=timezone.utc)
     return {"id": item["_id"], "query": item["query"], "source": item["source"],
-            "fuzzy": item["fuzzy"], "resultCount": item["result_count"],
+            "fuzzy": item["fuzzy"], "usePreferences": item.get("use_preferences", False), "resultCount": item["result_count"],
             "searchedAt": date.isoformat()}
 
 
@@ -38,15 +38,18 @@ def recent_entries(user_id, offset=0, limit=6):
     return {"items": [public_entry(item) for item in items[:limit]], "hasMore": len(items) > limit}
 
 
-def remember_search(user_id, query, source, fuzzy, payload):
+def remember_search(user_id, query, source, fuzzy, payload, use_preferences=False):
     """A failed history write must never discard successful search results."""
     if not query:
         return payload
-    key = sha256(json.dumps([user_id, query, source, fuzzy]).encode()).hexdigest()
+    identity = [user_id, query, source, fuzzy]
+    if use_preferences:
+        identity.append('preferences')
+    key = sha256(json.dumps(identity).encode()).hexdigest()
     try:
         collection().update_one({"_id": key, "user_id": user_id}, {"$set": {
             "user_id": user_id, "query": query, "source": source, "fuzzy": fuzzy,
-            "result_count": len(payload.get("results", [])), "searched_at": datetime.now(timezone.utc),
+            "use_preferences": use_preferences, "result_count": len(payload.get("results", [])), "searched_at": datetime.now(timezone.utc),
         }}, upsert=True)
         return {**payload, "historySaved": True}
     except PyMongoError:

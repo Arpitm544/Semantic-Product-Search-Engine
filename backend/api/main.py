@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import os
 from pathlib import Path
 import sys
-from threading import Thread
+from threading import Event, Thread
 from time import sleep
 
 # Load settings before importing the database and search modules.
@@ -22,6 +22,9 @@ import uvicorn
 
 from api.saved_products import router as saved_products_router
 from api.search_history import router as history_router, remember_search
+from api.account_features import router as account_router, load_preferences
+from api.price_alerts import router as alerts_router, worker_loop
+from api.product_prices import apply_preferences
 from api.auth import require_session
 from api.dashboard import dashboard_data
 from api import search_service
@@ -68,16 +71,28 @@ async def lifespan(app):
     _search_ready.clear()
     _search_error = None
     Thread(target=initialize_search, daemon=True).start()
-    yield
+    alerts_stop = Event()
+    alerts_thread = None
+    if os.environ.get('PRICE_ALERTS_ENABLED', '1') == '1':
+        alerts_thread = Thread(target=worker_loop, args=(alerts_stop,), daemon=True)
+        alerts_thread.start()
+    try:
+        yield
+    finally:
+        alerts_stop.set()
+        if alerts_thread:
+            alerts_thread.join(timeout=5)
 
 
 app = FastAPI(title="Semantic Product Search", lifespan=lifespan)
 app.include_router(saved_products_router)
 app.include_router(history_router)
+app.include_router(account_router)
+app.include_router(alerts_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
-    allow_methods=["GET", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
@@ -120,7 +135,7 @@ def get_dashboard():
 
 
 @app.get("/api/search")
-def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo", session=Depends(require_session)):
+def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo", preferences: bool = False, session=Depends(require_session)):
     """Choose MongoDB semantic search or Google Shopping via SerpApi."""
     query = q.strip()
     if source not in ("mongo", "serpapi"):
@@ -129,11 +144,17 @@ def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo", sessio
         return JSONResponse(status_code=400, content={
             "error": "Search queries must be 512 characters or fewer."
         })
+    preference_values = None
+    if preferences:
+        try:
+            preference_values = load_preferences(session['sub'])
+        except PyMongoError:
+            return JSONResponse(status_code=503, content={'error': 'Saved preferences are unavailable. Turn off saved preferences or try again.'})
     # Shopping search does not depend on MongoDB or local model readiness.
     if source == "serpapi":
         try:
             payload = rank_shopping_response(search_shopping(query))
-            return remember_search(session["sub"], query, source, fuzzy != "0", payload)
+            return finish_search(session["sub"], query, source, fuzzy != "0", payload, preference_values)
         except ShoppingError as error:
             return JSONResponse(status_code=error.status, content={
                 "error": str(error), "code": error.code, "source": "serpapi",
@@ -151,9 +172,16 @@ def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo", sessio
         return JSONResponse(status_code=503, content={"error": str(error)})
     try:
         payload = engine.search(query, fuzzy=fuzzy != "0")
-        return remember_search(session["sub"], query, source, fuzzy != "0", payload)
+        return finish_search(session["sub"], query, source, fuzzy != "0", payload, preference_values)
     except (ValueError, RuntimeError, OSError, PyMongoError) as error:
         return JSONResponse(status_code=503, content={"error": str(error)})
+
+
+def finish_search(user, query, source, fuzzy, payload, preferences):
+    if preferences is not None:
+        filtered = apply_preferences(payload, preferences)
+        return remember_search(user, query, source, fuzzy, filtered, use_preferences=True)
+    return remember_search(user, query, source, fuzzy, payload)
 
 
 def start_server():

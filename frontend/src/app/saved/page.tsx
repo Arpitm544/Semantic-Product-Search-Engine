@@ -74,7 +74,7 @@ export default function SavedProductsPage() {
   return <main className="min-h-screen bg-[var(--paper)] text-[var(--ink)] px-5 py-6">
     <header className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 border-b border-[var(--line)] pb-5">
       <a href="/" className="text-xl font-bold">✳ semantic.</a>
-      <nav className="flex items-center gap-4 text-sm"><a href="/search">Search</a><a href="/dashboard">Dashboard</a><ThemeToggle /><UserButton /></nav>
+      <nav className="flex flex-wrap items-center gap-4 text-sm"><a href="/search">Search</a><a href="/dashboard">Dashboard</a><a href="/collections">Collections</a><a href="/comparisons">Compare</a><a href="/alerts">Price alerts</a><ThemeToggle /><UserButton /></nav>
     </header>
     <section className="mx-auto max-w-5xl py-10">
       <h1 className="text-4xl font-semibold">Your saved products</h1>

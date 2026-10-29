@@ -1,4 +1,5 @@
 'use client';
+import AccountFeatureLinks from '@/components/AccountFeatureLinks';
 import PersonalDashboard from '@/components/PersonalDashboard';
 import ThemeToggle from '@/components/ThemeToggle';
 import { classes } from '@/lib/classes';
@@ -74,6 +75,7 @@ export default function DashboardPage() {
         <header className={"dashboard-topbar h-[62px] [border-bottom:1px_solid_var(--line)] flex items-center justify-between pt-[0] pr-[42px] pb-[0] pl-[42px] [background:var(--surface-topbar)] max-[1100.01px]:pt-[0] max-[1100.01px]:pr-[26px] max-[1100.01px]:pb-[0] max-[1100.01px]:pl-[26px] max-[700.01px]:pt-[0] max-[700.01px]:pr-[16px] max-[700.01px]:pb-[0] max-[700.01px]:pl-[16px] max-[700.01px]:h-[55px]"}><div className={"breadcrumb [color:var(--text-939b92)] text-[12px] [&_span]:pt-[0] [&_span]:pr-[9px] [&_span]:pb-[0] [&_span]:pl-[9px] [&_span]:[color:var(--text-bbc1b9)] [&_strong]:[color:var(--text-414a41)] [&_strong]:font-semibold"}>Workspace <span>/</span> <strong>Overview</strong></div><div className={"topbar-actions flex items-center gap-[15px]"}><a href="/saved" className="text-xs font-semibold">Saved products</a><ThemeToggle /><span className={"data-live-label flex items-center gap-[7px] [color:var(--text-718071)] text-[11px] [&_i]:w-[7px] [&_i]:h-[7px] [&_i]:rounded-[50%] [&_i]:[background:var(--surface-78a678)]"}><i/> Product catalog</span><span className={"topbar-divider h-[22px] w-[1px] [background:var(--line)]"}/><UserButton /></div></header>
         <div className={"dashboard-content max-w-[1400px] mt-[0] mr-[auto] mb-[0] ml-[auto] pt-[36px] pr-[42px] pb-[24px] pl-[42px] max-[1100.01px]:pl-[26px] max-[1100.01px]:pr-[26px] max-[700.01px]:pt-[27px] max-[700.01px]:pr-[16px] max-[700.01px]:pb-[20px] max-[700.01px]:pl-[16px]"}>
           <PersonalDashboard />
+          <AccountFeatureLinks />
           <div className="mb-5 border-t border-[var(--line)] pt-7"><h2 className="text-xl font-semibold">Explore the catalog</h2><p className="mt-2 text-xs opacity-65">Browse products and categories across the shared catalog.</p></div>
 
           {loadError && <div className={"dashboard-error pt-[12px] pr-[14px] pb-[12px] pl-[14px] mt-[-9px] mr-[0] mb-[16px] ml-[0] [border:1px_solid_var(--border-f1d6c8)] rounded-[8px] [background:var(--surface-fff9f5)] [color:var(--text-8c5a43)] text-[12px] [&_code]:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] [&_code]:text-[10px]"} role="alert">{loadError}</div>}

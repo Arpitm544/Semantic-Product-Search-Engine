@@ -1,4 +1,5 @@
 'use client';
+import { useAccountResource, type Preferences } from '@/lib/account';
 import SaveProductButton from '@/components/SaveProductButton';
 import ThemeToggle from '@/components/ThemeToggle';
 import { classes } from '@/lib/classes';
@@ -44,8 +45,8 @@ function ProductImage({ product, index }: { product: SearchProduct; index: numbe
   );
 }
 
-export default function ProductSearchPage({ initialQuery = '', initialSource = 'mongo', initialFuzzy = true }: {
-  initialQuery?: string; initialSource?: 'mongo' | 'serpapi'; initialFuzzy?: boolean;
+export default function ProductSearchPage({ initialQuery = '', initialSource = 'mongo', initialFuzzy = true, initialPreferences = false }: {
+  initialQuery?: string; initialSource?: 'mongo' | 'serpapi'; initialFuzzy?: boolean; initialPreferences?: boolean;
 }) {
   const authenticatedFetch = useAuthenticatedFetch();
   const { isLoaded, isSignedIn } = useAuth();
@@ -60,6 +61,16 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
   const [warning, setWarning] = useState('');
   const [correctedQuery, setCorrectedQuery] = useState<string | null>(null);
   const pending = useRef<AbortController | null>(null);
+  const preferences = useAccountResource<Preferences>('/api/preferences');
+  const [usePreferences, setUsePreferences] = useState(initialPreferences);
+  const defaultsApplied = useRef(false);
+  useEffect(() => {
+    if (preferences.data && !initialQuery && !defaultsApplied.current) {
+      defaultsApplied.current = true;
+      setSource(preferences.data.defaultSource);
+      setUsePreferences(preferences.data.applyByDefault);
+    }
+  }, [preferences.data, initialQuery]);
   const shopping = source === 'serpapi';
 
   useEffect(() => () => pending.current?.abort(), []);
@@ -104,7 +115,7 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
     setWarning('');
     setCorrectedQuery(null);
     try {
-      const params = new URLSearchParams({ q: query, source, fuzzy: fuzzy ? '1' : '0' });
+      const params = new URLSearchParams({ q: query, source, fuzzy: fuzzy ? '1' : '0', preferences: usePreferences ? '1' : '0' });
       const response = await authenticatedFetch(`${API_BASE}/api/search?${params}`, { signal: controller.signal });
       let payload;
       try {
@@ -143,6 +154,12 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
         <span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>PRODUCT DISCOVERY</span>
         <h1>Find what you’re<br/><em>looking for.</em></h1>
         <p>Choose a source and search by product, brand, or detail.</p>
+        <div className="mb-5 flex flex-wrap items-center justify-center gap-3 text-xs">
+          <label className="flex items-center gap-2"><input type="checkbox" checked={usePreferences} disabled={preferences.busy} onChange={event => setUsePreferences(event.target.checked)} />Use my saved preferences</label>
+          <a href="/preferences" className="underline">Edit budget and preferences</a>
+          {preferences.busy && <span role="status">Loading defaults…</span>}
+          {preferences.error && <span role="alert">Preferences could not be loaded. <button type="button" onClick={preferences.reload} className="underline">Retry</button></span>}
+        </div>
         <fieldset className={"search-source-picker [border:0] pt-[0] pr-[0] pb-[0] pl-[0] mt-[0] mr-[0] mb-[18px] ml-[0] flex justify-center gap-[10px] flex-wrap [&_legend]:mt-[0] [&_legend]:mr-[auto] [&_legend]:mb-[10px] [&_legend]:ml-[auto] [&_legend]:text-[11px] [&_legend]:[color:var(--text-667665)] [&_label]:flex [&_label]:items-center [&_label]:gap-[7px] [&_label]:pt-[10px] [&_label]:pr-[13px] [&_label]:pb-[10px] [&_label]:pl-[13px] [&_label]:[border:1px_solid_var(--border-dce4d9)] [&_label]:rounded-[8px] [&_label]:text-[12px] [&_label]:cursor-pointer [&_label]:[background:var(--surface-fff)] [&_label.is-selected]:[background:var(--surface-edf3e9)] [&_label.is-selected]:[border-color:var(--text-719375)] [&_label.is-selected]:[color:var(--text-3e6747)] [&_input]:[accent-color:var(--text-4f7857)] [&_label:focus-within]:[outline:2px_solid_var(--focus-ring)] [&_label:focus-within]:[outline-offset:3px]"}>
           <legend>Search source</legend>
           {Object.entries(SOURCES).map(([value, label]) => <label key={value} className={classes(source === value ? 'is-selected' : '')}>
@@ -153,7 +170,7 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
         <form className={"real-search-form light:[&.real-search-form_button]:[background:var(--day-action)] light:[&.real-search-form_button]:[color:var(--day-on-action)] light:[&.real-search-form_button:disabled]:[background:#aeb9ac] h-[62px] [background:var(--surface-fff)] [border:1px_solid_var(--border-dce4d9)] rounded-[11px] flex items-center pt-[6px] pr-[7px] pb-[6px] pl-[17px] [box-shadow:0_10px_35px_var(--shadow-384a3610)] [&_input]:h-[100%] [&_input]:min-w-[0] [&_input]:[flex:1] [&_input]:[border:0] [&_input]:[background:transparent] [&_input]:[color:var(--text-374237)] [&_input]:[font-style:normal] [&_input]:[font-weight:normal] [&_input]:text-[13px] [&_input]:leading-[normal] [&_input]:[font-family:'DM_Sans',sans-serif] [&_input:focus-visible]:[outline:2px_solid_var(--focus-ring)] [&_input:focus-visible]:[outline-offset:3px] [&_input:focus-visible]:rounded-[2px] [&_input::placeholder]:[color:var(--text-a1aaa0)] [&_button]:h-[46px] [&_button]:pt-[0] [&_button]:pr-[18px] [&_button]:pb-[0] [&_button]:pl-[18px] [&_button]:[border:0] [&_button]:rounded-[7px] [&_button]:[background:var(--surface-4f7857)] [&_button]:[color:white] [&_button]:[font-style:normal] [&_button]:font-semibold [&_button]:text-[12px] [&_button]:leading-[normal] [&_button]:[font-family:'DM_Sans',sans-serif] [&_button]:cursor-pointer [&_button:disabled]:[background:var(--surface-aeb9ac)] [&_button:disabled]:cursor-not-allowed [&_button_span]:text-[17px] [&_button_span]:ml-[10px] max-[600.01px]:h-[56px] max-[600.01px]:pl-[12px] max-[600.01px]:[&_button]:h-[42px] max-[600.01px]:[&_button]:pt-[0] max-[600.01px]:[&_button]:pr-[12px] max-[600.01px]:[&_button]:pb-[0] max-[600.01px]:[&_button]:pl-[12px] max-[600.01px]:[&_button]:text-[11px] dark:[&.real-search-form]:[border-color:#608368] dark:shadow-[0_0_0_4px_#a9c49708,0_16px_40px_#050d0926] dark:[&.real-search-form_button]:[background:#c9ddb5] dark:[&.real-search-form_button]:[color:#17251b] dark:[&.real-search-form_button:hover:not(:disabled)]:[background:#deebd0] dark:[&.real-search-form_button:disabled]:[background:#324337] dark:[&.real-search-form_button:disabled]:[color:#a3b3a5]"} onSubmit={submitSearch}>
           <span className={"search-glass text-[28px] [color:var(--text-879587)] leading-[1] mr-[11px] [transform:rotate(-20deg)]"} aria-hidden="true">⌕</span>
           <input autoFocus maxLength={512} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Try ‘wireless headphones’ or ‘mascara’" aria-label="Search products" />
-          <button type="submit" disabled={!input.trim() || loading}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
+          <button type="submit" disabled={!input.trim() || loading || preferences.busy}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
         </form>
         <span className={"search-data-note block mt-[11px] text-[10px] [color:var(--text-a1a99f)]"}>{shopping ? 'Google Shopping products, ranked when our search models are available. Prices and availability can change.' : 'Semantic catalog search with spelling suggestions. Images and prices may be unavailable.'}</span>
       </section>
