@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 import uvicorn
 
+from api.saved_products import router as saved_products_router
 from api.auth import require_session
 from api.dashboard import dashboard_data
 from api import search_service
@@ -70,10 +71,11 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Semantic Product Search", lifespan=lifespan)
+app.include_router(saved_products_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
-    allow_methods=["GET", "OPTIONS"],
+    allow_methods=["GET", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
