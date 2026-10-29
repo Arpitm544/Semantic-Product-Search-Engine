@@ -15,12 +15,17 @@ export function useAccountApi() {
     const response = await request(`${API_BASE}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...options?.headers } });
     const body = await response.json();
     if (!response.ok) {
-      const message = typeof body.detail === 'string' ? body.detail : Array.isArray(body.detail) ? body.detail[0]?.msg : body.error;
-      throw new Error(message || 'Your request could not be completed. Please try again.');
+      throw new Error(accountResponseMessage(body) || 'Your request could not be completed. Please try again.');
     }
     return body;
   }, [request]);
 }
+function accountResponseMessage(body: { detail?: string | { msg?: string }[]; error?: string }) {
+  if (typeof body.detail === 'string') return body.detail;
+  if (Array.isArray(body.detail)) return body.detail[0]?.msg;
+  return body.error;
+}
+
 type ResourceState<T> = {
   api: ReturnType<typeof useAccountApi>; path: string; version: React.RefObject<number>;
   setBusy: React.Dispatch<React.SetStateAction<boolean>>;
@@ -70,9 +75,17 @@ export function useAccountResource<T>(path: string) {
   useEffect(() => { setData(null); setNotice(''); setError(''); if (isLoaded && userId) void reload(); else setBusy(!isLoaded); return () => { version.current++; }; }, [reload, isLoaded, userId]);
   return { data, setData, busy, error, setError, notice, reload, mutate, api };
 }
-export function safeProductUrl(value?: string) {
-  try { const url = new URL(value || ''); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : undefined; } catch { return undefined; }
+function publicHttpUrl(url: URL) {
+  if (!['http:', 'https:'].includes(url.protocol)) return undefined;
+  if (url.username) return undefined;
+  if (url.password) return undefined;
+  return url.href;
 }
-export function productPrice(product: SearchProduct) {
-  return product.priceLabel || (product.price != null ? `${product.currency || ''} ${product.price}`.trim() : 'Unavailable');
+
+export function safeProductUrl(value = '') {
+  try { return publicHttpUrl(new URL(value)); } catch { return undefined; }
+}
+
+export function productPrice(product: SearchProduct, unavailable = 'Unavailable') {
+  return product.priceLabel || (product.price != null ? `${product.currency || ''} ${product.price}`.trim() : unavailable);
 }

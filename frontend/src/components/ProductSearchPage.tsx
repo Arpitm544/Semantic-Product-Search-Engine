@@ -29,22 +29,51 @@ interface SearchPayload {
   warning?: string;
   historySaved?: boolean;
 }
-async function readSearchResponse(response: Response): Promise<SearchPayload> {
-  let payload;
-  try { payload = await response.json(); }
-  catch { throw new Error('Search returned an unreadable response. Please try again shortly.'); }
-  if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'Search could not be completed. Please try again shortly.');
-  if (!Array.isArray(payload?.results)) throw new Error('Search returned an invalid response. Please try again shortly.');
-  if (!payload.results.every(validSearchProduct)) throw new Error('Search returned an invalid response. Please try again shortly.');
-  return payload;
+function isSearchPayload(value: unknown): value is Record<string, unknown> {
+  if (value === null) return false;
+  return typeof value === 'object';
 }
+
+async function readSearchJson(response: Response): Promise<unknown> {
+  try { return await response.json(); }
+  catch { throw new Error('Search returned an unreadable response. Please try again shortly.'); }
+}
+
+function searchFailureMessage(payload: unknown) {
+  const fallback = 'Search could not be completed. Please try again shortly.';
+  if (!isSearchPayload(payload)) return fallback;
+  return typeof payload.error === 'string' ? payload.error : fallback;
+}
+
+function requireSearchSuccess(response: Response, payload: unknown) {
+  if (!response.ok) throw new Error(searchFailureMessage(payload));
+}
+
+function validateSearchResults(payload: unknown): SearchPayload {
+  const message = 'Search returned an invalid response. Please try again shortly.';
+  if (!isSearchPayload(payload)) throw new Error(message);
+  if (!Array.isArray(payload.results)) throw new Error(message);
+  if (!payload.results.every(validSearchProduct)) throw new Error(message);
+  return payload as unknown as SearchPayload;
+}
+
+async function readSearchResponse(response: Response): Promise<SearchPayload> {
+  const payload = await readSearchJson(response);
+  requireSearchSuccess(response, payload);
+  return validateSearchResults(payload);
+}
+
 function searchDetails(payload: SearchPayload) {
   return {
     total: Number.isFinite(payload.candidateCount) ? payload.candidateCount : payload.results.length,
     correctedQuery: typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null,
-    warning: [typeof payload.warning === 'string' ? payload.warning : '', payload.historySaved === false ? 'Results are ready, but this search could not be saved to your history.' : ''].filter(Boolean).join(' '),
+    warning: searchWarning(payload),
   };
 }
+function searchWarning(payload: SearchPayload) {
+  return [typeof payload.warning === 'string' ? payload.warning : '', payload.historySaved === false ? 'Results are ready, but this search could not be saved to your history.' : ''].filter(Boolean).join(' ');
+}
+
 function searchError(reason: unknown, timedOut: boolean) {
   if (timedOut) return 'Search took too long. Please try again.';
   if (reason instanceof TypeError) return 'Cannot reach the search service. Make sure the backend is running and try again.';
@@ -52,18 +81,30 @@ function searchError(reason: unknown, timedOut: boolean) {
   return 'Search could not be completed.';
 }
 
+function numericSearchPrice(value: SearchProduct['price']) {
+  if (value == null) return null;
+  if (value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function searchPriceOptions(product: SearchProduct): Intl.NumberFormatOptions {
+  if (!product.currency) return {};
+  // Shopping prices without an explicit label must not get a guessed currency.
+  if (product.matchSources?.includes('google-shopping')) return {};
+  return { style: 'currency', currency: product.currency, maximumFractionDigits: 0 };
+}
+
+function formatSearchPrice(amount: number, product: SearchProduct) {
+  try { return new Intl.NumberFormat('en-IN', searchPriceOptions(product)).format(amount); }
+  catch { return 'Price unavailable'; }
+}
+
 function money(product: SearchProduct) {
   if (product.priceLabel) return product.priceLabel;
-  if (product.price == null) return 'Price unavailable';
-  if (product.price === '') return 'Price unavailable';
-  if (!Number.isFinite(Number(product.price))) return 'Price unavailable';
-  try {
-    // SerpApi prices without a currency label must not be assigned a guessed currency.
-    if (!product.currency || product.matchSources?.includes('google-shopping')) return new Intl.NumberFormat('en-IN').format(Number(product.price));
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: product.currency!, maximumFractionDigits: 0 }).format(Number(product.price));
-  } catch {
-    return 'Price unavailable';
-  }
+  const amount = numericSearchPrice(product.price);
+  if (amount === null) return 'Price unavailable';
+  return formatSearchPrice(amount, product);
 }
 
 function webUrl(value: string | undefined) {

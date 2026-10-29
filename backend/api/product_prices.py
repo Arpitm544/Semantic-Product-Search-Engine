@@ -52,9 +52,13 @@ def matches_budget(product, preferences):
         return False
     if price['currency'] != preferences['currency']:
         return False
-    if low is not None and price['amount'] < low:
+    return within_budget(price['amount'], low, high)
+
+
+def within_budget(amount, low, high):
+    if low is not None and amount < low:
         return False
-    return high is None or price['amount'] <= high
+    return high is None or amount <= high
 
 
 def matches_detail(product, field, values):
