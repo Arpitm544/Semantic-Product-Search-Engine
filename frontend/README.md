@@ -109,3 +109,110 @@ restart it with the updated dependencies and `CLERK_ISSUER_URL` configured as sh
 in `backend/.env.example`. The frontend sends bearer tokens with API requests.
 
 See [production deployment](../DEPLOYMENT.md) before deploying.
+
+## Saved products
+
+Search results offer Save/Remove controls. `/saved` lists the signed-in user's
+wishlist with pagination and remove actions; it is linked from search and the
+dashboard. Saved products are snapshots, not live price tracking.
+
+The Python API stores these snapshots in the existing MongoDB database's
+`saved_products` collection. Every document contains the verified Clerk user ID,
+source, product identity, snapshot, and saved time. Ownership is taken only from
+the verified bearer token. A deterministic document ID prevents duplicate saves
+for the same user/source/product, and every read/delete filters by that user.
+MongoDB must be available and the application database user must be allowed to
+create the collection and its index. No wishlist data is stored in Clerk or
+browser local storage. Restart the API and frontend after installing this change.
+
+## Personal dashboard and search history
+
+`/dashboard` greets the signed-in user by their Clerk name and shows private saved
+product previews, wishlist totals, and recent successful searches. The shared
+catalog overview remains below the personal section. The dashboard works without
+loading the search models or the catalog summary.
+
+Successful catalog and shopping searches are recorded by the Python API in the
+MongoDB `search_history` collection, using the verified Clerk subject as owner.
+Each distinct query/source/spelling-setting combination has one entry; repeating
+it moves it to the top and updates its result count. Successful zero-result
+searches are included; invalid and failed searches are not. Only searches made
+after this feature was installed appear. A history write failure preserves
+search results and shows a notice.
+
+Search history can be paginated, deleted one entry at a time, or cleared after
+confirmation. Clearing history does not remove saved products. History stays
+until the user deletes it. Every list, count, preview, and deletion is scoped to
+the authenticated user. Query text is stored in MongoDB, not Clerk or browser
+local storage. Allow the backend database user to create the new collection and
+its owner/recent-time index.
+
+“Search again” opens `/search?q=...&source=...&fuzzy=...` and automatically runs
+the original query after the session has loaded. Shopping searches may consume
+SerpApi usage again. The query is present in that navigation URL and browser
+history, as well as the private server history.
+
+Backend endpoints: `GET /api/personal-dashboard`, `GET /api/search-history`
+(`offset`, `limit`), `DELETE /api/search-history/{id}`, and
+`DELETE /api/search-history`. Restart the API after updating.
+
+## Collections, preferences, comparisons, and price alerts
+
+The account navigation and dashboard link to four private pages:
+
+- `/collections`: create, rename, and delete collections, and add/remove wishlist
+  products. Each collection holds up to 100 products. Deleting a collection keeps
+  the wishlist intact; removing a wishlist product removes its memberships.
+- `/preferences`: save an optional default source, currency, budget range,
+  categories, brands, and known-stock requirement. Enable defaults on new searches
+  or toggle them per search. Budget filters never convert currencies. Filters
+  apply to returned candidates; missing details for active filters are excluded.
+  Query history records whether preferences were used; replay uses current saved
+  preferences when that flag is enabled.
+- `/comparisons`: name, rename, and delete comparisons of two to four wishlist
+  products. Compare their saved prices, brands, categories, ratings, reviews,
+  stock, attributes, and descriptions. Missing details stay unavailable. Snapshots
+  remain after wishlist removal and are not live offers.
+- `/alerts`: opt into price tracking, choose an optional target price, pause/resume
+  or remove alerts, check due alerts, and read private in-app price notifications.
+  There is no email/SMS delivery. Up to 50 active alerts are supported per user.
+
+MongoDB collections are `product_collections`, `user_preferences`,
+`saved_comparisons`, `price_alerts`, and `price_notifications`. All records and
+mutations are scoped to the verified Clerk subject; the browser cannot choose an
+owner. Account data is not stored in Clerk or local storage. Database credentials
+need permission to create the collections and their indexes.
+
+### Price monitoring
+
+A background worker checks due alerts about every six hours while the backend is
+running, polling for due work every minute. The interval is configurable, with a
+one-hour minimum. Leased database updates prevent simultaneous workers checking
+the same due alert. Check-now actions use the same cooldown. Recreating an alert
+creates a new tracking request and may consume additional provider quota.
+
+Catalog checks read the matching product ID from the current verified catalog.
+Google Shopping checks search the saved title through the existing SerpApi
+integration and accept only the same stable Google product ID, merchant, market
+settings, and currency. No product URLs are scraped or fetched by the checker.
+If a matching offer is not returned, the check is marked unavailable; it never
+substitutes a similar product. Provider calls can consume SerpApi quota. See
+[SerpApi's documented result fields](https://serpapi.com/shopping-results).
+
+Only finite positive prices with unambiguous currencies can enable alerts.
+For example, `₹` identifies INR; a bare `$` without an explicit currency is not
+assumed to mean USD. Conflicting currency details are rejected. The ESCI catalog
+often has no prices, so many existing saved items cannot be monitored. Save a
+supported priced offer to enable an alert. Older saved snapshots may lack
+ratings/specifications; comparisons show those fields as unavailable.
+
+A notification is created only when a verified price is lower than the previous
+lowest observed price and at or below the target. Notifications are persisted
+with an outbox and idempotent IDs, so interrupted delivery can retry on the next
+due check without resetting read status. Temporary failures retain the baseline.
+Removing a wishlist product pauses its alerts. Alerts and notifications refresh
+on their page and dashboard while visible; the shopper should verify current
+merchant prices, shipping, taxes, and stock before purchasing.
+
+See [deployment notes](../DEPLOYMENT.md#scheduled-price-checks) for worker and cron
+configuration. A price alert is not a guarantee of availability or a purchase.

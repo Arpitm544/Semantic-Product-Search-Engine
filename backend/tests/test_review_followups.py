@@ -113,7 +113,7 @@ class TestReviewFollowups(unittest.TestCase):
                 patch.object(api, '_search_error', 'Missing catalog'), \
                 patch.object(search_service, '_search_engine', None), \
                 patch.object(api, 'get_search_engine', return_value=engine) as get:
-            self.assertEqual(api.search_products('phone'), {'results': []})
+            self.assertEqual(api.search_products(api.search_options('phone'), session={'sub': 'user_test'}), {'results': []})
             get.assert_called_once()
 
     def test_catalog_cache_checks_manifest_and_refreshes(self):
