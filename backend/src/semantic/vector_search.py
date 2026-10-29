@@ -1,5 +1,6 @@
 """
-Semantic Vector Search Engine using Sentence-Transformers (SBERT) and FAISS index.
+Offline evaluation engine using Sentence-Transformers and FAISS.
+Not used by the Atlas application; requires requirements-offline.txt.
 Provides semantic vector indexing and retrieval for product catalog records.
 """
 import pickle

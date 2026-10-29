@@ -81,13 +81,14 @@ class TestSearchAPI(unittest.TestCase):
 
     def test_unchanged_mongo_version_reuses_the_search_index(self):
         manifest = {"sha256": "catalog-sha", "updated_at": "import-time"}
-        signature = ("catalog-sha", "import-time", "model", "reranker")
+        signature = ("catalog-sha", "import-time", "model", "reranker", "product_vectors")
         engine = Mock()
         with patch.object(search_service, "version", return_value=manifest), \
                 patch.object(search_service, "_search_engine", engine), \
                 patch.object(search_service, "_search_signature", signature), \
                 patch.object(search_service, "load_products") as load, \
-                patch.dict("os.environ", {"SEMANTIC_MODEL_PATH": "model", "RERANKER_MODEL_PATH": "reranker"}):
+                patch.dict("os.environ", {"SEMANTIC_MODEL_PATH": "model", "RERANKER_MODEL_PATH": "reranker",
+                                          "ATLAS_VECTOR_INDEX": "product_vectors"}):
             self.assertIs(search_service.get_search_engine(), engine)
             load.assert_not_called()
 

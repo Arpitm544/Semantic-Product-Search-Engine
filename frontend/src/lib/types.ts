@@ -8,6 +8,9 @@ export interface CatalogProduct {
 }
 
 export interface SearchProduct {
+  source?: string;
+  availableForSale?: boolean;
+  detailsStatus?: string;
   id?: string | number;
   title: string;
   category?: string;

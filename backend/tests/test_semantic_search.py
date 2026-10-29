@@ -4,6 +4,8 @@ Unit tests for Semantic Vector Search module (Sentence-BERT + FAISS).
 import unittest
 import numpy as np
 
+import pytest
+pytest.importorskip("faiss", reason="Optional offline evaluation dependency")
 from src.semantic.vector_search import SemanticVectorSearch
 
 
