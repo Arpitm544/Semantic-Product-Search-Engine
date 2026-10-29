@@ -77,3 +77,23 @@ The header theme toggle switches between the warm light palette (default) and da
 The refined dark palette uses semantic `--night-*` tokens for canvas, panels, text, borders, and sage actions. Selected comparison cards, form actions, and dashboard navigation have distinct dark states. Product photographs retain a light studio background; preview failures use a readable dark card. Theme changes from another tab, including clearing the saved preference, remain synchronized.
 
 Light mode uses a warm ivory canvas, cream panels, sage section backgrounds and forest-green actions. The `--day-*` palette and its aliases are scoped to light mode; the dark palette and product photography are unchanged.
+
+## Authentication
+
+Clerk provides sign-in and sign-up modals in the desktop header and mobile menu,
+and a profile menu for signed-in users. Dedicated `/sign-in` and `/sign-up` routes
+are also available. The app uses `@clerk/nextjs` 6 for Next.js 14 compatibility.
+
+The linked development instance supports email and social authentication. Phone
+number sign-up and sign-in are disabled, and a phone number is not required to
+create an account. These settings are managed in Clerk; checking out this branch
+does not apply authentication settings to another Clerk application.
+
+Development keys are stored in the ignored `.env.local` file. Never commit keys or
+expose `CLERK_SECRET_KEY` to the browser. To restore configuration on another
+machine, authenticate with `npx -y clerk@latest auth login`, link the existing
+application `app_3KINthiV26dzRCDdqaMc4NKOMTj`, and run `npx -y clerk@latest env pull`.
+
+Routes and the Python search API remain public; the middleware makes Clerk
+sessions available without requiring login. Production Clerk configuration
+is still required before deployment.
