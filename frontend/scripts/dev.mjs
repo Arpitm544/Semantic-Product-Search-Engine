@@ -1,3 +1,4 @@
+import nextEnv from '@next/env';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import path from 'node:path';
@@ -45,6 +46,7 @@ export function backendIsRunning(port) {
 }
 
 async function main() {
+  nextEnv.loadEnvConfig(frontendDir);
   const port = Number(process.env.PORT || 8000);
   const reuseBackend = await backendIsRunning(port);
   let backend;

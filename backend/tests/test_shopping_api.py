@@ -6,7 +6,10 @@ import unittest
 from unittest.mock import Mock, patch
 
 import requests
+import pytest
 from fastapi.testclient import TestClient
+
+pytestmark = pytest.mark.usefixtures("authenticated_api")
 
 from api import main as api, shopping_service as shopping
 

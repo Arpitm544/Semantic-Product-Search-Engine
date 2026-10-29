@@ -14,12 +14,13 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from dotenv import load_dotenv
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 import uvicorn
 
+from api.auth import require_session
 from api.dashboard import dashboard_data
 from api import search_service
 from api.search_service import get_search_engine, _search_ready
@@ -73,7 +74,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
     allow_methods=["GET", "OPTIONS"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 
@@ -105,7 +106,7 @@ def check_health():
     })
 
 
-@app.get("/api/dashboard")
+@app.get("/api/dashboard", dependencies=[Depends(require_session)])
 def get_dashboard():
     """Return catalog counts, categories, and a preview of products."""
     try:
@@ -114,7 +115,7 @@ def get_dashboard():
         return JSONResponse(status_code=503, content={"error": str(error)})
 
 
-@app.get("/api/search")
+@app.get("/api/search", dependencies=[Depends(require_session)])
 def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
     """Choose MongoDB semantic search or Google Shopping via SerpApi."""
     query = q.strip()

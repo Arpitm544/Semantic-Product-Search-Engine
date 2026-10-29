@@ -12,7 +12,10 @@ from unittest.mock import Mock, patch
 import weakref
 
 import numpy as np
+import pytest
 from fastapi.testclient import TestClient
+
+pytestmark = pytest.mark.usefixtures("authenticated_api")
 
 from api import dashboard, main as api, search_service
 from src.data import catalog

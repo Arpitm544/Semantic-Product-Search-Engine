@@ -2,7 +2,10 @@
 
 import unittest
 from unittest.mock import Mock, patch
+import pytest
 from fastapi.testclient import TestClient
+
+pytestmark = pytest.mark.usefixtures("authenticated_api")
 
 from api import main as api
 from api import search_service, dashboard
