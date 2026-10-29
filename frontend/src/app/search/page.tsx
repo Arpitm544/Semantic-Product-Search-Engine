@@ -5,7 +5,8 @@ import { classes } from '@/lib/classes';
 import { useEffect, useRef, useState } from 'react';
 import type { SearchProduct } from '@/lib/types';
 import type { FormEvent } from 'react';
-import { API_BASE } from '@/lib/api';
+import { API_BASE, useAuthenticatedFetch } from '@/lib/api';
+import { UserButton } from '@clerk/nextjs';
 
 const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi' };
 
@@ -43,6 +44,7 @@ function ProductImage({ product, index }: { product: SearchProduct; index: numbe
 }
 
 export default function SearchPage() {
+  const authenticatedFetch = useAuthenticatedFetch();
   const [input, setInput] = useState('');
   const [source, setSource] = useState<keyof typeof SOURCES>('mongo');
   const [searched, setSearched] = useState('');
@@ -93,7 +95,7 @@ export default function SearchPage() {
     setCorrectedQuery(null);
     try {
       const params = new URLSearchParams({ q: query, source, fuzzy: fuzzy ? '1' : '0' });
-      const response = await fetch(`${API_BASE}/api/search?${params}`, { signal: controller.signal });
+      const response = await authenticatedFetch(`${API_BASE}/api/search?${params}`, { signal: controller.signal });
       let payload;
       try {
         payload = await response.json();
@@ -126,7 +128,7 @@ export default function SearchPage() {
 
   return (
     <main className={"product-search-page min-h-[100vh] [background:var(--surface-fafbf8)] [color:var(--text-263127)] [font-family:'DM_Sans',sans-serif]"}>
-      <header className={"search-page-header h-[72px] [border-bottom:1px_solid_var(--border-e8ece6)] [background:var(--surface-fff)] flex items-center justify-between pt-[0] pr-[max(6vw,24px)] pb-[0] pl-[max(6vw,24px)] max-[600.01px]:h-[60px]"}><a className={"search-page-brand [font-style:normal] font-extrabold text-[20px] leading-[normal] [font-family:Manrope,sans-serif] tracking-[-1px] [color:var(--text-263127)] no-underline [&>span:first-child]:[color:var(--text-739b72)] [&>span:first-child]:text-[24px] [&>span:first-child]:mr-[6px] [&>span:last-child]:[color:var(--text-7caa7c)]"} href="/"><span>✳</span> semantic<span>.</span></a><div className="flex items-center gap-3"><ThemeToggle /><a className={"back-dashboard text-[12px] font-semibold [color:var(--text-667665)] no-underline [&_span]:ml-[6px]"} href="/dashboard">Back to dashboard <span>↗</span></a></div></header>
+      <header className={"search-page-header h-[72px] [border-bottom:1px_solid_var(--border-e8ece6)] [background:var(--surface-fff)] flex items-center justify-between pt-[0] pr-[max(6vw,24px)] pb-[0] pl-[max(6vw,24px)] max-[600.01px]:h-[60px]"}><a className={"search-page-brand [font-style:normal] font-extrabold text-[20px] leading-[normal] [font-family:Manrope,sans-serif] tracking-[-1px] [color:var(--text-263127)] no-underline [&>span:first-child]:[color:var(--text-739b72)] [&>span:first-child]:text-[24px] [&>span:first-child]:mr-[6px] [&>span:last-child]:[color:var(--text-7caa7c)]"} href="/"><span>✳</span> semantic<span>.</span></a><div className="flex items-center gap-3"><ThemeToggle /><UserButton /><a className={"back-dashboard text-[12px] font-semibold [color:var(--text-667665)] no-underline [&_span]:ml-[6px]"} href="/dashboard">Back to dashboard <span>↗</span></a></div></header>
       <section className={"search-hero pt-[70px] pr-[24px] pb-[47px] pl-[24px] text-center max-w-[820px] mt-[auto] mr-[auto] mb-[auto] ml-[auto] [&_h1]:[font-style:normal] [&_h1]:font-bold [&_h1]:text-[clamp(40px,6vw,65px)] [&_h1]:leading-[1.04] [&_h1]:[font-family:Manrope,sans-serif] [&_h1]:tracking-[-3px] [&_h1]:mt-[15px] [&_h1]:mr-[0] [&_h1]:mb-[13px] [&_h1]:ml-[0] [&_h1]:[color:var(--text-29382e)] [&_h1_em]:[color:var(--text-79937a)] [&_h1_em]:font-medium [&>p]:text-[14px] [&>p]:[color:var(--text-838d82)] [&>p]:mt-[0] [&>p]:mr-[0] [&>p]:mb-[27px] [&>p]:ml-[0] max-[600.01px]:pt-[52px] max-[600.01px]:pr-[18px] max-[600.01px]:pb-[35px] max-[600.01px]:pl-[18px] max-[600.01px]:[&_h1]:tracking-[-2px] max-[600.01px]:[&>p]:text-[12px] max-[600.01px]:[&>p]:leading-[1.5]"}>
         <span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>PRODUCT DISCOVERY</span>
         <h1>Find what you’re<br/><em>looking for.</em></h1>

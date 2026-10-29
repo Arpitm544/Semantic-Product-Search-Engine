@@ -18,7 +18,7 @@ backend running. Open http://localhost:3001. To run only the API, use `python3 a
 
 `npm run start` serves only the frontend. Start the API separately with `python3 api/main.py` from `backend/` so the product search page can reach it.
 
-The frontend uses Next.js 14, React 18, TypeScript, Tailwind CSS 4, and Three.js. Run `npm run typecheck` to check source types without building or reading generated `.next` / `.next-dev` output. Next validates its generated route types during build/dev. The catalog search uses the MongoDB product catalog with keyword and semantic retrieval, spelling correction, and reranking. The scroll story and the approach comparison remain illustrative examples, not live search results.
+The frontend uses Next.js 16, React 19, TypeScript, Tailwind CSS 4, and Three.js. Run `npm run typecheck` to check source types without building or reading generated `.next` / `.next-dev` output. Next validates its generated route types during build/dev. The catalog search uses the MongoDB product catalog with keyword and semantic retrieval, spelling correction, and reranking. The scroll story and the approach comparison remain illustrative examples, not live search results.
 
 The `/search` page has a source selector for **MongoDB catalog** and **Google
 Shopping · SerpApi**. Configure `SERPAPI_API_KEY` in `backend/.env` and restart the
@@ -82,7 +82,7 @@ Light mode uses a warm ivory canvas, cream panels, sage section backgrounds and 
 
 Clerk provides sign-in and sign-up modals in the desktop header and mobile menu,
 and a profile menu for signed-in users. Dedicated `/sign-in` and `/sign-up` routes
-are also available. The app uses `@clerk/nextjs` 6 for Next.js 14 compatibility.
+are also available. The app uses `@clerk/nextjs` 6 with Next.js 16 and React 19.
 
 The linked development instance supports email and social authentication. Phone
 number sign-up and sign-in are disabled, and a phone number is not required to
@@ -94,6 +94,18 @@ expose `CLERK_SECRET_KEY` to the browser. To restore configuration on another
 machine, authenticate with `npx -y clerk@latest auth login`, link the existing
 application `app_3KINthiV26dzRCDdqaMc4NKOMTj`, and run `npx -y clerk@latest env pull`.
 
-Routes and the Python search API remain public; the middleware makes Clerk
-sessions available without requiring login. Production Clerk configuration
-is still required before deployment.
+The landing page and API health checks are public. `/dashboard` and `/search`
+require a Clerk session on the server. The Python `/api/dashboard` and
+`/api/search` endpoints independently verify RS256 bearer tokens, including
+signature, issuer, expiration, not-before time, session ID, subject, and allowed
+frontend origin. Pending sessions are rejected. Requests with missing or invalid
+tokens receive 401; missing auth configuration or an unreachable key service
+returns 503. Both workspace pages include Clerk profile and sign-out controls.
+
+Use Node.js 20.9 or later. `npm run dev` loads frontend environment configuration
+and forwards the public Clerk publishable key to the Python process it starts,
+which derives the trusted issuer from that key. If a backend is already running,
+restart it with the updated dependencies and `CLERK_ISSUER_URL` configured as shown
+in `backend/.env.example`. The frontend sends bearer tokens with API requests.
+
+See [production deployment](../DEPLOYMENT.md) before deploying.

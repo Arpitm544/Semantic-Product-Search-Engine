@@ -48,3 +48,6 @@ pytest>=7.0.0
 flake8>=6.0.0
 
 python-dotenv>=1,<2
+
+# Clerk session signature verification
+PyJWT[crypto]>=2.10.1,<3
