@@ -2,9 +2,10 @@
 
 from contextlib import asynccontextmanager
 import os
+import logging
 from pathlib import Path
 import sys
-from threading import Thread
+from threading import Event, Thread
 from time import sleep
 
 # Load settings before importing the database and search modules.
@@ -20,6 +21,12 @@ from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 import uvicorn
 
+from api.saved_products import router as saved_products_router
+from api.search_history import router as history_router, remember_search, SearchContext
+from api.account_features import router as account_router, load_preferences
+from api.price_alerts import router as alerts_router, worker_loop
+from api.product_prices import apply_preferences
+from api.search_limits import check_search_rate
 from api.auth import require_session
 from api.dashboard import dashboard_data
 from api import search_service
@@ -66,14 +73,28 @@ async def lifespan(app):
     _search_ready.clear()
     _search_error = None
     Thread(target=initialize_search, daemon=True).start()
-    yield
+    alerts_stop = Event()
+    alerts_thread = None
+    if os.environ.get('PRICE_ALERTS_ENABLED', '1') == '1':
+        alerts_thread = Thread(target=worker_loop, args=(alerts_stop,), daemon=True)
+        alerts_thread.start()
+    try:
+        yield
+    finally:
+        alerts_stop.set()
+        if alerts_thread:
+            alerts_thread.join(timeout=5)
 
 
 app = FastAPI(title="Semantic Product Search", lifespan=lifespan)
+app.include_router(saved_products_router)
+app.include_router(history_router)
+app.include_router(account_router)
+app.include_router(alerts_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
-    allow_methods=["GET", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
@@ -94,7 +115,7 @@ def check_health():
     if ready:
         status, message = "ready", "Search is ready."
     elif error:
-        status, message = "error", error
+        status, message = "error", "Search is temporarily unavailable. Check the server logs."
     else:
         status, message = "initializing", "Preparing the search index. Check terminal progress."
     return JSONResponse(status_code=200 if ready else 503, content={
@@ -112,42 +133,86 @@ def get_dashboard():
     try:
         return dashboard_data()
     except (OSError, ValueError, PyMongoError) as error:
-        return JSONResponse(status_code=503, content={"error": str(error)})
+        logging.getLogger(__name__).exception("Catalog summary failed")
+        return JSONResponse(status_code=503, content={"error": "The search service is temporarily unavailable. Please try again."})
 
 
-@app.get("/api/search", dependencies=[Depends(require_session)])
-def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
-    """Choose MongoDB semantic search or Google Shopping via SerpApi."""
-    query = q.strip()
+class SearchOptions:
+    def __init__(self, fuzzy: str = "1", source: str = "mongo", preferences: bool = False):
+        self.fuzzy = fuzzy != "0"
+        self.source = source
+        self.preferences = preferences
+
+
+def search_validation(query, source):
     if source not in ("mongo", "serpapi"):
         return JSONResponse(status_code=400, content={"error": "Choose a valid search source: mongo or serpapi."})
     if len(query) > 512:
-        return JSONResponse(status_code=400, content={
-            "error": "Search queries must be 512 characters or fewer."
+        return JSONResponse(status_code=400, content={"error": "Search queries must be 512 characters or fewer."})
+    return None
+
+
+@app.get("/api/search")
+def search_products(q: str = "", options: SearchOptions = Depends(SearchOptions), session=Depends(require_session)):
+    """Choose MongoDB semantic search or Google Shopping via SerpApi."""
+    query = q.strip()
+    invalid = search_validation(query, options.source)
+    if invalid is not None:
+        return invalid
+    if query:
+        check_search_rate(session["sub"], options.source)
+    try:
+        values = load_preferences(session['sub']) if options.preferences else None
+    except PyMongoError:
+        return JSONResponse(status_code=503, content={'error': 'Saved preferences are unavailable. Turn off saved preferences or try again.'})
+    context = SearchContext(session['sub'], query, options.source, options.fuzzy, options.preferences)
+    if options.source == "serpapi":
+        return shopping_search(context, values)
+    return catalog_search(context, values)
+
+
+def shopping_search(context, preferences):
+    try:
+        payload = rank_shopping_response(search_shopping(context.query))
+        return finish_search(context, payload, preferences)
+    except ShoppingError as error:
+        return JSONResponse(status_code=error.status, content={
+            "error": str(error), "code": error.code, "source": "serpapi",
         })
-    # Shopping search does not depend on MongoDB or local model readiness.
-    if source == "serpapi":
-        try:
-            return rank_shopping_response(search_shopping(query))
-        except ShoppingError as error:
-            return JSONResponse(status_code=error.status, content={
-                "error": str(error), "code": error.code, "source": "serpapi",
-            })
 
-    if (not _search_ready.is_set() and search_service._search_engine is None
-            and not (_search_error or search_service._search_error)):
-        message = _search_error or "Search is initializing. Wait for indexing to finish."
-        return JSONResponse(status_code=503, content={"error": message})
 
+def search_initializing():
+    if _search_ready.is_set():
+        return False
+    if search_service._search_engine is not None:
+        return False
+    return not (_search_error or search_service._search_error)
+
+
+def search_unavailable():
+    return JSONResponse(status_code=503, content={"error": "The search service is temporarily unavailable. Please try again."})
+
+
+def catalog_search(context, preferences):
+    if search_initializing():
+        return JSONResponse(status_code=503, content={"error": "Search is initializing. Wait for indexing to finish."})
     try:
         engine = get_search_engine()
-    except Exception as error:
-        # Initialization includes lazy model imports; all failures remain retryable.
-        return JSONResponse(status_code=503, content={"error": str(error)})
+    except Exception:
+        logging.getLogger(__name__).exception("Search initialization failed")
+        return search_unavailable()
     try:
-        return engine.search(query, fuzzy=fuzzy != "0")
-    except (ValueError, RuntimeError, OSError, PyMongoError) as error:
-        return JSONResponse(status_code=503, content={"error": str(error)})
+        payload = engine.search(context.query, fuzzy=context.fuzzy)
+        return finish_search(context, payload, preferences)
+    except (ValueError, RuntimeError, OSError, PyMongoError):
+        logging.getLogger(__name__).exception("Search request failed")
+        return search_unavailable()
+
+
+def finish_search(context, payload, preferences):
+    if preferences is not None:
+        payload = apply_preferences(payload, preferences)
+    return remember_search(context, payload)
 
 
 def start_server():
