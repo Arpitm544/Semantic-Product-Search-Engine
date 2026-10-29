@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.39.8",
     "next": "14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
