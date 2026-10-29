@@ -109,3 +109,18 @@ restart it with the updated dependencies and `CLERK_ISSUER_URL` configured as sh
 in `backend/.env.example`. The frontend sends bearer tokens with API requests.
 
 See [production deployment](../DEPLOYMENT.md) before deploying.
+
+## Saved products
+
+Search results offer Save/Remove controls. `/saved` lists the signed-in user's
+wishlist with pagination and remove actions; it is linked from search and the
+dashboard. Saved products are snapshots, not live price tracking.
+
+The Python API stores these snapshots in the existing MongoDB database's
+`saved_products` collection. Every document contains the verified Clerk user ID,
+source, product identity, snapshot, and saved time. Ownership is taken only from
+the verified bearer token. A deterministic document ID prevents duplicate saves
+for the same user/source/product, and every read/delete filters by that user.
+MongoDB must be available and the application database user must be allowed to
+create the collection and its index. No wishlist data is stored in Clerk or
+browser local storage. Restart the API and frontend after installing this change.
