@@ -1,4 +1,5 @@
 """Security regressions: real JWT signatures, claims, API guards, and CORS."""
+import base64
 import time
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -99,4 +100,44 @@ def test_missing_configuration_fails_closed():
     with patch.dict("os.environ", {"CLERK_ISSUER_URL": "", "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": ""}), \
             pytest.raises(HTTPException) as error:
         auth.require_session(HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid"))
+    assert error.value.status_code == 503
+
+
+@pytest.mark.parametrize("issuer", [
+    "http://test.clerk.accounts.dev", "https://", "https://example.com/path",
+    "https://example.com?query=1", "https://example.com#fragment",
+    "https://user@example.com", "https://user:password@example.com",
+])
+def test_reject_invalid_issuer_urls(issuer):
+    with patch.dict("os.environ", {"CLERK_ISSUER_URL": issuer}), \
+            pytest.raises(HTTPException) as error:
+        auth.issuer_url()
+    assert error.value.status_code == 503
+
+
+@pytest.mark.parametrize("prefix", ["pk_test_", "pk_live_"])
+def test_issuer_from_publishable_key(prefix):
+    encoded = base64.b64encode(b"test.clerk.accounts.dev$").decode().rstrip("=")
+    with patch.dict("os.environ", {"CLERK_ISSUER_URL": "",
+                                   "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": prefix + encoded}):
+        assert auth.issuer_url() == "https://test.clerk.accounts.dev"
+
+
+def test_explicit_issuer_takes_precedence():
+    with patch.dict("os.environ", {"CLERK_ISSUER_URL": "https://example.com/",
+                                   "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "invalid"}):
+        assert auth.issuer_url() == "https://example.com"
+
+
+def test_frontend_origins_ignore_whitespace_and_empty_entries():
+    with patch.dict("os.environ", {"FRONTEND_ORIGINS": " http://localhost:3001, ,http://localhost:3001,"}):
+        assert auth.frontend_origins() == {"http://localhost:3001"}
+
+
+def test_jwks_connection_failure_is_service_unavailable():
+    client = Mock()
+    client.get_signing_key_from_jwt.side_effect = jwt.PyJWKClientConnectionError("offline")
+    with patch.object(auth, "issuer_url", return_value="https://test.clerk.accounts.dev"), \
+            patch.object(auth, "jwks_client", return_value=client), pytest.raises(HTTPException) as error:
+        auth.require_session(HTTPAuthorizationCredentials(scheme="Bearer", credentials="token"))
     assert error.value.status_code == 503

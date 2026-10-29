@@ -8,7 +8,7 @@
     "dev:frontend": "next dev -p 3001",
     "build": "next build --webpack",
     "start": "next start -p 3001",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.39.8",

@@ -21,13 +21,14 @@ export interface SearchProduct {
   merchant?: string;
   rating?: number | string | null;
   reviews?: number | string | null;
-  stock?: number | null;
+  stock?: number | string | null;
   matchSources?: string[];
 }
 
 export interface DashboardData {
   products: SearchProduct[];
   productCount: number;
+  displayedProductCount: number;
   categories: string[];
   totalStock: number | null;
   sources?: { catalog?: string };
