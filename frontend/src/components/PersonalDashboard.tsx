@@ -28,6 +28,17 @@ function SavedPreview({ product }: { product: SearchProduct }) {
   </div>;
 }
 
+function errorMessage(reason: unknown, fallback: string) {
+  return reason instanceof Error ? reason.message : fallback;
+}
+
+function appendHistory(old: PersonalData | null, result: { hasMore: boolean; items: HistoryEntry[] }) {
+  if (!old) return old;
+  const existing = new Set(old.recentSearches.map(entry => entry.id));
+  return { ...old, hasMoreSearches: result.hasMore,
+    recentSearches: [...old.recentSearches, ...result.items.filter(entry => !existing.has(entry.id))] };
+}
+
 export default function PersonalDashboard() {
   const request = useAuthenticatedFetch();
   const { user } = useUser();
@@ -48,7 +59,7 @@ export default function PersonalDashboard() {
       const result = await response.json();
       if (current === version.current) setData(result);
     } catch (reason) {
-      if (current === version.current) setError(reason instanceof Error ? reason.message : 'Could not load your dashboard.');
+      if (current === version.current) setError(errorMessage(reason, 'Could not load your dashboard.'));
     } finally { if (current === version.current) setBusy(false); }
   }, [request]);
   useEffect(() => {
@@ -66,20 +77,21 @@ export default function PersonalDashboard() {
       setConfirmClear(false);
       setNotice(id ? 'Search removed from your history.' : 'Your search history has been cleared.');
       await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Please try again.'); }
+    } catch (reason) { setError(errorMessage(reason, 'Please try again.')); }
     finally { setMutation(null); }
   }
   async function loadMore() {
-    if (!data || mutation || busy) return;
+    if (!data) return;
+    if (mutation) return;
+    if (busy) return;
     setBusy(true); setError('');
     const current = version.current;
     try {
       const response = await request(`${API_BASE}/api/search-history?offset=${data.recentSearches.length}&limit=6`);
       if (!response.ok) throw new Error('Could not load more searches. Please try again.');
       const result = await response.json();
-      if (current === version.current) setData(old => old && ({ ...old, hasMoreSearches: result.hasMore,
-        recentSearches: [...old.recentSearches, ...result.items.filter((entry: HistoryEntry) => !old.recentSearches.some(item => item.id === entry.id))] }));
-    } catch (reason) { if (current === version.current) setError(reason instanceof Error ? reason.message : 'Please try again.'); }
+      if (current === version.current) setData(old => appendHistory(old, result));
+    } catch (reason) { if (current === version.current) setError(errorMessage(reason, 'Please try again.')); }
     finally { if (current === version.current) setBusy(false); }
   }
   const name = user?.firstName || user?.username;

@@ -133,7 +133,7 @@ def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo", sessio
     if source == "serpapi":
         try:
             payload = rank_shopping_response(search_shopping(query))
-            return remember_search(session["sub"], query, source, fuzzy != "0", payload)
+            return remember_search(session["sub"], query, (source, fuzzy != "0"), payload)
         except ShoppingError as error:
             return JSONResponse(status_code=error.status, content={
                 "error": str(error), "code": error.code, "source": "serpapi",
@@ -151,7 +151,7 @@ def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo", sessio
         return JSONResponse(status_code=503, content={"error": str(error)})
     try:
         payload = engine.search(query, fuzzy=fuzzy != "0")
-        return remember_search(session["sub"], query, source, fuzzy != "0", payload)
+        return remember_search(session["sub"], query, (source, fuzzy != "0"), payload)
     except (ValueError, RuntimeError, OSError, PyMongoError) as error:
         return JSONResponse(status_code=503, content={"error": str(error)})
 

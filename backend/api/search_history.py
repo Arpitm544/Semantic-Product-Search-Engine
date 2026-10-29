@@ -38,8 +38,9 @@ def recent_entries(user_id, offset=0, limit=6):
     return {"items": [public_entry(item) for item in items[:limit]], "hasMore": len(items) > limit}
 
 
-def remember_search(user_id, query, source, fuzzy, payload):
+def remember_search(user_id, query, options: tuple[str, bool], payload):
     """A failed history write must never discard successful search results."""
+    source, fuzzy = options
     if not query:
         return payload
     key = sha256(json.dumps([user_id, query, source, fuzzy]).encode()).hexdigest()

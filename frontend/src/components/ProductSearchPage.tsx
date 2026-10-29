@@ -13,7 +13,9 @@ const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi
 
 function money(product: SearchProduct) {
   if (product.priceLabel) return product.priceLabel;
-  if (product.price == null || product.price === '' || !Number.isFinite(Number(product.price))) return 'Price unavailable';
+  if (product.price == null) return 'Price unavailable';
+  if (product.price === '') return 'Price unavailable';
+  if (!Number.isFinite(Number(product.price))) return 'Price unavailable';
   try {
     // SerpApi prices without a currency label must not be assigned a guessed currency.
     if (product.matchSources?.includes('google-shopping')) return new Intl.NumberFormat('en-IN').format(Number(product.price));
@@ -30,6 +32,49 @@ function webUrl(value: string | undefined) {
   } catch {
     return null;
   }
+}
+
+function searchParams(query: string, source: keyof typeof SOURCES, fuzzy: boolean) {
+  return new URLSearchParams({ q: query, source, fuzzy: fuzzy ? '1' : '0' });
+}
+
+function isSearchProduct(product: unknown): product is SearchProduct {
+  if (!product) return false;
+  if (typeof product !== 'object') return false;
+  if (!('title' in product)) return false;
+  return typeof product.title === 'string';
+}
+
+async function readSearchResponse(response: Response) {
+  let payload;
+  try { payload = await response.json(); }
+  catch { throw new Error('Search returned an unreadable response. Please try again shortly.'); }
+  if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'Search could not be completed. Please try again shortly.');
+  if (!Array.isArray(payload?.results)) throw new Error('Search returned an invalid response. Please try again shortly.');
+  if (!payload.results.every(isSearchProduct)) throw new Error('Search returned an invalid response. Please try again shortly.');
+  return normalizeSearchResponse(payload);
+}
+
+function normalizeSearchResponse(payload: { results: SearchProduct[]; candidateCount?: number; correctedQuery?: unknown; warning?: unknown; historySaved?: boolean }) {
+  return {
+    results: payload.results,
+    total: Number.isFinite(payload.candidateCount) ? payload.candidateCount! : payload.results.length,
+    correctedQuery: typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null,
+    warning: searchWarning(payload),
+  };
+}
+
+function searchWarning(payload: { warning?: unknown; historySaved?: boolean }) {
+  const messages = [typeof payload.warning === 'string' ? payload.warning : ''];
+  if (payload.historySaved === false) messages.push('Results are ready, but this search could not be saved to your history.');
+  return messages.filter(Boolean).join(' ');
+}
+
+function searchError(reason: unknown, timedOut: boolean) {
+  if (timedOut) return 'Search took too long. Please try again.';
+  if (reason instanceof TypeError) return 'Cannot reach the search service. Make sure the backend is running and try again.';
+  if (reason instanceof Error) return reason.message || 'Search could not be completed.';
+  return 'Search could not be completed.';
 }
 
 function ProductImage({ product, index }: { product: SearchProduct; index: number }) {
@@ -67,7 +112,9 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
   useEffect(() => {
     // A history link mounts this page with the original query and source.
     // Source-picker changes should not replay the initial search again.
-    if (isLoaded && isSignedIn && initialQuery) void runSearch(initialQuery, initialFuzzy);
+    if (!isLoaded) return;
+    if (!isSignedIn) return;
+    if (initialQuery) void runSearch(initialQuery, initialFuzzy);
   }, [initialQuery, initialFuzzy, authenticatedFetch, isLoaded, isSignedIn]);
 
   function changeSource(value: keyof typeof SOURCES) {
@@ -104,29 +151,18 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
     setWarning('');
     setCorrectedQuery(null);
     try {
-      const params = new URLSearchParams({ q: query, source, fuzzy: fuzzy ? '1' : '0' });
+      const params = searchParams(query, source, fuzzy);
       const response = await authenticatedFetch(`${API_BASE}/api/search?${params}`, { signal: controller.signal });
-      let payload;
-      try {
-        payload = await response.json();
-      } catch {
-        throw new Error('Search returned an unreadable response. Please try again shortly.');
-      }
-      if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'Search could not be completed. Please try again shortly.');
-      if (!Array.isArray(payload?.results) || payload.results.some((product: unknown) => !product || typeof product !== 'object' || !('title' in product) || typeof product.title !== 'string')) {
-        throw new Error('Search returned an invalid response. Please try again shortly.');
-      }
+      const payload = await readSearchResponse(response);
       if (pending.current !== controller) return;
       setResults(payload.results);
-      setTotal(Number.isFinite(payload.candidateCount) ? payload.candidateCount : payload.results.length);
-      setCorrectedQuery(typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null);
-      setWarning([typeof payload.warning === 'string' ? payload.warning : '', payload.historySaved === false ? 'Results are ready, but this search could not be saved to your history.' : ''].filter(Boolean).join(' '));
+      setTotal(payload.total);
+      setCorrectedQuery(payload.correctedQuery);
+      setWarning(payload.warning);
     } catch (reason) {
       if (pending.current !== controller) return;
       if (controller.signal.aborted && !timedOut) return;
-      setError(timedOut ? 'Search took too long. Please try again.' : reason instanceof TypeError
-        ? 'Cannot reach the search service. Make sure the backend is running and try again.'
-        : (reason instanceof Error && reason.message || 'Search could not be completed.'));
+      setError(searchError(reason, timedOut));
     } finally {
       clearTimeout(timeout);
       if (pending.current === controller) {
