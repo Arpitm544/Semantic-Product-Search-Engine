@@ -103,6 +103,18 @@ function makeMeaningSpace(T: typeof THREE) {
   return field;
 }
 
+function updateFieldOpacity(T: typeof THREE, field: THREE.Group, opacity: number) {
+  field.traverse((object) => {
+    if (!(object instanceof T.Mesh || object instanceof T.Points || object instanceof T.Line)) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) {
+      if (material.userData.originalOpacity === undefined) material.userData.originalOpacity = material.opacity;
+      material.opacity = material.userData.originalOpacity * opacity;
+      material.transparent = true;
+    }
+  });
+}
+
 export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef, onFailure }: { progressRef: MutableRefObject<number>; appearanceRef: MutableRefObject<string>; rotationRef: MutableRefObject<number>; onFailure: () => void }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
@@ -217,15 +229,7 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
           field.visible = cloud > .01;
           field.rotation.y = -.2 + smoothed * .45;
           field.scale.setScalar(lerp(.4, 1.04, cloud));
-          field.traverse((object) => {
-            if (!(object instanceof T.Mesh || object instanceof T.Points || object instanceof T.Line)) return;
-            const materials = Array.isArray(object.material) ? object.material : [object.material];
-            for (const material of materials) {
-              if (material.userData.originalOpacity === undefined) material.userData.originalOpacity = material.opacity;
-              material.opacity = material.userData.originalOpacity * cloud;
-              material.transparent = true;
-            }
-          });
+          updateFieldOpacity(T, field, cloud);
           try {
             renderer.render(scene, camera);
           } catch {
