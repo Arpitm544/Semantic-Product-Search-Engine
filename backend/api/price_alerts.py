@@ -78,6 +78,13 @@ def list_alerts(offset: int = Query(0, ge=0, le=100000), session=Depends(require
             'intervalSeconds': interval_seconds(), 'schedulerEnabled': os.environ.get('PRICE_ALERTS_ENABLED', '1') == '1'}
 
 
+def alert_target(body, price):
+    target = body.targetPrice if body.targetPrice is not None else price['amount']
+    if target > price['amount']:
+        raise HTTPException(422, 'Target price must not exceed the saved price.')
+    return target
+
+
 @router.put('/api/price-alerts')
 def create_alert(body: AlertInput, session=Depends(require_session)):
     user = session['sub']
@@ -85,9 +92,7 @@ def create_alert(body: AlertInput, session=Depends(require_session)):
     price, reason = eligibility(item)
     if reason:
         raise HTTPException(422, reason)
-    target = body.targetPrice if body.targetPrice is not None else price['amount']
-    if target > price['amount']:
-        raise HTTPException(422, 'Target price must not exceed the saved price.')
+    target = alert_target(body, price)
     identifier = sha256(f'{user}:{body.savedId}'.encode()).hexdigest()
     previous = store('price_alerts').find_one({'_id': identifier, 'user_id': user})
     if previous:
@@ -123,25 +128,38 @@ def delete_alert(identifier: str, session=Depends(require_session)):
     return {'ok': True}
 
 
+def catalog_product(alert):
+    before = catalog.version()
+    identity = alert['identity']
+    identities = [identity]
+    if identity.isdigit() and len(identity) < 20:
+        identities.append(int(identity))
+    product = catalog.database()[catalog.COLLECTION].find_one({'id': {'$in': identities}}, {'_id': 0})
+    if catalog.version() != before:
+        raise ValueError('The catalog is updating. A later check will retry.')
+    if product is None:
+        raise ValueError('This product is no longer available in the catalog.')
+    return product
+
+
+def same_offer(item, alert):
+    if str(item.get('id')) != alert['identity']:
+        return False
+    return str(item.get('merchant') or '').casefold() == alert['product']['merchant'].casefold()
+
+
+def shopping_product(alert):
+    if alert['market'] != market_settings():
+        raise ValueError('Shopping region settings changed. Recreate this alert for the new region.')
+    candidates = search_shopping(alert['product']['title'])['results']
+    product = next((item for item in candidates if same_offer(item, alert)), None)
+    if product is None:
+        raise ValueError('The same product and merchant could not be verified. A later check will retry.')
+    return product
+
+
 def observe_price(alert):
-    if alert['source'] == 'mongo':
-        before = catalog.version()
-        identities = [alert['identity']]
-        if alert['identity'].isdigit() and len(alert['identity']) < 20:
-            identities.append(int(alert['identity']))
-        product = catalog.database()[catalog.COLLECTION].find_one({'id': {'$in': identities}}, {'_id': 0})
-        if catalog.version() != before:
-            raise ValueError('The catalog is updating. A later check will retry.')
-        if product is None:
-            raise ValueError('This product is no longer available in the catalog.')
-    else:
-        if alert['market'] != market_settings():
-            raise ValueError('Shopping region settings changed. Recreate this alert for the new region.')
-        candidates = search_shopping(alert['product']['title'])['results']
-        product = next((item for item in candidates if str(item.get('id')) == alert['identity']
-                        and str(item.get('merchant') or '').casefold() == alert['product']['merchant'].casefold()), None)
-        if product is None:
-            raise ValueError('The same product and merchant could not be verified. A later check will retry.')
+    product = catalog_product(alert) if alert['source'] == 'mongo' else shopping_product(alert)
     quote = price_info(product)
     if not quote or quote['currency'] != alert['currency']:
         raise ValueError('A comparable price in the original currency is unavailable.')

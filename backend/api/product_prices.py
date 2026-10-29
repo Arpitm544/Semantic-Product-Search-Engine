@@ -33,25 +33,46 @@ def price_info(product):
     return {'amount': amount, 'currency': currency}
 
 
-def apply_preferences(payload, preferences):
-    def matches(product):
-        if preferences['minBudget'] is not None or preferences['maxBudget'] is not None:
-            price = price_info(product)
-            if not price or price['currency'] != preferences['currency']:
-                return False
-            if preferences['minBudget'] is not None and price['amount'] < preferences['minBudget']:
-                return False
-            if preferences['maxBudget'] is not None and price['amount'] > preferences['maxBudget']:
-                return False
-        for field, values in [('category', preferences['categories']), ('brand', preferences['brands'])]:
-            if values and str(product.get(field) or '').casefold() not in {v.casefold() for v in values}:
-                return False
-        if preferences['inStockOnly']:
-            stock = numeric(product.get('stock'))
-            if stock is None or stock <= 0:
-                return False
+def within_budget(product, preferences):
+    minimum, maximum = preferences['minBudget'], preferences['maxBudget']
+    if minimum is None and maximum is None:
         return True
-    results = [item for item in payload.get('results', []) if matches(item)]
+    price = price_info(product)
+    if not price or price['currency'] != preferences['currency']:
+        return False
+    return price_in_range(price['amount'], minimum, maximum)
+
+
+def price_in_range(amount, minimum, maximum):
+    if minimum is not None and amount < minimum:
+        return False
+    if maximum is not None and amount > maximum:
+        return False
+    return True
+
+
+def matches_detail(product, field, values):
+    if not values:
+        return True
+    return str(product.get(field) or '').casefold() in {v.casefold() for v in values}
+
+
+def matches_stock(product, preferences):
+    if not preferences['inStockOnly']:
+        return True
+    stock = numeric(product.get('stock'))
+    return stock is not None and stock > 0
+
+
+def matches_preferences(product, preferences):
+    return all((within_budget(product, preferences),
+                matches_detail(product, 'category', preferences['categories']),
+                matches_detail(product, 'brand', preferences['brands']),
+                matches_stock(product, preferences)))
+
+
+def apply_preferences(payload, preferences):
+    results = [item for item in payload.get('results', []) if matches_preferences(item, preferences)]
     notice = 'Saved preferences filter the returned candidates. Products with unavailable details for an active filter are excluded.'
     return {**payload, 'results': results, 'preferencesApplied': True,
             'warning': ' '.join(filter(None, [payload.get('warning'), notice]))}

@@ -15,6 +15,17 @@ from src.data.db import get_database
 router = APIRouter(prefix="/api/saved-products", tags=["Saved products"])
 
 
+def validate_numeric_detail(value):
+    import math
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError('Numeric details must be finite.')
+
+
+def validate_text_detail(value):
+    if isinstance(value, str) and len(value) > 200:
+        raise ValueError('Product details are too long.')
+
+
 class ProductSnapshot(BaseModel):
     model_config = ConfigDict(extra="ignore")
     title: str = Field(min_length=1, max_length=500)
@@ -30,13 +41,10 @@ class ProductSnapshot(BaseModel):
     @field_validator('price', 'rating', 'reviews', 'stock', mode='before')
     @classmethod
     def bounded_values(cls, value):
-        import math
         if isinstance(value, bool):
             raise ValueError('Numeric details cannot be booleans.')
-        if isinstance(value, float) and not math.isfinite(value):
-            raise ValueError('Numeric details must be finite.')
-        if isinstance(value, str) and len(value) > 200:
-            raise ValueError('Product details are too long.')
+        validate_numeric_detail(value)
+        validate_text_detail(value)
         return value
 
     @field_validator('attributes')

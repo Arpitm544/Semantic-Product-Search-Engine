@@ -29,6 +29,12 @@ class ComparisonInput(Named):
         return self
 
 
+def budget_is_reversed(minimum, maximum):
+    if minimum is None or maximum is None:
+        return False
+    return minimum > maximum
+
+
 class Preferences(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
     defaultSource: Literal['mongo', 'serpapi'] = 'mongo'
@@ -49,7 +55,7 @@ class Preferences(BaseModel):
 
     @model_validator(mode='after')
     def valid_budget(self):
-        if self.minBudget is not None and self.maxBudget is not None and self.minBudget > self.maxBudget:
+        if budget_is_reversed(self.minBudget, self.maxBudget):
             raise ValueError('Minimum budget must not exceed maximum budget.')
         self.categories = list(dict.fromkeys(self.categories))
         self.brands = list(dict.fromkeys(self.brands))

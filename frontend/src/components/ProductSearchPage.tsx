@@ -14,7 +14,9 @@ const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi
 
 function money(product: SearchProduct) {
   if (product.priceLabel) return product.priceLabel;
-  if (product.price == null || product.price === '' || !Number.isFinite(Number(product.price))) return 'Price unavailable';
+  if (product.price == null) return 'Price unavailable';
+  if (product.price === '') return 'Price unavailable';
+  if (!Number.isFinite(Number(product.price))) return 'Price unavailable';
   try {
     // SerpApi prices without a currency label must not be assigned a guessed currency.
     if (product.matchSources?.includes('google-shopping')) return new Intl.NumberFormat('en-IN').format(Number(product.price));
@@ -45,6 +47,36 @@ function ProductImage({ product, index }: { product: SearchProduct; index: numbe
   );
 }
 
+function validProduct(product: unknown): product is SearchProduct {
+  if (!product || typeof product !== 'object') return false;
+  if (!('title' in product)) return false;
+  return typeof product.title === 'string';
+}
+async function searchResponse(response: Response) {
+  let payload;
+  try { payload = await response.json(); }
+  catch { throw new Error('Search returned an unreadable response. Please try again shortly.'); }
+  if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'Search could not be completed. Please try again shortly.');
+  if (!Array.isArray(payload?.results)) throw new Error('Search returned an invalid response. Please try again shortly.');
+  if (!payload.results.every(validProduct)) throw new Error('Search returned an invalid response. Please try again shortly.');
+  return payload as { results: SearchProduct[]; candidateCount?: number; correctedQuery?: string; warning?: string; historySaved?: boolean };
+}
+function searchWarning(payload: { warning?: string; historySaved?: boolean }) {
+  const warnings = [typeof payload.warning === 'string' ? payload.warning : ''];
+  if (payload.historySaved === false) warnings.push('Results are ready, but this search could not be saved to your history.');
+  return warnings.filter(Boolean).join(' ');
+}
+function searchError(reason: unknown, timedOut: boolean) {
+  if (timedOut) return 'Search took too long. Please try again.';
+  if (reason instanceof TypeError) return 'Cannot reach the search service. Make sure the backend is running and try again.';
+  if (reason instanceof Error && reason.message) return reason.message;
+  return 'Search could not be completed.';
+}
+
+function searchParameters(query: string, options: { source: string; fuzzy: boolean; preferences: boolean }) {
+  return new URLSearchParams({ q: query, source: options.source, fuzzy: options.fuzzy ? '1' : '0', preferences: options.preferences ? '1' : '0' });
+}
+
 export default function ProductSearchPage({ initialQuery = '', initialSource = 'mongo', initialFuzzy = true, initialPreferences = false }: {
   initialQuery?: string; initialSource?: 'mongo' | 'serpapi'; initialFuzzy?: boolean; initialPreferences?: boolean;
 }) {
@@ -65,7 +97,9 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
   const [usePreferences, setUsePreferences] = useState(initialPreferences);
   const defaultsApplied = useRef(false);
   useEffect(() => {
-    if (preferences.data && !initialQuery && !defaultsApplied.current) {
+    if (!preferences.data) return;
+    if (initialQuery) return;
+    if (!defaultsApplied.current) {
       defaultsApplied.current = true;
       setSource(preferences.data.defaultSource);
       setUsePreferences(preferences.data.applyByDefault);
@@ -78,7 +112,9 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
   useEffect(() => {
     // A history link mounts this page with the original query and source.
     // Source-picker changes should not replay the initial search again.
-    if (isLoaded && isSignedIn && initialQuery) void runSearch(initialQuery, initialFuzzy);
+    if (!isLoaded) return;
+    if (!isSignedIn) return;
+    if (initialQuery) void runSearch(initialQuery, initialFuzzy);
   }, [initialQuery, initialFuzzy, authenticatedFetch, isLoaded, isSignedIn]);
 
   function changeSource(value: keyof typeof SOURCES) {
@@ -99,6 +135,13 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
     await runSearch(input.trim());
   }
 
+  function displayResults(payload: Awaited<ReturnType<typeof searchResponse>>) {
+    setResults(payload.results);
+    setTotal(Number.isFinite(payload.candidateCount) ? payload.candidateCount! : payload.results.length);
+    setCorrectedQuery(typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null);
+    setWarning(searchWarning(payload));
+  }
+
   async function runSearch(query: string, fuzzy = true) {
     if (!query) return;
     pending.current?.abort();
@@ -115,29 +158,15 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
     setWarning('');
     setCorrectedQuery(null);
     try {
-      const params = new URLSearchParams({ q: query, source, fuzzy: fuzzy ? '1' : '0', preferences: usePreferences ? '1' : '0' });
+      const params = searchParameters(query, { source, fuzzy, preferences: usePreferences });
       const response = await authenticatedFetch(`${API_BASE}/api/search?${params}`, { signal: controller.signal });
-      let payload;
-      try {
-        payload = await response.json();
-      } catch {
-        throw new Error('Search returned an unreadable response. Please try again shortly.');
-      }
-      if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'Search could not be completed. Please try again shortly.');
-      if (!Array.isArray(payload?.results) || payload.results.some((product: unknown) => !product || typeof product !== 'object' || !('title' in product) || typeof product.title !== 'string')) {
-        throw new Error('Search returned an invalid response. Please try again shortly.');
-      }
+      const payload = await searchResponse(response);
       if (pending.current !== controller) return;
-      setResults(payload.results);
-      setTotal(Number.isFinite(payload.candidateCount) ? payload.candidateCount : payload.results.length);
-      setCorrectedQuery(typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null);
-      setWarning([typeof payload.warning === 'string' ? payload.warning : '', payload.historySaved === false ? 'Results are ready, but this search could not be saved to your history.' : ''].filter(Boolean).join(' '));
+      displayResults(payload);
     } catch (reason) {
       if (pending.current !== controller) return;
       if (controller.signal.aborted && !timedOut) return;
-      setError(timedOut ? 'Search took too long. Please try again.' : reason instanceof TypeError
-        ? 'Cannot reach the search service. Make sure the backend is running and try again.'
-        : (reason instanceof Error && reason.message || 'Search could not be completed.'));
+      setError(searchError(reason, timedOut));
     } finally {
       clearTimeout(timeout);
       if (pending.current === controller) {

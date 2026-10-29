@@ -21,7 +21,7 @@ from pymongo.errors import PyMongoError
 import uvicorn
 
 from api.saved_products import router as saved_products_router
-from api.search_history import router as history_router, remember_search
+from api.search_history import router as history_router, remember_search, SearchContext
 from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
 from api.product_prices import apply_preferences
@@ -134,54 +134,71 @@ def get_dashboard():
         return JSONResponse(status_code=503, content={"error": str(error)})
 
 
-@app.get("/api/search")
-def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo", preferences: bool = False, session=Depends(require_session)):
-    """Choose MongoDB semantic search or Google Shopping via SerpApi."""
-    query = q.strip()
-    if source not in ("mongo", "serpapi"):
+def search_options(q: str = "", fuzzy: str = "1", source: str = "mongo", preferences: bool = False):
+    return SearchContext(q.strip(), source, fuzzy != "0", preferences)
+
+
+def search_validation_error(search):
+    if search.source not in ("mongo", "serpapi"):
         return JSONResponse(status_code=400, content={"error": "Choose a valid search source: mongo or serpapi."})
-    if len(query) > 512:
-        return JSONResponse(status_code=400, content={
-            "error": "Search queries must be 512 characters or fewer."
-        })
-    preference_values = None
-    if preferences:
+    if len(search.query) > 512:
+        return JSONResponse(status_code=400, content={"error": "Search queries must be 512 characters or fewer."})
+    return None
+
+
+@app.get("/api/search")
+def search_products(search=Depends(search_options), session=Depends(require_session)):
+    """Choose MongoDB semantic search or Google Shopping via SerpApi."""
+    invalid = search_validation_error(search)
+    if invalid is not None:
+        return invalid
+    try:
+        preferences = load_preferences(session['sub']) if search.use_preferences else None
+    except PyMongoError:
+        return JSONResponse(status_code=503, content={'error': 'Saved preferences are unavailable. Turn off saved preferences or try again.'})
+    payload = search_payload(search)
+    if isinstance(payload, JSONResponse):
+        return payload
+    return finish_search(session['sub'], search, payload, preferences)
+
+
+def search_payload(search):
+    if search.source == "serpapi":
         try:
-            preference_values = load_preferences(session['sub'])
-        except PyMongoError:
-            return JSONResponse(status_code=503, content={'error': 'Saved preferences are unavailable. Turn off saved preferences or try again.'})
-    # Shopping search does not depend on MongoDB or local model readiness.
-    if source == "serpapi":
-        try:
-            payload = rank_shopping_response(search_shopping(query))
-            return finish_search(session["sub"], query, source, fuzzy != "0", payload, preference_values)
+            return rank_shopping_response(search_shopping(search.query))
         except ShoppingError as error:
             return JSONResponse(status_code=error.status, content={
                 "error": str(error), "code": error.code, "source": "serpapi",
             })
+    return search_catalog(search)
 
-    if (not _search_ready.is_set() and search_service._search_engine is None
-            and not (_search_error or search_service._search_error)):
-        message = _search_error or "Search is initializing. Wait for indexing to finish."
-        return JSONResponse(status_code=503, content={"error": message})
 
+def catalog_initializing():
+    if _search_ready.is_set():
+        return False
+    if search_service._search_engine is not None:
+        return False
+    return not (_search_error or search_service._search_error)
+
+
+def search_catalog(search):
+    if catalog_initializing():
+        return JSONResponse(status_code=503, content={"error": "Search is initializing. Wait for indexing to finish."})
     try:
         engine = get_search_engine()
     except Exception as error:
         # Initialization includes lazy model imports; all failures remain retryable.
         return JSONResponse(status_code=503, content={"error": str(error)})
     try:
-        payload = engine.search(query, fuzzy=fuzzy != "0")
-        return finish_search(session["sub"], query, source, fuzzy != "0", payload, preference_values)
+        return engine.search(search.query, fuzzy=search.fuzzy)
     except (ValueError, RuntimeError, OSError, PyMongoError) as error:
         return JSONResponse(status_code=503, content={"error": str(error)})
 
 
-def finish_search(user, query, source, fuzzy, payload, preferences):
+def finish_search(user, search, payload, preferences):
     if preferences is not None:
-        filtered = apply_preferences(payload, preferences)
-        return remember_search(user, query, source, fuzzy, filtered, use_preferences=True)
-    return remember_search(user, query, source, fuzzy, payload)
+        payload = apply_preferences(payload, preferences)
+    return remember_search(user, search, payload)
 
 
 def start_server():
