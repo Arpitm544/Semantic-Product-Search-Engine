@@ -5,6 +5,9 @@
 - [Catalog backend](backend.md): MongoDB import, startup, and local model files.
 - [Architecture](architecture.md): responsibilities, storage, and configuration.
 - [Commands](commands.md): startup, dataset import, training, and evaluation.
+- [Shopify implementation plan](shopify-implementation-plan.md): proposed folder structure, compact catalog sync, semantic indexing, and rollout phases.
+
+- [Shopify setup](shopify-setup.md): credentials, sync worker, webhooks, recovery, and capacity limits.
 
 ## Training and learning
 

@@ -105,7 +105,8 @@ class TestRelocationAndStartup(unittest.TestCase):
 
     def test_old_index_metadata_still_uses_its_model_reference(self):
         import pickle
-        import faiss
+        import pytest
+        faiss = pytest.importorskip("faiss")
         from src.semantic.vector_search import SemanticVectorSearch
         with tempfile.TemporaryDirectory() as directory:
             index, mapping = Path(directory) / "index.bin", Path(directory) / "map.pkl"

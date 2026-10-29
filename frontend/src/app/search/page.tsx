@@ -8,7 +8,7 @@ import type { FormEvent } from 'react';
 import { API_BASE, useAuthenticatedFetch } from '@/lib/api';
 import { UserButton } from '@clerk/nextjs';
 
-const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi' };
+const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi', shopify: 'Shopify store' };
 
 function money(product: SearchProduct) {
   if (product.priceLabel) return product.priceLabel;
@@ -59,6 +59,22 @@ export default function SearchPage() {
   const shopping = source === 'serpapi';
 
   useEffect(() => () => pending.current?.abort(), []);
+
+  useEffect(() => {
+    if (source !== 'shopify') return;
+    const controller = new AbortController();
+    authenticatedFetch(`${API_BASE}/api/shopify/status`, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error('Cannot check Shopify status.');
+        const state = await response.json();
+        if (controller.signal.aborted) return;
+        if (state.status === 'disabled') setWarning('Shopify is not configured. Connect the store in the backend first.');
+        else if (state.status === 'initial_sync') setWarning('Shopify is waiting for its first product sync.');
+        else if (state.status === 'degraded') setWarning('The latest Shopify sync failed. Results may reflect the previous sync.');
+      })
+      .catch(() => { if (!controller.signal.aborted) setWarning('Cannot check Shopify status.'); });
+    return () => controller.abort();
+  }, [source, authenticatedFetch]);
 
   function changeSource(value: keyof typeof SOURCES) {
     pending.current?.abort();
@@ -151,6 +167,7 @@ export default function SearchPage() {
       <section className={"search-results-section max-w-[990px] min-h-[290px] mt-[0] mr-[auto] mb-[0] ml-[auto] pt-[0] pr-[24px] pb-[50px] pl-[24px] max-[600.01px]:pl-[17px] max-[600.01px]:pr-[17px]"} aria-live="polite" aria-busy={loading}>
         {error && <div className={"search-error flex items-center justify-between gap-[12px] mt-[20px] mr-[0] mb-[20px] ml-[0] pt-[13px] pr-[13px] pb-[13px] pl-[13px] [border:1px_solid_var(--border-f0d5c8)] rounded-[8px] [background:var(--surface-fff9f5)] [color:var(--text-945d45)] text-[12px] [&_button]:shrink-[0] [&_button]:pt-[8px] [&_button]:pr-[10px] [&_button]:pb-[8px] [&_button]:pl-[10px] [&_button]:[background:var(--surface-fff)] [&_button]:[border:1px_solid_var(--border-dcbda9)] [&_button]:rounded-[5px] [&_button]:[color:var(--text-804e36)] [&_button]:cursor-pointer [&_button]:[font:inherit] max-[600.01px]:items-start max-[600.01px]:flex-col"} role="alert"><span>{error}</span><button type="button" onClick={() => runSearch(searched, lastFuzzy)}>Try again</button></div>}
         {loading && <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:var(--text-677567)] text-[13px] [&_small]:text-[11px] [&_small]:[color:var(--text-929c91)]"}>Searching {SOURCES[source]}…</div>}
+        {!searched && warning && <p role="status">{warning}</p>}
         {!loading && !error && !searched && <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:var(--text-677567)] text-[13px] [&_small]:text-[11px] [&_small]:[color:var(--text-929c91)] search-empty-start [&>span]:w-[32px] [&>span]:h-[32px] [&>span]:rounded-[10px] [&>span]:[background:var(--surface-edf3e9)] [&>span]:[color:var(--text-759272)] [&>span]:grid [&>span]:place-items-center [&>span]:mb-[4px] [&_strong]:text-[13px] [&_strong]:font-semibold"}><span>✳</span><strong>Start with a product or a need</strong><small>Enter a product, brand, or category to search {SOURCES[source]}.</small></div>}
         {!loading && !error && searched && <>
           <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_var(--border-e7ebe5)] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:var(--text-344035)] [&>span]:text-[11px] [&>span]:[color:var(--text-8b958a)] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span>{shopping ? `${results.length} products shown` : `${results.length} products shown from ${total} ranked candidates`}</span></div>
@@ -164,7 +181,7 @@ export default function SearchPage() {
                 <span className={"search-result-category text-[9px] [color:var(--text-899587)] uppercase tracking-[.55px]"}>{shopping ? product.merchant || 'Google Shopping' : [product.category, product.brand].filter(Boolean).join(' · ')}</span>
                 <h3>{url ? <a href={url} target="_blank" rel="noopener noreferrer">{product.title} <span aria-hidden="true">↗</span></a> : product.title}</h3>
                 {product.description && <p>{product.description}</p>}
-                <div className={"search-result-meta flex items-center gap-[13px] mt-[7px] text-[10px] [color:var(--text-828d81)] [&_strong]:text-[11px] [&_strong]:[color:var(--text-455b48)] max-[600.01px]:gap-[8px] max-[600.01px]:text-[9px] max-[600.01px]:flex-wrap"}><strong>{money(product)}</strong>{product.rating != null && <span>★ {Number(product.rating).toFixed(1)}{product.reviews != null ? ` (${Number(product.reviews).toLocaleString()} reviews)` : ''}</span>}{product.stock != null && <span>{product.stock} in stock</span>}</div>
+                <div className={"search-result-meta flex items-center gap-[13px] mt-[7px] text-[10px] [color:var(--text-828d81)] [&_strong]:text-[11px] [&_strong]:[color:var(--text-455b48)] max-[600.01px]:gap-[8px] max-[600.01px]:text-[9px] max-[600.01px]:flex-wrap"}><strong>{money(product)}</strong>{product.rating != null && <span>★ {Number(product.rating).toFixed(1)}{product.reviews != null ? ` (${Number(product.reviews).toLocaleString()} reviews)` : ''}</span>}{product.stock != null && <span>{product.stock} in stock</span>}{product.availableForSale != null && <span>{product.availableForSale ? 'Available' : 'Sold out'}</span>}</div>
               </div>
               <span className={"relevance-score self-start mt-[3px] mr-[3px] mb-[0] ml-[0] rounded-[14px] pt-[5px] pr-[8px] pb-[5px] pl-[8px] [background:var(--surface-f0f4ee)] [color:var(--text-577658)] text-[10px] font-bold whitespace-nowrap [&_small]:text-[8px] [&_small]:font-medium [&_small]:ml-[4px] [&_small]:[color:var(--text-82927f)] max-[600.01px]:text-[9px] max-[600.01px]:pt-[4px] max-[600.01px]:pr-[6px] max-[600.01px]:pb-[4px] max-[600.01px]:pl-[6px] max-[600.01px]:ml-[66px] max-[600.01px]:[&_small]:hidden"}>{shopping ? product.matchSources?.includes('reranker') ? 'Engine ranked' : 'Google ranked' : product.matchSources?.some((source) => source === 'fuzzy' || source === 'semantic-corrected') ? 'Spelling match' : product.matchSources?.includes('keyword') ? 'Product match' : 'Related match'}</span>
             </article>;

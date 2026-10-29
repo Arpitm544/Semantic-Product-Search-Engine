@@ -70,6 +70,8 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Semantic Product Search", lifespan=lifespan)
+from api.shopify_routes import router as shopify_router
+app.include_router(shopify_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
@@ -119,12 +121,22 @@ def get_dashboard():
 def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
     """Choose MongoDB semantic search or Google Shopping via SerpApi."""
     query = q.strip()
-    if source not in ("mongo", "serpapi"):
-        return JSONResponse(status_code=400, content={"error": "Choose a valid search source: mongo or serpapi."})
+    if source not in ("mongo", "serpapi", "shopify"):
+        return JSONResponse(status_code=400, content={"error": "Choose a valid search source: mongo, serpapi, or shopify."})
     if len(query) > 512:
         return JSONResponse(status_code=400, content={
             "error": "Search queries must be 512 characters or fewer."
         })
+    if source == "shopify":
+        from api.shopify_service import search as shopify_search
+        try:
+            return shopify_search(query, fuzzy=fuzzy != "0")
+        except Exception:
+            return JSONResponse(status_code=503, content={
+                "error": "Shopify search is unavailable. Check Shopify status and the sync worker.",
+                "source": "shopify",
+            })
+
     # Shopping search does not depend on MongoDB or local model readiness.
     if source == "serpapi":
         try:

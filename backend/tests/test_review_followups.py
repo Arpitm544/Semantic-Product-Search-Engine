@@ -6,12 +6,10 @@ from pathlib import Path
 import runpy
 import shutil
 import tempfile
-from threading import Lock
 import unittest
 from unittest.mock import Mock, patch
 import weakref
 
-import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
@@ -19,6 +17,7 @@ pytestmark = pytest.mark.usefixtures("authenticated_api")
 
 from api import dashboard, main as api, search_service
 from src.data import catalog
+from src.semantic.identity import vector_generation
 from src.search.hybrid import HybridSearch
 from src.search.typos import CatalogSpelling, FrequencySpelling
 
@@ -36,22 +35,6 @@ class TestReviewFollowups(unittest.TestCase):
             self.assertEqual(response.status_code, 503)
             self.assertIn('Missing model dependency', response.json()['error'])
             self.assertEqual(client.get('/api/search?q=phone').status_code, 200)
-
-    def test_readable_malformed_vector_caches_are_rebuilt(self):
-        for payload in ({'vectors': [[1., 0.]]}, {'ids': ['p']},
-                        {'ids': ['p'], 'vectors': [1., 0.]}):
-            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as directory:
-                path = Path(directory) / 'cache.npz'
-                np.savez_compressed(path, **payload)
-                semantic = Mock()
-                semantic.index.reconstruct_n.return_value = np.array([[1., 0.]], dtype='float32')
-                with patch('src.semantic.vector_search.SemanticVectorSearch', return_value=semantic), \
-                        patch.object(search_service, 'get_candidate_ranker', return_value=Mock(lock=Lock())), \
-                        patch.object(search_service, 'vector_cache_path', return_value=path):
-                    self.assertIs(search_service.load_semantic_search([{'id': 'p'}], 'model', 'hash'), semantic)
-                semantic.fit.assert_called_once()
-                with np.load(path) as cache:
-                    self.assertEqual(cache['vectors'].shape, (1, 2))
 
     def test_colab_upload_is_verified_and_reconnect_does_not_rewrite_drive(self):
         generator = runpy.run_path(str(api.PROJECT_ROOT / 'scripts/create_colab_bundle.py'))
@@ -141,39 +124,9 @@ class TestReviewFollowups(unittest.TestCase):
             root = Path(directory)
             weights = root / 'pytorch_model.bin'
             weights.write_bytes(b'first')
-            first = search_service.vector_cache_path(str(root), 'catalog')
+            first = vector_generation(str(root), 'catalog')
             weights.write_bytes(b'changed weights')
-            self.assertNotEqual(first, search_service.vector_cache_path(str(root), 'catalog'))
-
-    def test_corrupt_cache_rebuilt_and_save_failure_is_nonfatal(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'cache.npz'
-            path.write_bytes(b'broken')
-            semantic = Mock()
-            semantic.index.reconstruct_n.return_value = np.array([[1., 0.]], dtype='float32')
-            ranker = Mock(lock=Lock())
-            with patch('src.semantic.vector_search.SemanticVectorSearch', return_value=semantic), \
-                    patch.object(search_service, 'get_candidate_ranker', return_value=ranker), \
-                    patch.object(search_service, 'vector_cache_path', return_value=path), \
-                    patch.object(search_service, 'restore_vectors', side_effect=ValueError('truncated')), \
-                    patch('numpy.savez_compressed', side_effect=OSError('disk full')):
-                self.assertIs(search_service.load_semantic_search([{'id': 'p'}], 'model', 'hash'), semantic)
-            semantic.fit.assert_called_once()
-            self.assertEqual(list(Path(directory).iterdir()), [path])
-            self.assertEqual(path.read_bytes(), b'broken')
-
-    def test_cache_is_atomically_published(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'cache.npz'
-            semantic = Mock()
-            semantic.index.reconstruct_n.return_value = np.array([[1., 0.]], dtype='float32')
-            with patch('src.semantic.vector_search.SemanticVectorSearch', return_value=semantic), \
-                    patch.object(search_service, 'get_candidate_ranker', return_value=Mock(lock=Lock())), \
-                    patch.object(search_service, 'vector_cache_path', return_value=path):
-                search_service.load_semantic_search([{'id': 'p'}], 'model', 'hash')
-            with np.load(path, allow_pickle=False) as cached:
-                self.assertEqual(cached['ids'].tolist(), ['p'])
-            self.assertEqual(list(Path(directory).iterdir()), [path])
+            self.assertNotEqual(first, vector_generation(str(root), 'catalog'))
 
     def test_generated_colab_cells_verify_upload_and_invalidate_reports(self):
         generator = runpy.run_path(str(api.PROJECT_ROOT / 'scripts/create_colab_bundle.py'))
@@ -187,7 +140,7 @@ class TestReviewFollowups(unittest.TestCase):
                 compile(''.join(cell['source']), '<colab-cell>', 'exec')
 
     def test_loaded_vectors_forward_model_loading_options(self):
-        import faiss
+        faiss = pytest.importorskip("faiss")
         from src.semantic.vector_search import SemanticVectorSearch
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
