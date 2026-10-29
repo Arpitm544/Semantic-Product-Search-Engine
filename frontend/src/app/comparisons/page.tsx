@@ -22,6 +22,9 @@ function SavedComparison({ item, busy, rename, remove }: { item: Comparison; bus
 function comparisonItems(data: Page<Comparison> | null, extra: Comparison[]) {
   return [...(data?.items || []), ...extra].filter((item, i, list) => list.findIndex(other => other.id === item.id) === i);
 }
+function hasMoreComparisons(more: boolean | null, data: Page<Comparison> | null) {
+  return more ?? data?.hasMore;
+}
 export default function ComparisonsPage() {
   const resource = useAccountResource<Page<Comparison>>('/api/comparisons');
   const [selected, setSelected] = useState<string[]>([]);
@@ -45,11 +48,17 @@ export default function ComparisonsPage() {
   function renderCreateForm() {
     return <form onSubmit={create} className={`${accountPanel} mb-6`}><label className="text-sm">Comparison name<input required maxLength={100} className={`${accountInput} mt-2`} placeholder="Headphones for commuting" value={name} onChange={e => setName(e.target.value)} /></label><SavedProductPicker selected={selected} onChange={setSelected} disabled={resource.busy} /><button className={accountButton} disabled={resource.busy || selected.length < 2 || !name.trim()}>Save comparison</button></form>;
   }
+  function renderComparisons() {
+    return <div className="space-y-6">{all.map(item => <SavedComparison key={item.id} item={item} busy={resource.busy} rename={(id, value) => resource.mutate(() => resource.api(`/api/comparisons/${id}`, { method: 'PATCH', body: JSON.stringify({ name: value }) }), 'Comparison renamed.')} remove={async id => { const result = await resource.mutate(() => resource.api(`/api/comparisons/${id}`, { method: 'DELETE' }), 'Comparison deleted.'); if (result) setExtra(old => old.filter(item => item.id !== id)); }} />)}</div>;
+  }
+  function renderPagination() {
+    return hasMoreComparisons(more, resource.data) && <button className={`${accountButton} mt-6`} disabled={resource.busy || loadingMore} onClick={loadMore}>{loadingMore ? 'Loading…' : 'Load more comparisons'}</button>;
+  }
   return <AccountShell active="/comparisons" title="Your saved comparisons" description="Keep two to four shortlisted products side by side. Comparisons keep their snapshots even if you later remove a product from your wishlist.">
     {renderCreateForm()}
     <ResourceStatus busy={resource.busy} error={resource.error} notice={resource.notice} retry={resource.reload} />
     {!resource.busy && !all.length && <p className={`${accountPanel} text-sm opacity-70`}>Choose at least two saved products to create your first comparison.</p>}
-    <div className="space-y-6">{all.map(item => <SavedComparison key={item.id} item={item} busy={resource.busy} rename={(id, value) => resource.mutate(() => resource.api(`/api/comparisons/${id}`, { method: 'PATCH', body: JSON.stringify({ name: value }) }), 'Comparison renamed.')} remove={async id => { const result = await resource.mutate(() => resource.api(`/api/comparisons/${id}`, { method: 'DELETE' }), 'Comparison deleted.'); if (result) setExtra(old => old.filter(item => item.id !== id)); }} />)}</div>
-    {(more ?? resource.data?.hasMore) && <button className={`${accountButton} mt-6`} disabled={resource.busy || loadingMore} onClick={loadMore}>{loadingMore ? 'Loading…' : 'Load more comparisons'}</button>}
+    {renderComparisons()}
+    {renderPagination()}
   </AccountShell>;
 }

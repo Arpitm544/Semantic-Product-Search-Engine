@@ -41,6 +41,12 @@ function errorMessage(reason: unknown, fallback = 'Please try again.') {
   return reason instanceof Error ? reason.message : fallback;
 }
 
+async function checkedResponse(request: Promise<Response>, message: string) {
+  const response = await request;
+  if (!response.ok) throw new Error(message);
+  return response;
+}
+
 export default function PersonalDashboard() {
   const request = useAuthenticatedFetch();
   const { user } = useUser();
@@ -52,17 +58,19 @@ export default function PersonalDashboard() {
   const [notice, setNotice] = useState('');
   const version = useRef(0);
   const userId = user?.id;
+  function applyCurrent(current: number, update: () => void) {
+    if (current === version.current) update();
+  }
   const load = useCallback(async () => {
     const current = ++version.current;
     setBusy(true); setError('');
     try {
-      const response = await request(`${API_BASE}/api/personal-dashboard`);
-      if (!response.ok) throw new Error('Could not load your personal dashboard. Please try again.');
+      const response = await checkedResponse(request(`${API_BASE}/api/personal-dashboard`), 'Could not load your personal dashboard. Please try again.');
       const result = await response.json();
-      if (current === version.current) setData(result);
+      applyCurrent(current, () => setData(result));
     } catch (reason) {
-      if (current === version.current) setError(errorMessage(reason, 'Could not load your dashboard.'));
-    } finally { if (current === version.current) setBusy(false); }
+      applyCurrent(current, () => setError(errorMessage(reason, 'Could not load your dashboard.')));
+    } finally { applyCurrent(current, () => setBusy(false)); }
   }, [request]);
   useEffect(() => {
     setData(null); setNotice(''); setConfirmClear(false);
@@ -74,8 +82,7 @@ export default function PersonalDashboard() {
     if (mutation || busy) return;
     setMutation(id || 'clear'); setError(''); setNotice('');
     try {
-      const response = await request(`${API_BASE}/api/search-history${id ? `/${encodeURIComponent(id)}` : ''}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Could not delete search history. Please try again.');
+      await checkedResponse(request(`${API_BASE}/api/search-history${id ? `/${encodeURIComponent(id)}` : ''}`, { method: 'DELETE' }), 'Could not delete search history. Please try again.');
       setConfirmClear(false);
       setNotice(id ? 'Search removed from your history.' : 'Your search history has been cleared.');
       await load();
@@ -89,12 +96,11 @@ export default function PersonalDashboard() {
     setBusy(true); setError('');
     const current = version.current;
     try {
-      const response = await request(`${API_BASE}/api/search-history?offset=${data.recentSearches.length}&limit=6`);
-      if (!response.ok) throw new Error('Could not load more searches. Please try again.');
+      const response = await checkedResponse(request(`${API_BASE}/api/search-history?offset=${data.recentSearches.length}&limit=6`), 'Could not load more searches. Please try again.');
       const result = await response.json();
-      if (current === version.current) setData(old => appendHistory(old, result));
-    } catch (reason) { if (current === version.current) setError(errorMessage(reason)); }
-    finally { if (current === version.current) setBusy(false); }
+      applyCurrent(current, () => setData(old => appendHistory(old, result)));
+    } catch (reason) { applyCurrent(current, () => setError(errorMessage(reason))); }
+    finally { applyCurrent(current, () => setBusy(false)); }
   }
   const name = dashboardName(user);
   return <section aria-label="Your personal dashboard" className="mb-8 space-y-5">

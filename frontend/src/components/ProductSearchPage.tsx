@@ -1,5 +1,5 @@
 'use client';
-import { useAccountResource, type Preferences } from '@/lib/account';
+import { useAccountResource, safeProductUrl as webUrl, type Preferences } from '@/lib/account';
 import SaveProductButton from '@/components/SaveProductButton';
 import ThemeToggle from '@/components/ThemeToggle';
 import { classes } from '@/lib/classes';
@@ -12,27 +12,23 @@ import { useAuth, UserButton } from '@clerk/nextjs';
 
 const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi' };
 
+function priceAmount(value: SearchProduct['price']) {
+  if (value == null) return null;
+  if (value === '') return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+function formatPrice(amount: number, product: SearchProduct) {
+  // Shopping prices without a currency label must not be assigned a guessed currency.
+  if (product.matchSources?.includes('google-shopping')) return new Intl.NumberFormat('en-IN').format(amount);
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: product.currency || 'INR', maximumFractionDigits: 0 }).format(amount);
+}
 function money(product: SearchProduct) {
   if (product.priceLabel) return product.priceLabel;
-  if (product.price == null) return 'Price unavailable';
-  if (product.price === '') return 'Price unavailable';
-  if (!Number.isFinite(Number(product.price))) return 'Price unavailable';
-  try {
-    // SerpApi prices without a currency label must not be assigned a guessed currency.
-    if (product.matchSources?.includes('google-shopping')) return new Intl.NumberFormat('en-IN').format(Number(product.price));
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: product.currency || 'INR', maximumFractionDigits: 0 }).format(Number(product.price));
-  } catch {
-    return 'Price unavailable';
-  }
-}
-
-function webUrl(value: string | undefined) {
-  try {
-    const url = new URL(value ?? '');
-    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
-  } catch {
-    return null;
-  }
+  const amount = priceAmount(product.price);
+  if (amount === null) return 'Price unavailable';
+  try { return formatPrice(amount, product); }
+  catch { return 'Price unavailable'; }
 }
 
 function ProductImage({ product, index }: { product: SearchProduct; index: number }) {
@@ -52,14 +48,29 @@ function validProduct(product: unknown): product is SearchProduct {
   if (!('title' in product)) return false;
   return typeof product.title === 'string';
 }
-async function searchResponse(response: Response) {
-  let payload;
-  try { payload = await response.json(); }
+async function readSearchJson(response: Response) {
+  try { return await response.json(); }
   catch { throw new Error('Search returned an unreadable response. Please try again shortly.'); }
-  if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : 'Search could not be completed. Please try again shortly.');
-  if (!Array.isArray(payload?.results)) throw new Error('Search returned an invalid response. Please try again shortly.');
-  if (!payload.results.every(validProduct)) throw new Error('Search returned an invalid response. Please try again shortly.');
+}
+function responseError(payload: { error?: unknown } | null) {
+  return typeof payload?.error === 'string' ? payload.error : 'Search could not be completed. Please try again shortly.';
+}
+function validateResults(results: unknown): asserts results is SearchProduct[] {
+  if (!Array.isArray(results)) throw new Error('Search returned an invalid response. Please try again shortly.');
+  if (!results.every(validProduct)) throw new Error('Search returned an invalid response. Please try again shortly.');
+}
+async function searchResponse(response: Response) {
+  const payload = await readSearchJson(response);
+  if (!response.ok) throw new Error(responseError(payload));
+  validateResults(payload?.results);
   return payload as { results: SearchProduct[]; candidateCount?: number; correctedQuery?: string; warning?: string; historySaved?: boolean };
+}
+function searchSummary(payload: Awaited<ReturnType<typeof searchResponse>>) {
+  return {
+    total: Number.isFinite(payload.candidateCount) ? payload.candidateCount! : payload.results.length,
+    correction: typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null,
+    warning: searchWarning(payload),
+  };
 }
 function searchWarning(payload: { warning?: string; historySaved?: boolean }) {
   const warnings = [typeof payload.warning === 'string' ? payload.warning : ''];
@@ -137,9 +148,10 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
 
   function displayResults(payload: Awaited<ReturnType<typeof searchResponse>>) {
     setResults(payload.results);
-    setTotal(Number.isFinite(payload.candidateCount) ? payload.candidateCount! : payload.results.length);
-    setCorrectedQuery(typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null);
-    setWarning(searchWarning(payload));
+    const summary = searchSummary(payload);
+    setTotal(summary.total);
+    setCorrectedQuery(summary.correction);
+    setWarning(summary.warning);
   }
 
   async function runSearch(query: string, fuzzy = true) {
