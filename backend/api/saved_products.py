@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pymongo.errors import PyMongoError
 
-from api.account_store import clean_saved_links
+from api.account_store import clean_saved_links, iso
 from api.auth import require_session
 from src.data.db import get_database
 
@@ -74,7 +74,7 @@ def saved_id(user_id, source, identity):
 
 def public_item(item):
     return {"id": item["_id"], "source": item["source"], "identity": item["identity"],
-            "product": item["product"], "savedAt": item["saved_at"].isoformat()}
+            "product": item["product"], "savedAt": iso(item["saved_at"])}
 
 
 def unavailable():

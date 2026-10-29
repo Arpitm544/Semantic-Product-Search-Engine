@@ -1,6 +1,6 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
-import { UserButton } from '@clerk/nextjs';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth, UserButton } from '@clerk/nextjs';
 import ThemeToggle from '@/components/ThemeToggle';
 import { API_BASE, useAuthenticatedFetch } from '@/lib/api';
 import type { SearchProduct } from '@/lib/types';
@@ -20,33 +20,41 @@ function errorMessage(reason: unknown) {
 
 function useSavedProducts() {
   const request = useAuthenticatedFetch();
+  const { userId, isLoaded } = useAuth();
+  const owner = useRef(userId); owner.current = userId;
+  const sequence = useRef(0);
+  const [loadedOwner, setLoadedOwner] = useState(userId);
   const [items, setItems] = useState<SavedItem[]>([]);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null);
   const [error, setError] = useState('');
   const load = useCallback(async (offset = 0) => {
+    const current = ++sequence.current;
     setBusy(true); setError('');
     try {
       const response = await request(`${API_BASE}/api/saved-products?offset=${offset}`);
       if (!response.ok) throw new Error('Could not load your saved products. Please try again.');
       const data = await response.json();
+      if (current !== sequence.current || owner.current !== userId) return;
+      setLoadedOwner(userId);
       setItems(old => mergeSavedItems(old, data.items, offset));
       setMore(data.hasMore);
-    } catch (reason) { setError(errorMessage(reason)); }
-    finally { setBusy(false); }
-  }, [request]);
-  useEffect(() => { void load(); }, [load]);
+    } catch (reason) { if (current === sequence.current && owner.current === userId) setError(errorMessage(reason)); }
+    finally { if (current === sequence.current && owner.current === userId) setBusy(false); }
+  }, [request, userId]);
+  useEffect(() => { setItems([]); setMore(false); setRemoving(null); setError(''); setBusy(!isLoaded || !!userId); if (isLoaded && userId) void load(); return () => { sequence.current++; }; }, [load, isLoaded, userId]);
   async function remove(id: string) {
+    sequence.current++;
     setRemoving(id); setError('');
     try {
       const response = await request(`${API_BASE}/api/saved-products/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Could not remove this product. Please try again.');
-      setItems(old => old.filter(item => item.id !== id));
-    } catch (reason) { setError(errorMessage(reason)); }
-    finally { setRemoving(null); }
+      if (owner.current === userId) setItems(old => old.filter(item => item.id !== id));
+    } catch (reason) { if (owner.current === userId) setError(errorMessage(reason)); }
+    finally { if (owner.current === userId) setRemoving(null); }
   }
-  return { items, more, busy, removing, error, load, remove };
+  return { items: loadedOwner === userId ? items : [], more, busy, removing, error, load, remove };
 }
 
 function SavedProductCard({ item, disabled, removing, remove }: {

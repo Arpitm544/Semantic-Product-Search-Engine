@@ -5,7 +5,7 @@ import { useAccountApi, type SavedItem, type Page } from '@/lib/account';
 import { accountButton, accountPanel } from './AccountShell';
 
 export function ResourceStatus({ busy, error, notice, retry }: { busy: boolean; error: string; notice?: string; retry: () => void }) {
-  return <>{busy && <p role="status" className="my-4 text-sm opacity-70">Loading…</p>}{notice && <p role="status" className="my-4 text-sm">{notice}</p>}{error && <div role="alert" className={`${accountPanel} my-4 flex flex-wrap items-center justify-between gap-3`}><p>{error}</p><button disabled={busy} className={accountButton} onClick={retry}>Retry</button></div>}</>;
+  return <>{busy && <p role="status" className="my-4 text-sm opacity-70">Loading…</p>}{notice && <p role="status" className="my-4 text-sm">{notice}</p>}{error && <div role="alert" className={`${accountPanel} my-4 flex flex-wrap items-center justify-between gap-3`}><p>{error}</p><button type="button" disabled={busy} className={accountButton} onClick={retry}>Retry</button></div>}</>;
 }
 export function ConfirmDelete({ label = 'Delete', description, disabled, onConfirm }: { label?: string; description: string; disabled?: boolean; onConfirm: () => void }) {
   const [confirming, setConfirming] = useState(false);

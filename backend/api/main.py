@@ -2,6 +2,7 @@
 
 from contextlib import asynccontextmanager
 import os
+import logging
 from pathlib import Path
 import sys
 from threading import Event, Thread
@@ -25,6 +26,7 @@ from api.search_history import router as history_router, remember_search
 from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
 from api.product_prices import apply_preferences
+from api.search_limits import check_search_rate
 from api.auth import require_session
 from api.dashboard import dashboard_data
 from api import search_service
@@ -113,7 +115,7 @@ def check_health():
     if ready:
         status, message = "ready", "Search is ready."
     elif error:
-        status, message = "error", error
+        status, message = "error", "Search is temporarily unavailable. Check the server logs."
     else:
         status, message = "initializing", "Preparing the search index. Check terminal progress."
     return JSONResponse(status_code=200 if ready else 503, content={
@@ -131,7 +133,8 @@ def get_dashboard():
     try:
         return dashboard_data()
     except (OSError, ValueError, PyMongoError) as error:
-        return JSONResponse(status_code=503, content={"error": str(error)})
+        logging.getLogger(__name__).exception("Catalog summary failed")
+        return JSONResponse(status_code=503, content={"error": "The search service is temporarily unavailable. Please try again."})
 
 
 @app.get("/api/search")
@@ -144,6 +147,8 @@ def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo", prefer
         return JSONResponse(status_code=400, content={
             "error": "Search queries must be 512 characters or fewer."
         })
+    if query:
+        check_search_rate(session["sub"], source)
     preference_values = None
     if preferences:
         try:
@@ -168,13 +173,15 @@ def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo", prefer
     try:
         engine = get_search_engine()
     except Exception as error:
+        logging.getLogger(__name__).exception("Search initialization failed")
         # Initialization includes lazy model imports; all failures remain retryable.
-        return JSONResponse(status_code=503, content={"error": str(error)})
+        return JSONResponse(status_code=503, content={"error": "The search service is temporarily unavailable. Please try again."})
     try:
         payload = engine.search(query, fuzzy=fuzzy != "0")
         return finish_search(session["sub"], query, source, fuzzy != "0", payload, preference_values)
     except (ValueError, RuntimeError, OSError, PyMongoError) as error:
-        return JSONResponse(status_code=503, content={"error": str(error)})
+        logging.getLogger(__name__).exception("Search request failed")
+        return JSONResponse(status_code=503, content={"error": "The search service is temporarily unavailable. Please try again."})
 
 
 def finish_search(user, query, source, fuzzy, payload, preferences):

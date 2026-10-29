@@ -59,7 +59,7 @@ class TestSearchAPI(unittest.TestCase):
             response = TestClient(api.app).get("/api/health")
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["status"], "error")
-        self.assertIn("Missing model", response.json()["message"])
+        self.assertNotIn("Missing model", response.json()["message"])
 
     def test_search_returns_suggestion_and_matching_product(self):
         status, payload = request("/api/search?q=samsng", HybridSearch(PRODUCTS))
@@ -103,7 +103,7 @@ class TestSearchAPI(unittest.TestCase):
     def test_missing_catalog_returns_service_error(self):
         engine = Mock()
         engine.search.side_effect = ValueError("Missing catalog")
-        self.assertEqual(request("/api/search?q=laptop", engine), (503, {"error": "Missing catalog"}))
+        self.assertEqual(request("/api/search?q=laptop", engine), (503, {"error": "The search service is temporarily unavailable. Please try again."}))
 
     def test_catalog_change_before_index_initialization_is_retryable(self):
         from src.data.catalog import CatalogUpdatingError

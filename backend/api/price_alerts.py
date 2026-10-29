@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from pymongo import ReturnDocument
-from pymongo.errors import PyMongoError
+from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from api.auth import require_session
 from api.account_store import PrivateDataRoute, store, saved_items, owned, now, iso, new_id
@@ -92,28 +92,47 @@ def create_alert(body: AlertInput, session=Depends(require_session)):
     previous = store('price_alerts').find_one({'_id': identifier, 'user_id': user})
     if previous:
         raise HTTPException(409, 'An alert already exists for this product. Manage it below.')
-    if store('price_alerts').count_documents({'user_id': user, 'enabled': True}) >= 50:
-        raise HTTPException(409, 'Pause or remove an alert before enabling more than 50 active alerts.')
     timestamp = now()
     row = {'_id': identifier, 'user_id': user, 'saved_id': body.savedId,
            'product': item['product'], 'source': item['source'], 'identity': item['identity'],
            'currency': price['currency'], 'baseline_price': price['amount'], 'min_price': price['amount'],
            'target_price': target, 'enabled': True, 'status': 'pending', 'market': market_settings(),
            'revision': new_id(), 'next_check_at': timestamp, 'updated_at': timestamp}
-    store('price_alerts').update_one({'_id': identifier, 'user_id': user}, {'$setOnInsert': row}, upsert=True)
+    reserve_active_slot(user, row)
     return public_alert(owned('price_alerts', identifier, user))
+
+
+def reserve_active_slot(user, row, resume=False):
+    alerts = store('price_alerts')
+    # Legacy enabled alerts have no slot. Keep that many slots reserved until
+    # they are paused; all new/resumed alerts use the unique partial index.
+    legacy = alerts.count_documents({'user_id': user, 'enabled': True, 'active_slot': {'$exists': False}})
+    for slot in range(legacy, 50):
+        try:
+            if resume:
+                result = alerts.update_one({'_id': row['_id'], 'user_id': user, 'enabled': False},
+                    {'$set': {'active_slot': slot, 'enabled': True, 'revision': new_id(), 'updated_at': now()}})
+                if not result.matched_count:
+                    owned('price_alerts', row['_id'], user)
+            else:
+                alerts.update_one({'_id': row['_id'], 'user_id': user},
+                    {'$setOnInsert': {**row, 'active_slot': slot}}, upsert=True)
+            return
+        except DuplicateKeyError:
+            continue
+    raise HTTPException(409, 'Pause or remove an alert before enabling more than 50 active alerts.')
 
 
 @router.patch('/api/price-alerts/{identifier}')
 def toggle_alert(identifier: str, body: AlertUpdate, session=Depends(require_session)):
     user = session['sub']
     row = owned('price_alerts', identifier, user)
-    if body.enabled:
+    if body.enabled and not row['enabled']:
         saved_items(user, [row['saved_id']])
-        if not row['enabled'] and store('price_alerts').count_documents({'user_id': user, 'enabled': True}) >= 50:
-            raise HTTPException(409, 'Pause another alert before resuming more than 50 active alerts.')
-    store('price_alerts').update_one({'_id': identifier, 'user_id': user},
-        {'$set': {'enabled': body.enabled, 'revision': new_id(), 'updated_at': now()}})
+        reserve_active_slot(user, row, resume=True)
+    elif not body.enabled:
+        store('price_alerts').update_one({'_id': identifier, 'user_id': user},
+            {'$set': {'enabled': False, 'revision': new_id(), 'updated_at': now()}})
     return {'ok': True}
 
 

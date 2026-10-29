@@ -34,7 +34,7 @@ class TestReviewFollowups(unittest.TestCase):
             client = TestClient(api.app)
             response = client.get('/api/search?q=phone')
             self.assertEqual(response.status_code, 503)
-            self.assertIn('Missing model dependency', response.json()['error'])
+            self.assertNotIn('Missing model dependency', response.json()['error'])
             self.assertEqual(client.get('/api/search?q=phone').status_code, 200)
 
     def test_readable_malformed_vector_caches_are_rebuilt(self):

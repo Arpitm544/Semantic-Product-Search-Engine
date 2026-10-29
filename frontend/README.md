@@ -216,3 +216,11 @@ merchant prices, shipping, taxes, and stock before purchasing.
 
 See [deployment notes](../DEPLOYMENT.md#scheduled-price-checks) for worker and cron
 configuration. A price alert is not a guarantee of availability or a purchase.
+
+Account/search fixes preserve loaded alert pages during background refreshes,
+protect wishlist loads against stale responses and account switching, and use
+atomic all-or-nothing additions for collection batches. Saved timestamps are
+explicit UTC. Search results without known currency display the numeric amount
+without inventing a currency. Retry buttons do not submit forms, and collection
+details have their own retry action. See the deployment guide for search limits
+and concurrent alert-capacity enforcement.

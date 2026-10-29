@@ -20,7 +20,10 @@ def currency_of(product):
     label = str(product.get('priceLabel') or '')
     explicit = {value for value in CURRENCIES if re.search(r'\b' + value + r'\b', label, re.I)}
     symbols = [('₹', 'INR'), ('€', 'EUR'), ('£', 'GBP'), ('US$', 'USD'), ('CA$', 'CAD'), ('A$', 'AUD'), ('NZ$', 'NZD'), ('S$', 'SGD'), ('HK$', 'HKD')]
-    found = explicit | {currency for symbol, currency in symbols if symbol in label}
+    # Match longest tokens first, so US$ cannot also match S$, nor CA$ A$.
+    tokens = dict(symbols)
+    pattern = '|'.join(re.escape(symbol) for symbol in sorted(tokens, key=len, reverse=True))
+    found = explicit | {tokens[match.group()] for match in re.finditer(pattern, label)}
     if code:
         return code if code in CURRENCIES and (not found or found == {code}) else None
     return found.pop() if len(found) == 1 else None

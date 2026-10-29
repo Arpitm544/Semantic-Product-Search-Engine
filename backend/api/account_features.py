@@ -136,6 +136,26 @@ def add_collection_product(identifier: str, saved_id: str, session=Depends(requi
     return {'ok': True}
 
 
+class CollectionProducts(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    savedIds: list[Identifier] = Field(min_length=1, max_length=10)
+
+
+@router.put('/api/collections/{identifier}/products')
+def add_collection_products(identifier: str, body: CollectionProducts, session=Depends(require_session)):
+    user = session['sub']
+    owned('product_collections', identifier, user)
+    ids = list(dict.fromkeys(body.savedIds))
+    saved_items(user, ids)
+    result = store('product_collections').update_one(
+        {'_id': identifier, 'user_id': user,
+         '$expr': {'$lte': [{'$size': {'$setUnion': ['$product_ids', ids]}}, 100]}},
+        {'$addToSet': {'product_ids': {'$each': ids}}, '$set': {'updated_at': now()}})
+    if not result.matched_count:
+        raise HTTPException(409, 'Adding these products would exceed the 100-product limit. No products were added.')
+    return {'ok': True}
+
+
 @router.delete('/api/collections/{identifier}/products/{saved_id}')
 def remove_collection_product(identifier: str, saved_id: str, session=Depends(require_session)):
     store('product_collections').update_one({'_id': identifier, 'user_id': session['sub']},

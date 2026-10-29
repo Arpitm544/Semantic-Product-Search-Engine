@@ -135,6 +135,16 @@ def restore_vectors(semantic, products, cache_path):
             raise ValueError("Cached vector IDs do not match MongoDB.")
         vectors = cached["vectors"]
 
+    if (vectors.ndim != 2 or vectors.shape[0] != len(products) or vectors.shape[1] < 1
+            or not np.issubdtype(vectors.dtype, np.floating) or not np.isfinite(vectors).all()):
+        raise ValueError("Invalid vector cache shape or values.")
+    model = getattr(semantic, '_model', None)
+    expected_dimension = model.get_sentence_embedding_dimension() if model is not None else None
+    if isinstance(expected_dimension, int) and vectors.shape[1] != expected_dimension:
+        raise ValueError("Cached vector dimension does not match the model.")
+    lengths = np.linalg.norm(vectors, axis=1)
+    if not np.allclose(lengths, 1, rtol=1e-3, atol=1e-3):
+        raise ValueError("Cached vectors must be normalized.")
     semantic.products = products
     semantic.dimension = vectors.shape[1]
     semantic.index = faiss.IndexFlatIP(semantic.dimension)

@@ -20,3 +20,9 @@ def authenticated_api():
 def no_background_price_checks(monkeypatch):
     # Unit/API tests never start a real price-monitoring thread or spend API quota.
     monkeypatch.setenv('PRICE_ALERTS_ENABLED', '0')
+
+
+@pytest.fixture(autouse=True)
+def no_real_search_limit_storage():
+    with patch('api.main.check_search_rate'):
+        yield

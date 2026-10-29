@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import AccountShell, { accountButton, accountInput, accountPanel } from '@/components/AccountShell';
 import { ConfirmDelete, ResourceStatus, SavedProductPicker } from '@/components/AccountControls';
 import { useAccountResource, safeProductUrl, type Page } from '@/lib/account';
@@ -20,14 +21,40 @@ export default function AlertsPage() {
   const [moreAlerts, setMoreAlerts] = useState<boolean | null>(null);
   const [moreNotifications, setMoreNotifications] = useState<boolean | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  useEffect(() => { setExtraAlerts([]); setMoreAlerts(null); }, [alerts.data]);
-  useEffect(() => { setExtraNotifications([]); setMoreNotifications(null); }, [notifications.data]);
+  const { userId } = useAuth();
+  const owner = useRef(userId); owner.current = userId;
+  const visibleCounts = useRef({ alerts: 50, notifications: 50 });
+  const polling = useRef(false);
+  const refreshVersion = useRef(0);
+  useEffect(() => { refreshVersion.current++; }, [alerts.data, notifications.data]);
+  useEffect(() => { setExtraAlerts([]); setExtraNotifications([]); setMoreAlerts(null); setMoreNotifications(null); }, [userId]);
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible' && !alerts.busy && !notifications.busy) { void alerts.reload(); void notifications.reload(); }
+    let live = true;
+    const timer = setInterval(async () => {
+      if (document.visibilityState !== 'visible' || alerts.busy || notifications.busy || loadingMore || polling.current) return;
+      polling.current = true;
+      const version = refreshVersion.current;
+      async function pages<T>(path: string, count: number): Promise<{ first: Page<T>; rest: T[]; more: boolean }> {
+        const first = await alerts.api<Page<T>>(path);
+        const all = [...first.items]; let more = first.hasMore;
+        while (more && all.length < count) {
+          const next = await alerts.api<Page<T>>(`${path}?offset=${all.length}`);
+          all.push(...next.items); more = next.hasMore;
+          if (!next.items.length) break;
+        }
+        return { first, rest: all.slice(first.items.length), more };
+      }
+      try {
+        const [a, n] = await Promise.all([pages<Alert>('/api/price-alerts', visibleCounts.current.alerts), pages<Notification>('/api/notifications', visibleCounts.current.notifications)]);
+        if (!live || owner.current !== userId || refreshVersion.current !== version) return;
+        alerts.setError(''); notifications.setError('');
+        alerts.setData(a.first as AlertPage); setExtraAlerts(a.rest); setMoreAlerts(a.more);
+        notifications.setData(n.first); setExtraNotifications(n.rest); setMoreNotifications(n.more);
+      } catch (reason) { if (live && owner.current === userId) alerts.setError(reason instanceof Error ? reason.message : 'Could not refresh alerts.'); }
+      finally { polling.current = false; }
     }, 60000);
-    return () => clearInterval(timer);
-  }, [alerts.reload, notifications.reload, alerts.busy, notifications.busy]);
+    return () => { live = false; clearInterval(timer); };
+  }, [alerts.api, alerts.busy, notifications.busy, loadingMore, userId]);
   useEffect(() => {
     let live = true; setEligibility(null); setEligibilityError(''); setTarget('');
     if (selected[0]) alerts.api<Eligibility>(`/api/price-alerts/eligibility/${selected[0]}`).then(data => { if (live) setEligibility(data); }).catch(reason => { if (live) setEligibilityError(reason.message); });
@@ -44,6 +71,7 @@ export default function AlertsPage() {
   }
   const alertItems = [...(alerts.data?.items || []), ...extraAlerts].filter((item, i, all) => all.findIndex(other => other.id === item.id) === i);
   const notificationItems = [...(notifications.data?.items || []), ...extraNotifications].filter((item, i, all) => all.findIndex(other => other.id === item.id) === i);
+  visibleCounts.current = { alerts: Math.max(50, alertItems.length), notifications: Math.max(50, notificationItems.length) };
   async function loadMore(kind: 'alerts' | 'notifications') {
     setLoadingMore(true);
     try {
