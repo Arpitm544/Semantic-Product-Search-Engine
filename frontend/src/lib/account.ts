@@ -21,6 +21,39 @@ export function useAccountApi() {
     return body;
   }, [request]);
 }
+type ResourceState<T> = {
+  api: ReturnType<typeof useAccountApi>; path: string; version: React.RefObject<number>;
+  setBusy: React.Dispatch<React.SetStateAction<boolean>>;
+  setError: React.Dispatch<React.SetStateAction<string>>;
+  setData: React.Dispatch<React.SetStateAction<T | null>>;
+  setNotice: React.Dispatch<React.SetStateAction<string>>;
+  ownerRef: React.RefObject<ReturnType<typeof useAuth>['userId']>;
+  userId: ReturnType<typeof useAuth>['userId']; busy: boolean;
+};
+function useResourceReload<T>({ api, path, version, setBusy, setError, setData }: ResourceState<T>) {
+  const reload = useCallback(async () => {
+    const current = ++version.current;
+    setBusy(true); setError('');
+    try { const result = await api<T>(path); if (current === version.current) setData(result); }
+    catch (reason) { if (current === version.current) setError(accountError(reason)); }
+    finally { if (current === version.current) setBusy(false); }
+  }, [api, path]);
+  return reload;
+}
+function useResourceMutation<T>({ busy, setBusy, setError, setNotice, ownerRef, userId }: ResourceState<T>, reload: () => Promise<void>) {
+  async function mutate<R>(task: () => Promise<R>, message = 'Changes saved.'): Promise<R | undefined> {
+    if (busy) return;
+    setBusy(true); setError(''); setNotice('');
+    try { const result = await task(); if (ownerRef.current !== userId) return; setNotice(message); await reload(); return result; }
+    catch (reason) { if (ownerRef.current === userId) setError(accountError(reason)); }
+    finally { if (ownerRef.current === userId) setBusy(false); }
+  }
+  return mutate;
+}
+export function accountError(reason: unknown, fallback = 'Please try again.') {
+  return reason instanceof Error ? reason.message : fallback;
+}
+
 export function useAccountResource<T>(path: string) {
   const api = useAccountApi();
   const { userId, isLoaded } = useAuth();
@@ -31,21 +64,10 @@ export function useAccountResource<T>(path: string) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const version = useRef(0);
-  const reload = useCallback(async () => {
-    const current = ++version.current;
-    setBusy(true); setError('');
-    try { const result = await api<T>(path); if (current === version.current) setData(result); }
-    catch (reason) { if (current === version.current) setError(reason instanceof Error ? reason.message : 'Please try again.'); }
-    finally { if (current === version.current) setBusy(false); }
-  }, [api, path]);
+  const state = { api, path, version, setBusy, setError, setData, setNotice, ownerRef, userId, busy };
+  const reload = useResourceReload(state);
+  const mutate = useResourceMutation(state, reload);
   useEffect(() => { setData(null); setNotice(''); setError(''); if (isLoaded && userId) void reload(); else setBusy(!isLoaded); return () => { version.current++; }; }, [reload, isLoaded, userId]);
-  async function mutate<R>(task: () => Promise<R>, message = 'Changes saved.'): Promise<R | undefined> {
-    if (busy) return;
-    setBusy(true); setError(''); setNotice('');
-    try { const result = await task(); if (ownerRef.current !== userId) return; setNotice(message); await reload(); return result; }
-    catch (reason) { if (ownerRef.current === userId) setError(reason instanceof Error ? reason.message : 'Please try again.'); }
-    finally { if (ownerRef.current === userId) setBusy(false); }
-  }
   return { data, setData, busy, error, setError, notice, reload, mutate, api };
 }
 export function safeProductUrl(value?: string) {

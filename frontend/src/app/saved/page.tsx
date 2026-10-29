@@ -18,6 +18,49 @@ function errorMessage(reason: unknown) {
   return reason instanceof Error ? reason.message : 'Please try again.';
 }
 
+type SavedState = {
+  request: ReturnType<typeof useAuthenticatedFetch>;
+  userId: ReturnType<typeof useAuth>['userId'];
+  owner: React.RefObject<ReturnType<typeof useAuth>['userId']>;
+  sequence: React.RefObject<number>;
+  setBusy: React.Dispatch<React.SetStateAction<boolean>>;
+  setError: React.Dispatch<React.SetStateAction<string>>;
+  setLoadedOwner: React.Dispatch<React.SetStateAction<ReturnType<typeof useAuth>['userId']>>;
+  setItems: React.Dispatch<React.SetStateAction<SavedItem[]>>;
+  setMore: React.Dispatch<React.SetStateAction<boolean>>;
+  setRemoving: React.Dispatch<React.SetStateAction<string | null>>;
+};
+function useSavedLoad({ request, userId, owner, sequence, setBusy, setError, setLoadedOwner, setItems, setMore }: SavedState) {
+  const load = useCallback(async (offset = 0) => {
+    const current = ++sequence.current;
+    const isCurrent = () => current === sequence.current && owner.current === userId;
+    setBusy(true); setError('');
+    try {
+      const response = await request(`${API_BASE}/api/saved-products?offset=${offset}`);
+      if (!response.ok) throw new Error('Could not load your saved products. Please try again.');
+      const data = await response.json();
+      if (!isCurrent()) return;
+      setLoadedOwner(userId);
+      setItems(old => mergeSavedItems(old, data.items, offset));
+      setMore(data.hasMore);
+    } catch (reason) { if (isCurrent()) setError(errorMessage(reason)); }
+    finally { if (isCurrent()) setBusy(false); }
+  }, [request, userId]);
+  return load;
+}
+function useSavedRemove({ request, userId, owner, sequence, setError, setItems, setRemoving }: SavedState) {
+  async function remove(id: string) {
+    sequence.current++;
+    setRemoving(id); setError('');
+    try {
+      const response = await request(`${API_BASE}/api/saved-products/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Could not remove this product. Please try again.');
+      if (owner.current === userId) setItems(old => old.filter(item => item.id !== id));
+    } catch (reason) { if (owner.current === userId) setError(errorMessage(reason)); }
+    finally { if (owner.current === userId) setRemoving(null); }
+  }
+  return remove;
+}
 function useSavedProducts() {
   const request = useAuthenticatedFetch();
   const { userId, isLoaded } = useAuth();
@@ -29,31 +72,10 @@ function useSavedProducts() {
   const [busy, setBusy] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const load = useCallback(async (offset = 0) => {
-    const current = ++sequence.current;
-    setBusy(true); setError('');
-    try {
-      const response = await request(`${API_BASE}/api/saved-products?offset=${offset}`);
-      if (!response.ok) throw new Error('Could not load your saved products. Please try again.');
-      const data = await response.json();
-      if (current !== sequence.current || owner.current !== userId) return;
-      setLoadedOwner(userId);
-      setItems(old => mergeSavedItems(old, data.items, offset));
-      setMore(data.hasMore);
-    } catch (reason) { if (current === sequence.current && owner.current === userId) setError(errorMessage(reason)); }
-    finally { if (current === sequence.current && owner.current === userId) setBusy(false); }
-  }, [request, userId]);
+  const state = { request, userId, owner, sequence, setBusy, setError, setLoadedOwner, setItems, setMore, setRemoving };
+  const load = useSavedLoad(state);
+  const remove = useSavedRemove(state);
   useEffect(() => { setItems([]); setMore(false); setRemoving(null); setError(''); setBusy(!isLoaded || !!userId); if (isLoaded && userId) void load(); return () => { sequence.current++; }; }, [load, isLoaded, userId]);
-  async function remove(id: string) {
-    sequence.current++;
-    setRemoving(id); setError('');
-    try {
-      const response = await request(`${API_BASE}/api/saved-products/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Could not remove this product. Please try again.');
-      if (owner.current === userId) setItems(old => old.filter(item => item.id !== id));
-    } catch (reason) { if (owner.current === userId) setError(errorMessage(reason)); }
-    finally { if (owner.current === userId) setRemoving(null); }
-  }
   return { items: loadedOwner === userId ? items : [], more, busy, removing, error, load, remove };
 }
 

@@ -142,27 +142,41 @@ def delete_alert(identifier: str, session=Depends(require_session)):
     return {'ok': True}
 
 
+def catalog_offer(alert):
+    before = catalog.version()
+    identities = [alert['identity']]
+    if alert['identity'].isdigit() and len(alert['identity']) < 20:
+        identities.append(int(alert['identity']))
+    product = catalog.database()[catalog.COLLECTION].find_one({'id': {'$in': identities}}, {'_id': 0})
+    if catalog.version() != before:
+        raise ValueError('The catalog is updating. A later check will retry.')
+    if product is None:
+        raise ValueError('This product is no longer available in the catalog.')
+    return product
+
+
+def same_offer(item, alert):
+    if str(item.get('id')) != alert['identity']:
+        return False
+    return str(item.get('merchant') or '').casefold() == alert['product']['merchant'].casefold()
+
+
+def shopping_offer(alert):
+    if alert['market'] != market_settings():
+        raise ValueError('Shopping region settings changed. Recreate this alert for the new region.')
+    candidates = search_shopping(alert['product']['title'])['results']
+    product = next((item for item in candidates if same_offer(item, alert)), None)
+    if product is None:
+        raise ValueError('The same product and merchant could not be verified. A later check will retry.')
+    return product
+
+
 def observe_price(alert):
-    if alert['source'] == 'mongo':
-        before = catalog.version()
-        identities = [alert['identity']]
-        if alert['identity'].isdigit() and len(alert['identity']) < 20:
-            identities.append(int(alert['identity']))
-        product = catalog.database()[catalog.COLLECTION].find_one({'id': {'$in': identities}}, {'_id': 0})
-        if catalog.version() != before:
-            raise ValueError('The catalog is updating. A later check will retry.')
-        if product is None:
-            raise ValueError('This product is no longer available in the catalog.')
-    else:
-        if alert['market'] != market_settings():
-            raise ValueError('Shopping region settings changed. Recreate this alert for the new region.')
-        candidates = search_shopping(alert['product']['title'])['results']
-        product = next((item for item in candidates if str(item.get('id')) == alert['identity']
-                        and str(item.get('merchant') or '').casefold() == alert['product']['merchant'].casefold()), None)
-        if product is None:
-            raise ValueError('The same product and merchant could not be verified. A later check will retry.')
+    product = catalog_offer(alert) if alert['source'] == 'mongo' else shopping_offer(alert)
     quote = price_info(product)
-    if not quote or quote['currency'] != alert['currency']:
+    if not quote:
+        raise ValueError('A comparable price in the original currency is unavailable.')
+    if quote['currency'] != alert['currency']:
         raise ValueError('A comparable price in the original currency is unavailable.')
     return quote['amount']
 

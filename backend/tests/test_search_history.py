@@ -28,7 +28,7 @@ def document(**overrides):
 def test_remember_deduplicates_per_user_query_source_and_spelling():
     with patch.object(history, 'collection') as factory:
         for _ in range(2):
-            result = history.remember_search('alice', 'headphones', 'mongo', False, {'results': []})
+            result = history.remember_search(history.SearchContext('alice', 'headphones', 'mongo', False), {'results': []})
             assert result['historySaved'] is True
         calls = factory.return_value.update_one.call_args_list
         assert calls[0].args[0] == calls[1].args[0]
@@ -38,21 +38,21 @@ def test_remember_deduplicates_per_user_query_source_and_spelling():
         assert data['query'] == 'headphones' and data['fuzzy'] is False and data['result_count'] == 0
         assert data['searched_at'].tzinfo == timezone.utc
         for user, source, fuzzy in [('bob', 'mongo', False), ('alice', 'serpapi', False), ('alice', 'mongo', True)]:
-            history.remember_search(user, 'headphones', source, fuzzy, {'results': []})
+            history.remember_search(history.SearchContext(user, 'headphones', source, fuzzy), {'results': []})
             assert factory.return_value.update_one.call_args.args[0]['_id'] != owner['_id']
 
 
 def test_failed_history_write_keeps_results():
     payload = {'results': [{'title': 'Headphones'}], 'warning': 'Existing ranking notice'}
     with patch.object(history, 'collection', side_effect=ConnectionFailure('private uri')):
-        result = history.remember_search('alice', 'headphones', 'mongo', True, payload)
+        result = history.remember_search(history.SearchContext('alice', 'headphones', 'mongo', True), payload)
     assert result['results'] == payload['results'] and result['warning'] == payload['warning']
     assert result['historySaved'] is False and 'historySaved' not in payload
 
 
 def test_blank_query_is_not_recorded():
     with patch.object(history, 'collection') as factory:
-        assert history.remember_search('alice', '', 'mongo', True, {'results': []}) == {'results': []}
+        assert history.remember_search(history.SearchContext('alice', '', 'mongo', True), {'results': []}) == {'results': []}
         factory.assert_not_called()
 
 
@@ -122,7 +122,7 @@ def test_success_records_original_query_and_trusted_identity(client):
     with patch('api.main.get_search_engine', return_value=engine), patch('api.main._search_ready.is_set', return_value=True), \
             patch('api.main.remember_search', side_effect=lambda *args: args[-1]) as record:
         assert client.get('/api/search?q=hedphones&fuzzy=0').status_code == 200
-        record.assert_called_once_with('alice', 'hedphones', 'mongo', False, engine.search.return_value)
+        record.assert_called_once_with(history.SearchContext('alice', 'hedphones', 'mongo', False), engine.search.return_value)
 
 
 def test_shopping_success_is_recorded(client):
@@ -130,7 +130,7 @@ def test_shopping_success_is_recorded(client):
             patch('api.main.rank_shopping_response', return_value={'results': []}), \
             patch('api.main.remember_search', side_effect=lambda *args: args[-1]) as record:
         assert client.get('/api/search?q=headphones&source=serpapi').status_code == 200
-        record.assert_called_once_with('alice', 'headphones', 'serpapi', True, {'results': []})
+        record.assert_called_once_with(history.SearchContext('alice', 'headphones', 'serpapi', True), {'results': []})
 
 
 def test_invalid_and_failed_searches_are_not_recorded(client):
@@ -141,3 +141,39 @@ def test_invalid_and_failed_searches_are_not_recorded(client):
                 patch('api.main._search_ready.is_set', return_value=True):
             assert client.get('/api/search?q=headphones').status_code == 503
         record.assert_not_called()
+
+
+@pytest.mark.parametrize('source', ['mongo', 'serpapi'])
+def test_preference_search_filters_before_recording_and_keeps_query_options(client, source):
+    from api import main
+    from api.account_features import Preferences
+    payload = {'results': [{'title': 'Affordable', 'price': 20, 'currency': 'USD'},
+                           {'title': 'Expensive', 'price': 100, 'currency': 'USD'}]}
+    engine = Mock()
+    engine.search.return_value = payload
+    preferences = Preferences(currency='USD', maxBudget=50).model_dump()
+    with patch.object(main, 'get_search_engine', return_value=engine), \
+            patch.object(main._search_ready, 'is_set', return_value=True), \
+            patch.object(main, 'search_shopping', return_value=payload), \
+            patch.object(main, 'rank_shopping_response', side_effect=lambda result: result), \
+            patch.object(main, 'load_preferences', return_value=preferences), \
+            patch.object(history, 'collection') as factory:
+        response = client.get(f'/api/search?q=%20headphones%20&source={source}&fuzzy=0&preferences=true')
+    assert response.status_code == 200
+    assert response.json()['results'] == payload['results'][:1]
+    assert response.json()['preferencesApplied'] is True
+    recorded = factory.return_value.update_one.call_args.args[1]['$set']
+    assert recorded['user_id'] == 'alice'
+    assert recorded['query'] == 'headphones'
+    assert recorded['source'] == source
+    assert recorded['fuzzy'] is False
+    assert recorded['use_preferences'] is True
+    assert recorded['result_count'] == 1
+
+
+def test_history_distinguishes_searches_with_and_without_preferences():
+    with patch.object(history, 'collection') as factory:
+        for enabled in (False, True):
+            history.remember_search(history.SearchContext('alice', 'headphones', 'mongo', True, enabled), {'results': []})
+    calls = factory.return_value.update_one.call_args_list
+    assert calls[0].args[0]['_id'] != calls[1].args[0]['_id']

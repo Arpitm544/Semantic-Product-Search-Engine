@@ -1,5 +1,6 @@
 """Private, persistent recent searches and personal dashboard summaries."""
 from datetime import datetime, timezone
+from dataclasses import dataclass
 from functools import lru_cache
 from hashlib import sha256
 import json
@@ -38,8 +39,19 @@ def recent_entries(user_id, offset=0, limit=6):
     return {"items": [public_entry(item) for item in items[:limit]], "hasMore": len(items) > limit}
 
 
-def remember_search(user_id, query, source, fuzzy, payload, use_preferences=False):
+@dataclass(frozen=True)
+class SearchContext:
+    user_id: str
+    query: str
+    source: str
+    fuzzy: bool
+    use_preferences: bool = False
+
+
+def remember_search(context, payload):
     """A failed history write must never discard successful search results."""
+    user_id, query, source, fuzzy = context.user_id, context.query, context.source, context.fuzzy
+    use_preferences = context.use_preferences
     if not query:
         return payload
     identity = [user_id, query, source, fuzzy]

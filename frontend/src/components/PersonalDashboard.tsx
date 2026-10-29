@@ -28,7 +28,17 @@ function SavedPreview({ product }: { product: SearchProduct }) {
   </div>;
 }
 
-export default function PersonalDashboard() {
+function dashboardError(reason: unknown) {
+  return reason instanceof Error ? reason.message : 'Please try again.';
+}
+
+function appendHistory(old: PersonalData | null, result: { hasMore: boolean; items: HistoryEntry[] }) {
+  if (!old) return old;
+  const ids = new Set(old.recentSearches.map(item => item.id));
+  return { ...old, hasMoreSearches: result.hasMore, recentSearches: [...old.recentSearches, ...result.items.filter(entry => !ids.has(entry.id))] };
+}
+
+function usePersonalDashboard() {
   const request = useAuthenticatedFetch();
   const { user } = useUser();
   const [data, setData] = useState<PersonalData | null>(null);
@@ -66,22 +76,28 @@ export default function PersonalDashboard() {
       setConfirmClear(false);
       setNotice(id ? 'Search removed from your history.' : 'Your search history has been cleared.');
       await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Please try again.'); }
+    } catch (reason) { setError(dashboardError(reason)); }
     finally { setMutation(null); }
   }
   async function loadMore() {
-    if (!data || mutation || busy) return;
+    if (!data) return;
+    if (mutation) return;
+    if (busy) return;
     setBusy(true); setError('');
     const current = version.current;
     try {
       const response = await request(`${API_BASE}/api/search-history?offset=${data.recentSearches.length}&limit=6`);
       if (!response.ok) throw new Error('Could not load more searches. Please try again.');
       const result = await response.json();
-      if (current === version.current) setData(old => old && ({ ...old, hasMoreSearches: result.hasMore,
-        recentSearches: [...old.recentSearches, ...result.items.filter((entry: HistoryEntry) => !old.recentSearches.some(item => item.id === entry.id))] }));
-    } catch (reason) { if (current === version.current) setError(reason instanceof Error ? reason.message : 'Please try again.'); }
+      if (current === version.current) setData(old => appendHistory(old, result));
+    } catch (reason) { if (current === version.current) setError(dashboardError(reason)); }
     finally { if (current === version.current) setBusy(false); }
   }
+  return { user, data, error, busy, mutation, confirmClear, setConfirmClear, notice, load, mutate, loadMore };
+}
+
+export default function PersonalDashboard() {
+  const { user, data, error, busy, mutation, confirmClear, setConfirmClear, notice, load, mutate, loadMore } = usePersonalDashboard();
   const name = user?.firstName || user?.username;
   return <section aria-label="Your personal dashboard" className="mb-8 space-y-5">
     <div className="flex flex-wrap items-end justify-between gap-4">

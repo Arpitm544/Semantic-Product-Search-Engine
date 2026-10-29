@@ -49,8 +49,13 @@ class Preferences(BaseModel):
 
     @model_validator(mode='after')
     def valid_budget(self):
-        if self.minBudget is not None and self.maxBudget is not None and self.minBudget > self.maxBudget:
+        if self.minBudget is None or self.maxBudget is None:
+            return self.normalize_filters()
+        if self.minBudget > self.maxBudget:
             raise ValueError('Minimum budget must not exceed maximum budget.')
+        return self.normalize_filters()
+
+    def normalize_filters(self):
         self.categories = list(dict.fromkeys(self.categories))
         self.brands = list(dict.fromkeys(self.brands))
         return self

@@ -10,7 +10,7 @@ def authenticated_api():
     previous = app.dependency_overrides.copy()
     app.dependency_overrides[require_session] = lambda: {"sub": "user_test", "sid": "sess_test"}
     # Keep API behavior tests from persisting developer search history.
-    with patch("api.main.remember_search", side_effect=lambda user, query, source, fuzzy, payload, **kwargs: payload):
+    with patch("api.main.remember_search", side_effect=lambda context, payload: payload):
         yield
     app.dependency_overrides.clear()
     app.dependency_overrides.update(previous)
