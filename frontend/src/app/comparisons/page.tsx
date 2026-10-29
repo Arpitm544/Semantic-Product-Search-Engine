@@ -25,7 +25,7 @@ function comparisonItems(data: Page<Comparison> | null, extra: Comparison[]) {
 function hasMoreComparisons(more: boolean | null, data: Page<Comparison> | null) {
   return more ?? data?.hasMore;
 }
-export default function ComparisonsPage() {
+function useComparisons() {
   const resource = useAccountResource<Page<Comparison>>('/api/comparisons');
   const [selected, setSelected] = useState<string[]>([]);
   const [name, setName] = useState('');
@@ -45,20 +45,23 @@ export default function ComparisonsPage() {
     catch (reason) { resource.setError(reason instanceof Error ? reason.message : 'Could not load comparisons.'); }
     finally { setLoadingMore(false); }
   }
-  function renderCreateForm() {
-    return <form onSubmit={create} className={`${accountPanel} mb-6`}><label className="text-sm">Comparison name<input required maxLength={100} className={`${accountInput} mt-2`} placeholder="Headphones for commuting" value={name} onChange={e => setName(e.target.value)} /></label><SavedProductPicker selected={selected} onChange={setSelected} disabled={resource.busy} /><button className={accountButton} disabled={resource.busy || selected.length < 2 || !name.trim()}>Save comparison</button></form>;
+  function rename(id: string, value: string) {
+    return resource.mutate(() => resource.api(`/api/comparisons/${id}`, { method: 'PATCH', body: JSON.stringify({ name: value }) }), 'Comparison renamed.');
   }
-  function renderComparisons() {
-    return <div className="space-y-6">{all.map(item => <SavedComparison key={item.id} item={item} busy={resource.busy} rename={(id, value) => resource.mutate(() => resource.api(`/api/comparisons/${id}`, { method: 'PATCH', body: JSON.stringify({ name: value }) }), 'Comparison renamed.')} remove={async id => { const result = await resource.mutate(() => resource.api(`/api/comparisons/${id}`, { method: 'DELETE' }), 'Comparison deleted.'); if (result) setExtra(old => old.filter(item => item.id !== id)); }} />)}</div>;
+  async function remove(id: string) {
+    const result = await resource.mutate(() => resource.api(`/api/comparisons/${id}`, { method: 'DELETE' }), 'Comparison deleted.');
+    if (result) setExtra(old => old.filter(item => item.id !== id));
   }
-  function renderPagination() {
-    return hasMoreComparisons(more, resource.data) && <button className={`${accountButton} mt-6`} disabled={resource.busy || loadingMore} onClick={loadMore}>{loadingMore ? 'Loading…' : 'Load more comparisons'}</button>;
-  }
+  return { resource, selected, setSelected, name, setName, all, more, loadingMore, create, loadMore, rename, remove };
+}
+
+export default function ComparisonsPage() {
+  const { resource, selected, setSelected, name, setName, all, more, loadingMore, create, loadMore, rename, remove } = useComparisons();
   return <AccountShell active="/comparisons" title="Your saved comparisons" description="Keep two to four shortlisted products side by side. Comparisons keep their snapshots even if you later remove a product from your wishlist.">
-    {renderCreateForm()}
+    <form onSubmit={create} className={`${accountPanel} mb-6`}><label className="text-sm">Comparison name<input required maxLength={100} className={`${accountInput} mt-2`} placeholder="Headphones for commuting" value={name} onChange={e => setName(e.target.value)} /></label><SavedProductPicker selected={selected} onChange={setSelected} disabled={resource.busy} /><button className={accountButton} disabled={resource.busy || selected.length < 2 || !name.trim()}>Save comparison</button></form>
     <ResourceStatus busy={resource.busy} error={resource.error} notice={resource.notice} retry={resource.reload} />
     {!resource.busy && !all.length && <p className={`${accountPanel} text-sm opacity-70`}>Choose at least two saved products to create your first comparison.</p>}
-    {renderComparisons()}
-    {renderPagination()}
+    <div className="space-y-6">{all.map(item => <SavedComparison key={item.id} item={item} busy={resource.busy} rename={rename} remove={remove} />)}</div>
+    {hasMoreComparisons(more, resource.data) && <button className={`${accountButton} mt-6`} disabled={resource.busy || loadingMore} onClick={loadMore}>{loadingMore ? 'Loading…' : 'Load more comparisons'}</button>}
   </AccountShell>;
 }
