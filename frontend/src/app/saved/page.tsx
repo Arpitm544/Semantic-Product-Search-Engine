@@ -9,7 +9,16 @@ type SavedItem = { id: string; source: string; product: SearchProduct; savedAt: 
 function safeUrl(value?: string) {
   try { const url = new URL(value || ''); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : undefined; } catch { return undefined; }
 }
-export default function SavedProductsPage() {
+function mergeSavedItems(old: SavedItem[], incoming: SavedItem[], offset: number) {
+  if (!offset) return incoming;
+  return [...old, ...incoming.filter(item => !old.some(existing => existing.id === item.id))];
+}
+
+function errorMessage(reason: unknown) {
+  return reason instanceof Error ? reason.message : 'Please try again.';
+}
+
+function useSavedProducts() {
   const request = useAuthenticatedFetch();
   const [items, setItems] = useState<SavedItem[]>([]);
   const [more, setMore] = useState(false);
@@ -22,9 +31,9 @@ export default function SavedProductsPage() {
       const response = await request(`${API_BASE}/api/saved-products?offset=${offset}`);
       if (!response.ok) throw new Error('Could not load your saved products. Please try again.');
       const data = await response.json();
-      setItems(old => offset ? [...old, ...data.items.filter((item: SavedItem) => !old.some(existing => existing.id === item.id))] : data.items);
+      setItems(old => mergeSavedItems(old, data.items, offset));
       setMore(data.hasMore);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Please try again.'); }
+    } catch (reason) { setError(errorMessage(reason)); }
     finally { setBusy(false); }
   }, [request]);
   useEffect(() => { void load(); }, [load]);
@@ -34,9 +43,34 @@ export default function SavedProductsPage() {
       const response = await request(`${API_BASE}/api/saved-products/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Could not remove this product. Please try again.');
       setItems(old => old.filter(item => item.id !== id));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Please try again.'); }
+    } catch (reason) { setError(errorMessage(reason)); }
     finally { setRemoving(null); }
   }
+  return { items, more, busy, removing, error, load, remove };
+}
+
+function SavedProductCard({ item, disabled, removing, remove }: {
+  item: SavedItem;
+  disabled: boolean;
+  removing: boolean;
+  remove: (id: string) => Promise<void>;
+}) {
+  const { id, product, source, savedAt } = item;
+  const url = safeUrl(product.url);
+  return <li className="flex flex-col gap-3 rounded-2xl border border-[var(--line)] p-5">
+    <span className="text-xs uppercase opacity-60">{source === 'serpapi' ? product.merchant || 'Google Shopping' : 'Product catalog'}</span>
+    <h2 className="text-lg font-semibold">{product.title}</h2>
+    <p className="text-sm">{product.priceLabel || (product.price != null ? `${product.currency || ''} ${product.price}` : 'Price unavailable')}</p>
+    <p className="text-xs opacity-60">Saved {new Date(savedAt).toLocaleDateString()}</p>
+    <div className="mt-auto flex items-center justify-between gap-4">
+      {url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm underline">View product ↗</a> : <span className="text-xs opacity-60">Saved from the catalog</span>}
+      <button disabled={disabled} onClick={() => remove(id)} className="rounded-full border border-current px-4 py-2 text-sm disabled:opacity-50">{removing ? 'Removing…' : 'Remove'}</button>
+    </div>
+  </li>;
+}
+
+export default function SavedProductsPage() {
+  const { items, more, busy, removing, error, load, remove } = useSavedProducts();
   return <main className="min-h-screen bg-[var(--paper)] text-[var(--ink)] px-5 py-6">
     <header className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 border-b border-[var(--line)] pb-5">
       <a href="/" className="text-xl font-bold">✳ semantic.</a>
@@ -48,16 +82,7 @@ export default function SavedProductsPage() {
       {error && <div role="alert" className="my-4 rounded-lg border border-current p-4">{error} <button onClick={() => load()} className="underline">Retry</button></div>}
       {!busy && !error && !items.length && <div className="rounded-2xl border border-[var(--line)] p-10 text-center"><p>No saved products yet.</p><a href="/search" className="mt-4 inline-block underline">Find your first good find →</a></div>}
       <ul className="grid gap-4 sm:grid-cols-2">
-        {items.map(({ id, product, source, savedAt }) => <li key={id} className="flex flex-col gap-3 rounded-2xl border border-[var(--line)] p-5">
-          <span className="text-xs uppercase opacity-60">{source === 'serpapi' ? product.merchant || 'Google Shopping' : 'Product catalog'}</span>
-          <h2 className="text-lg font-semibold">{product.title}</h2>
-          <p className="text-sm">{product.priceLabel || (product.price != null ? `${product.currency || ''} ${product.price}` : 'Price unavailable')}</p>
-          <p className="text-xs opacity-60">Saved {new Date(savedAt).toLocaleDateString()}</p>
-          <div className="mt-auto flex items-center justify-between gap-4">
-            {safeUrl(product.url) ? <a href={safeUrl(product.url)} target="_blank" rel="noopener noreferrer" className="text-sm underline">View product ↗</a> : <span className="text-xs opacity-60">Saved from the catalog</span>}
-            <button disabled={removing !== null || busy} onClick={() => remove(id)} className="rounded-full border border-current px-4 py-2 text-sm disabled:opacity-50">{removing === id ? 'Removing…' : 'Remove'}</button>
-          </div>
-        </li>)}
+        {items.map(item => <SavedProductCard key={item.id} item={item} disabled={removing !== null || busy} removing={removing === item.id} remove={remove} />)}
       </ul>
       {busy && <p role="status" className="py-6">Loading saved products…</p>}
       {more && !busy && <button onClick={() => load(items.length)} className="mt-6 rounded-full border border-current px-5 py-2">Load more</button>}
