@@ -20,6 +20,8 @@ from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 import uvicorn
 
+from api.saved_products import router as saved_products_router
+from api.search_history import router as history_router, remember_search
 from api.auth import require_session
 from api.dashboard import dashboard_data
 from api import search_service
@@ -70,10 +72,12 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Semantic Product Search", lifespan=lifespan)
+app.include_router(saved_products_router)
+app.include_router(history_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
-    allow_methods=["GET", "OPTIONS"],
+    allow_methods=["GET", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
@@ -115,8 +119,8 @@ def get_dashboard():
         return JSONResponse(status_code=503, content={"error": str(error)})
 
 
-@app.get("/api/search", dependencies=[Depends(require_session)])
-def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
+@app.get("/api/search")
+def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo", session=Depends(require_session)):
     """Choose MongoDB semantic search or Google Shopping via SerpApi."""
     query = q.strip()
     if source not in ("mongo", "serpapi"):
@@ -128,7 +132,8 @@ def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
     # Shopping search does not depend on MongoDB or local model readiness.
     if source == "serpapi":
         try:
-            return rank_shopping_response(search_shopping(query))
+            payload = rank_shopping_response(search_shopping(query))
+            return remember_search(session["sub"], query, (source, fuzzy != "0"), payload)
         except ShoppingError as error:
             return JSONResponse(status_code=error.status, content={
                 "error": str(error), "code": error.code, "source": "serpapi",
@@ -145,7 +150,8 @@ def search_products(q: str = "", fuzzy: str = "1", source: str = "mongo"):
         # Initialization includes lazy model imports; all failures remain retryable.
         return JSONResponse(status_code=503, content={"error": str(error)})
     try:
-        return engine.search(query, fuzzy=fuzzy != "0")
+        payload = engine.search(query, fuzzy=fuzzy != "0")
+        return remember_search(session["sub"], query, (source, fuzzy != "0"), payload)
     except (ValueError, RuntimeError, OSError, PyMongoError) as error:
         return JSONResponse(status_code=503, content={"error": str(error)})
 

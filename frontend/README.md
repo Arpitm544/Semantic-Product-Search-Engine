@@ -109,3 +109,49 @@ restart it with the updated dependencies and `CLERK_ISSUER_URL` configured as sh
 in `backend/.env.example`. The frontend sends bearer tokens with API requests.
 
 See [production deployment](../DEPLOYMENT.md) before deploying.
+
+## Saved products
+
+Search results offer Save/Remove controls. `/saved` lists the signed-in user's
+wishlist with pagination and remove actions; it is linked from search and the
+dashboard. Saved products are snapshots, not live price tracking.
+
+The Python API stores these snapshots in the existing MongoDB database's
+`saved_products` collection. Every document contains the verified Clerk user ID,
+source, product identity, snapshot, and saved time. Ownership is taken only from
+the verified bearer token. A deterministic document ID prevents duplicate saves
+for the same user/source/product, and every read/delete filters by that user.
+MongoDB must be available and the application database user must be allowed to
+create the collection and its index. No wishlist data is stored in Clerk or
+browser local storage. Restart the API and frontend after installing this change.
+
+## Personal dashboard and search history
+
+`/dashboard` greets the signed-in user by their Clerk name and shows private saved
+product previews, wishlist totals, and recent successful searches. The shared
+catalog overview remains below the personal section. The dashboard works without
+loading the search models or the catalog summary.
+
+Successful catalog and shopping searches are recorded by the Python API in the
+MongoDB `search_history` collection, using the verified Clerk subject as owner.
+Each distinct query/source/spelling-setting combination has one entry; repeating
+it moves it to the top and updates its result count. Successful zero-result
+searches are included; invalid and failed searches are not. Only searches made
+after this feature was installed appear. A history write failure preserves
+search results and shows a notice.
+
+Search history can be paginated, deleted one entry at a time, or cleared after
+confirmation. Clearing history does not remove saved products. History stays
+until the user deletes it. Every list, count, preview, and deletion is scoped to
+the authenticated user. Query text is stored in MongoDB, not Clerk or browser
+local storage. Allow the backend database user to create the new collection and
+its owner/recent-time index.
+
+“Search again” opens `/search?q=...&source=...&fuzzy=...` and automatically runs
+the original query after the session has loaded. Shopping searches may consume
+SerpApi usage again. The query is present in that navigation URL and browser
+history, as well as the private server history.
+
+Backend endpoints: `GET /api/personal-dashboard`, `GET /api/search-history`
+(`offset`, `limit`), `DELETE /api/search-history/{id}`, and
+`DELETE /api/search-history`. Restart the API after updating.
