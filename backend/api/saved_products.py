@@ -5,13 +5,20 @@ from hashlib import sha256
 from typing import Literal, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pymongo.errors import PyMongoError
 
+from api.account_store import clean_saved_links, iso
 from api.auth import require_session
 from src.data.db import get_database
 
 router = APIRouter(prefix="/api/saved-products", tags=["Saved products"])
+
+
+def bounded_numeric_text(value):
+    if len(value) > 200:
+        raise ValueError('Product details are too long.')
+    return value
 
 
 class ProductSnapshot(BaseModel):
@@ -21,6 +28,30 @@ class ProductSnapshot(BaseModel):
     brand: Optional[str] = Field(default=None, max_length=200)
     description: Optional[str] = Field(default=None, max_length=10000)
     price: Optional[Union[float, str]] = None
+    rating: Optional[Union[float, str]] = None
+    reviews: Optional[Union[float, str]] = None
+    stock: Optional[Union[float, str]] = None
+    attributes: list[str] = Field(default_factory=list, max_length=40)
+
+    @field_validator('price', 'rating', 'reviews', 'stock', mode='before')
+    @classmethod
+    def bounded_values(cls, value):
+        import math
+        if isinstance(value, bool):
+            raise ValueError('Numeric details cannot be booleans.')
+        if isinstance(value, str):
+            return bounded_numeric_text(value)
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError('Numeric details must be finite.')
+        return value
+
+    @field_validator('attributes')
+    @classmethod
+    def bounded_attributes(cls, value):
+        if any(len(item) > 500 for item in value):
+            raise ValueError('Product attribute is too long.')
+        return value
+
     priceLabel: Optional[str] = Field(default=None, max_length=200)
     currency: Optional[str] = Field(default=None, max_length=10)
     imageUrl: Optional[HttpUrl] = None
@@ -49,7 +80,7 @@ def saved_id(user_id, source, identity):
 
 def public_item(item):
     return {"id": item["_id"], "source": item["source"], "identity": item["identity"],
-            "product": item["product"], "savedAt": item["saved_at"].isoformat()}
+            "product": item["product"], "savedAt": iso(item["saved_at"])}
 
 
 def unavailable():
@@ -94,6 +125,7 @@ def save_product(body: SaveProduct, session=Depends(require_session)):
 def remove_product(item_id: str, session=Depends(require_session)):
     try:
         collection().delete_one({"_id": item_id, "user_id": session["sub"]})
+        clean_saved_links(session['sub'], item_id)
         return {"saved": False}
     except PyMongoError:
         raise unavailable() from None

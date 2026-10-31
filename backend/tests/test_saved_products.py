@@ -19,7 +19,7 @@ def client():
 BODY = {"source": "mongo", "identity": "product-1", "product": {"title": "Headphones", "price": 100}}
 
 def test_save_is_owned_and_idempotent(client):
-    with patch('api.saved_products.collection') as factory:
+    with patch('api.saved_products.collection') as factory, patch('api.saved_products.clean_saved_links'):
         first = client.put('/api/saved-products', json=BODY)
         second = client.put('/api/saved-products', json=BODY)
         assert first.status_code == 200
@@ -35,12 +35,12 @@ def test_cannot_supply_another_owner(client):
     assert client.put('/api/saved-products', json={**BODY, 'user_id': 'user_bob'}).status_code == 422
 
 def test_remove_always_scopes_owner(client):
-    with patch('api.saved_products.collection') as factory:
+    with patch('api.saved_products.collection') as factory, patch('api.saved_products.clean_saved_links'):
         assert client.delete('/api/saved-products/bobs-item').status_code == 200
         factory.return_value.delete_one.assert_called_once_with({'_id': 'bobs-item', 'user_id': 'user_alice'})
 
 def test_list_scopes_owner_and_hides_internal_fields(client):
-    with patch('api.saved_products.collection') as factory:
+    with patch('api.saved_products.collection') as factory, patch('api.saved_products.clean_saved_links'):
         factory.return_value.find.return_value.sort.return_value.skip.return_value.limit.return_value = [{
             '_id': 'item', 'user_id': 'user_alice', 'source': 'mongo', 'identity': '1',
             'saved_at': datetime.now(timezone.utc), 'product': {'title': 'Headphones'},
@@ -52,7 +52,7 @@ def test_list_scopes_owner_and_hides_internal_fields(client):
         assert response.json()['hasMore'] is False
 
 def test_status_scopes_owner(client):
-    with patch('api.saved_products.collection') as factory:
+    with patch('api.saved_products.collection') as factory, patch('api.saved_products.clean_saved_links'):
         factory.return_value.find_one.return_value = None
         response = client.get('/api/saved-products/status?source=mongo&identity=product-1')
         assert response.json()['saved'] is False

@@ -15,3 +15,16 @@ export function useAuthenticatedFetch() {
     return response;
   }, [getToken]);
 }
+
+export function requireResponseOk(response: Response, message: string) {
+  if (!response.ok) throw new Error(message);
+}
+
+export async function readJsonResponse<T>(response: Response, message: string): Promise<T> {
+  requireResponseOk(response, message);
+  return response.json();
+}
+
+export function applyIfCurrent(version: { current: number }, current: number, update: () => void) {
+  if (version.current === current) update();
+}

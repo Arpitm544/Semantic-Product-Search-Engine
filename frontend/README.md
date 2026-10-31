@@ -155,3 +155,72 @@ history, as well as the private server history.
 Backend endpoints: `GET /api/personal-dashboard`, `GET /api/search-history`
 (`offset`, `limit`), `DELETE /api/search-history/{id}`, and
 `DELETE /api/search-history`. Restart the API after updating.
+
+## Collections, preferences, comparisons, and price alerts
+
+The account navigation and dashboard link to four private pages:
+
+- `/collections`: create, rename, and delete collections, and add/remove wishlist
+  products. Each collection holds up to 100 products. Deleting a collection keeps
+  the wishlist intact; removing a wishlist product removes its memberships.
+- `/preferences`: save an optional default source, currency, budget range,
+  categories, brands, and known-stock requirement. Enable defaults on new searches
+  or toggle them per search. Budget filters never convert currencies. Filters
+  apply to returned candidates; missing details for active filters are excluded.
+  Query history records whether preferences were used; replay uses current saved
+  preferences when that flag is enabled.
+- `/comparisons`: name, rename, and delete comparisons of two to four wishlist
+  products. Compare their saved prices, brands, categories, ratings, reviews,
+  stock, attributes, and descriptions. Missing details stay unavailable. Snapshots
+  remain after wishlist removal and are not live offers.
+- `/alerts`: opt into price tracking, choose an optional target price, pause/resume
+  or remove alerts, check due alerts, and read private in-app price notifications.
+  There is no email/SMS delivery. Up to 50 active alerts are supported per user.
+
+MongoDB collections are `product_collections`, `user_preferences`,
+`saved_comparisons`, `price_alerts`, and `price_notifications`. All records and
+mutations are scoped to the verified Clerk subject; the browser cannot choose an
+owner. Account data is not stored in Clerk or local storage. Database credentials
+need permission to create the collections and their indexes.
+
+### Price monitoring
+
+A background worker checks due alerts about every six hours while the backend is
+running, polling for due work every minute. The interval is configurable, with a
+one-hour minimum. Leased database updates prevent simultaneous workers checking
+the same due alert. Check-now actions use the same cooldown. Recreating an alert
+creates a new tracking request and may consume additional provider quota.
+
+Catalog checks read the matching product ID from the current verified catalog.
+Google Shopping checks search the saved title through the existing SerpApi
+integration and accept only the same stable Google product ID, merchant, market
+settings, and currency. No product URLs are scraped or fetched by the checker.
+If a matching offer is not returned, the check is marked unavailable; it never
+substitutes a similar product. Provider calls can consume SerpApi quota. See
+[SerpApi's documented result fields](https://serpapi.com/shopping-results).
+
+Only finite positive prices with unambiguous currencies can enable alerts.
+For example, `₹` identifies INR; a bare `$` without an explicit currency is not
+assumed to mean USD. Conflicting currency details are rejected. The ESCI catalog
+often has no prices, so many existing saved items cannot be monitored. Save a
+supported priced offer to enable an alert. Older saved snapshots may lack
+ratings/specifications; comparisons show those fields as unavailable.
+
+A notification is created only when a verified price is lower than the previous
+lowest observed price and at or below the target. Notifications are persisted
+with an outbox and idempotent IDs, so interrupted delivery can retry on the next
+due check without resetting read status. Temporary failures retain the baseline.
+Removing a wishlist product pauses its alerts. Alerts and notifications refresh
+on their page and dashboard while visible; the shopper should verify current
+merchant prices, shipping, taxes, and stock before purchasing.
+
+See [deployment notes](../DEPLOYMENT.md#scheduled-price-checks) for worker and cron
+configuration. A price alert is not a guarantee of availability or a purchase.
+
+Account/search fixes preserve loaded alert pages during background refreshes,
+protect wishlist loads against stale responses and account switching, and use
+atomic all-or-nothing additions for collection batches. Saved timestamps are
+explicit UTC. Search results without known currency display the numeric amount
+without inventing a currency. Retry buttons do not submit forms, and collection
+details have their own retry action. See the deployment guide for search limits
+and concurrent alert-capacity enforcement.

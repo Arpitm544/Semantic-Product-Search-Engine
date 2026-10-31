@@ -1,4 +1,5 @@
 'use client';
+import { useAccountResource, type Preferences } from '@/lib/account';
 import SaveProductButton from '@/components/SaveProductButton';
 import ThemeToggle from '@/components/ThemeToggle';
 import { classes } from '@/lib/classes';
@@ -11,102 +12,108 @@ import { useAuth, UserButton } from '@clerk/nextjs';
 
 const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi' };
 
-function money(product: SearchProduct) {
-  if (product.priceLabel) return product.priceLabel;
-  const price = numericPrice(product.price);
-  if (price === null) return 'Price unavailable';
-  return formatPrice(product, price);
+function searchParams({ query, source, fuzzy, usePreferences }: { query: string; source: string; fuzzy: boolean; usePreferences: boolean }) {
+  return new URLSearchParams({ q: query, source, fuzzy: fuzzy ? '1' : '0', preferences: usePreferences ? '1' : '0' });
 }
 
-function numericPrice(value: SearchProduct['price']) {
-  if (value == null) return null;
-  if (value === '') return null;
-  const price = Number(value);
-  return Number.isFinite(price) ? price : null;
-}
-
-function formatPrice(product: SearchProduct, price: number) {
-  try {
-    // SerpApi prices without a currency label must not be assigned a guessed currency.
-    if (product.matchSources?.includes('google-shopping')) return new Intl.NumberFormat('en-IN').format(price);
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: product.currency || 'INR', maximumFractionDigits: 0 }).format(price);
-  } catch {
-    return 'Price unavailable';
-  }
-}
-
-function webUrl(value: string | undefined) {
-  try {
-    const url = new URL(value ?? '');
-    return isPublicWebUrl(url) ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
-function isPublicWebUrl(url: URL) {
-  if (!['http:', 'https:'].includes(url.protocol)) return false;
-  if (url.username) return false;
-  return !url.password;
-}
-
-function searchParams(query: string, source: keyof typeof SOURCES, fuzzy: boolean) {
-  return new URLSearchParams({ q: query, source, fuzzy: fuzzy ? '1' : '0' });
-}
-
-function isSearchProduct(product: unknown): product is SearchProduct {
+function validSearchProduct(product: unknown): product is SearchProduct {
   if (!product) return false;
   if (typeof product !== 'object') return false;
   if (!('title' in product)) return false;
   return typeof product.title === 'string';
 }
+interface SearchPayload {
+  results: SearchProduct[];
+  candidateCount: number;
+  correctedQuery?: string;
+  warning?: string;
+  historySaved?: boolean;
+}
+function isSearchPayload(value: unknown): value is Record<string, unknown> {
+  if (value === null) return false;
+  return typeof value === 'object';
+}
 
-async function readSearchJson(response: Response) {
+async function readSearchJson(response: Response): Promise<unknown> {
   try { return await response.json(); }
   catch { throw new Error('Search returned an unreadable response. Please try again shortly.'); }
 }
 
-function responseError(payload: { error?: unknown } | null) {
-  if (typeof payload?.error === 'string') return payload.error;
-  return 'Search could not be completed. Please try again shortly.';
+function searchFailureMessage(payload: unknown) {
+  const fallback = 'Search could not be completed. Please try again shortly.';
+  if (!isSearchPayload(payload)) return fallback;
+  return typeof payload.error === 'string' ? payload.error : fallback;
 }
 
-function validateSearchResults(results: unknown): asserts results is SearchProduct[] {
-  if (!Array.isArray(results)) throw new Error('Search returned an invalid response. Please try again shortly.');
-  if (!results.every(isSearchProduct)) throw new Error('Search returned an invalid response. Please try again shortly.');
+function requireSearchSuccess(response: Response, payload: unknown) {
+  if (!response.ok) throw new Error(searchFailureMessage(payload));
 }
 
-async function readSearchResponse(response: Response) {
+function validateSearchResults(payload: unknown): SearchPayload {
+  const message = 'Search returned an invalid response. Please try again shortly.';
+  if (!isSearchPayload(payload)) throw new Error(message);
+  if (!Array.isArray(payload.results)) throw new Error(message);
+  if (!payload.results.every(validSearchProduct)) throw new Error(message);
+  return payload as unknown as SearchPayload;
+}
+
+async function readSearchResponse(response: Response): Promise<SearchPayload> {
   const payload = await readSearchJson(response);
-  if (!response.ok) throw new Error(responseError(payload));
-  validateSearchResults(payload?.results);
-  return normalizeSearchResponse(payload);
+  requireSearchSuccess(response, payload);
+  return validateSearchResults(payload);
 }
 
-function normalizeSearchResponse(payload: { results: SearchProduct[]; candidateCount?: number; correctedQuery?: unknown; warning?: unknown; historySaved?: boolean }) {
+function searchDetails(payload: SearchPayload) {
   return {
-    results: payload.results,
-    total: Number.isFinite(payload.candidateCount) ? payload.candidateCount! : payload.results.length,
+    total: Number.isFinite(payload.candidateCount) ? payload.candidateCount : payload.results.length,
     correctedQuery: typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null,
     warning: searchWarning(payload),
   };
 }
-
-function searchWarning(payload: { warning?: unknown; historySaved?: boolean }) {
-  const messages = [typeof payload.warning === 'string' ? payload.warning : ''];
-  if (payload.historySaved === false) messages.push('Results are ready, but this search could not be saved to your history.');
-  return messages.filter(Boolean).join(' ');
+function searchWarning(payload: SearchPayload) {
+  return [typeof payload.warning === 'string' ? payload.warning : '', payload.historySaved === false ? 'Results are ready, but this search could not be saved to your history.' : ''].filter(Boolean).join(' ');
 }
 
 function searchError(reason: unknown, timedOut: boolean) {
   if (timedOut) return 'Search took too long. Please try again.';
   if (reason instanceof TypeError) return 'Cannot reach the search service. Make sure the backend is running and try again.';
-  return reasonMessage(reason);
-}
-
-function reasonMessage(reason: unknown) {
   if (reason instanceof Error) return reason.message || 'Search could not be completed.';
   return 'Search could not be completed.';
+}
+
+function numericSearchPrice(value: SearchProduct['price']) {
+  if (value == null) return null;
+  if (value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function searchPriceOptions(product: SearchProduct): Intl.NumberFormatOptions {
+  if (!product.currency) return {};
+  // Shopping prices without an explicit label must not get a guessed currency.
+  if (product.matchSources?.includes('google-shopping')) return {};
+  return { style: 'currency', currency: product.currency, maximumFractionDigits: 0 };
+}
+
+function formatSearchPrice(amount: number, product: SearchProduct) {
+  try { return new Intl.NumberFormat('en-IN', searchPriceOptions(product)).format(amount); }
+  catch { return 'Price unavailable'; }
+}
+
+function money(product: SearchProduct) {
+  if (product.priceLabel) return product.priceLabel;
+  const amount = numericSearchPrice(product.price);
+  if (amount === null) return 'Price unavailable';
+  return formatSearchPrice(amount, product);
+}
+
+function webUrl(value: string | undefined) {
+  try {
+    const url = new URL(value ?? '');
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
+  } catch {
+    return null;
+  }
 }
 
 function ProductImage({ product, index }: { product: SearchProduct; index: number }) {
@@ -121,8 +128,8 @@ function ProductImage({ product, index }: { product: SearchProduct; index: numbe
   );
 }
 
-export default function ProductSearchPage({ initialQuery = '', initialSource = 'mongo', initialFuzzy = true }: {
-  initialQuery?: string; initialSource?: 'mongo' | 'serpapi'; initialFuzzy?: boolean;
+export default function ProductSearchPage({ initialQuery = '', initialSource = 'mongo', initialFuzzy = true, initialPreferences = false }: {
+  initialQuery?: string; initialSource?: 'mongo' | 'serpapi'; initialFuzzy?: boolean; initialPreferences?: boolean;
 }) {
   const authenticatedFetch = useAuthenticatedFetch();
   const { isLoaded, isSignedIn } = useAuth();
@@ -137,6 +144,18 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
   const [warning, setWarning] = useState('');
   const [correctedQuery, setCorrectedQuery] = useState<string | null>(null);
   const pending = useRef<AbortController | null>(null);
+  const preferences = useAccountResource<Preferences>('/api/preferences');
+  const [usePreferences, setUsePreferences] = useState(initialPreferences);
+  const defaultsApplied = useRef(false);
+  useEffect(() => {
+    if (!preferences.data) return;
+    if (initialQuery) return;
+    if (!defaultsApplied.current) {
+      defaultsApplied.current = true;
+      setSource(preferences.data.defaultSource);
+      setUsePreferences(preferences.data.applyByDefault);
+    }
+  }, [preferences.data, initialQuery]);
   const shopping = source === 'serpapi';
 
   useEffect(() => () => pending.current?.abort(), []);
@@ -183,14 +202,15 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
     setWarning('');
     setCorrectedQuery(null);
     try {
-      const params = searchParams(query, source, fuzzy);
+      const params = searchParams({ query, source, fuzzy, usePreferences });
       const response = await authenticatedFetch(`${API_BASE}/api/search?${params}`, { signal: controller.signal });
       const payload = await readSearchResponse(response);
       if (pending.current !== controller) return;
       setResults(payload.results);
-      setTotal(payload.total);
-      setCorrectedQuery(payload.correctedQuery);
-      setWarning(payload.warning);
+      const details = searchDetails(payload);
+      setTotal(details.total);
+      setCorrectedQuery(details.correctedQuery);
+      setWarning(details.warning);
     } catch (reason) {
       if (pending.current !== controller) return;
       if (controller.signal.aborted && !timedOut) return;
@@ -206,11 +226,17 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
 
   return (
     <main className={"product-search-page min-h-[100vh] [background:var(--surface-fafbf8)] [color:var(--text-263127)] [font-family:'DM_Sans',sans-serif]"}>
-      <header className={"search-page-header h-[72px] [border-bottom:1px_solid_var(--border-e8ece6)] [background:var(--surface-fff)] flex items-center justify-between pt-[0] pr-[max(6vw,24px)] pb-[0] pl-[max(6vw,24px)] max-[600.01px]:h-[60px]"}><a className={"search-page-brand [font-style:normal] font-extrabold text-[20px] leading-[normal] [font-family:Manrope,sans-serif] tracking-[-1px] [color:var(--text-263127)] no-underline [&>span:first-child]:[color:var(--text-739b72)] [&>span:first-child]:text-[24px] [&>span:first-child]:mr-[6px] [&>span:last-child]:[color:var(--text-7caa7c)]"} href="/"><span>✳</span> semantic<span>.</span></a><div className="flex items-center gap-3"><a href="/saved" className="text-xs font-semibold">Saved products</a><ThemeToggle /><UserButton /><a className={"back-dashboard text-[12px] font-semibold [color:var(--text-667665)] no-underline [&_span]:ml-[6px]"} href="/dashboard">Back to dashboard <span>↗</span></a></div></header>
+      <header className={"search-page-header min-h-[72px] gap-3 py-3 [border-bottom:1px_solid_var(--border-e8ece6)] [background:var(--surface-fff)] flex items-center justify-between pr-[max(6vw,24px)] pl-[max(6vw,24px)] max-[600.01px]:min-h-[60px]"}><a className={"search-page-brand shrink-0 whitespace-nowrap [font-style:normal] font-extrabold text-[20px] leading-[normal] [font-family:Manrope,sans-serif] tracking-[-1px] [color:var(--text-263127)] no-underline [&>span:first-child]:[color:var(--text-739b72)] [&>span:first-child]:text-[24px] [&>span:first-child]:mr-[6px] [&>span:last-child]:[color:var(--text-7caa7c)]"} href="/"><span>✳</span> semantic<span>.</span></a><div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3"><a href="/saved" className="text-xs font-semibold">Saved products</a><ThemeToggle /><UserButton /><a className={"back-dashboard text-[12px] font-semibold [color:var(--text-667665)] no-underline [&_span]:ml-[6px]"} href="/dashboard">Back to dashboard <span>↗</span></a></div></header>
       <section className={"search-hero pt-[70px] pr-[24px] pb-[47px] pl-[24px] text-center max-w-[820px] mt-[auto] mr-[auto] mb-[auto] ml-[auto] [&_h1]:[font-style:normal] [&_h1]:font-bold [&_h1]:text-[clamp(40px,6vw,65px)] [&_h1]:leading-[1.04] [&_h1]:[font-family:Manrope,sans-serif] [&_h1]:tracking-[-3px] [&_h1]:mt-[15px] [&_h1]:mr-[0] [&_h1]:mb-[13px] [&_h1]:ml-[0] [&_h1]:[color:var(--text-29382e)] [&_h1_em]:[color:var(--text-79937a)] [&_h1_em]:font-medium [&>p]:text-[14px] [&>p]:[color:var(--text-838d82)] [&>p]:mt-[0] [&>p]:mr-[0] [&>p]:mb-[27px] [&>p]:ml-[0] max-[600.01px]:pt-[52px] max-[600.01px]:pr-[18px] max-[600.01px]:pb-[35px] max-[600.01px]:pl-[18px] max-[600.01px]:[&_h1]:tracking-[-2px] max-[600.01px]:[&>p]:text-[12px] max-[600.01px]:[&>p]:leading-[1.5]"}>
         <span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>PRODUCT DISCOVERY</span>
         <h1>Find what you’re<br/><em>looking for.</em></h1>
         <p>Choose a source and search by product, brand, or detail.</p>
+        <div className="mb-5 flex flex-wrap items-center justify-center gap-3 text-xs">
+          <label className="flex items-center gap-2"><input type="checkbox" checked={usePreferences} disabled={preferences.busy} onChange={event => setUsePreferences(event.target.checked)} />Use my saved preferences</label>
+          <a href="/preferences" className="underline">Edit budget and preferences</a>
+          {preferences.busy && <span role="status">Loading defaults…</span>}
+          {preferences.error && <span role="alert">Preferences could not be loaded. <button type="button" onClick={preferences.reload} className="underline">Retry</button></span>}
+        </div>
         <fieldset className={"search-source-picker [border:0] pt-[0] pr-[0] pb-[0] pl-[0] mt-[0] mr-[0] mb-[18px] ml-[0] flex justify-center gap-[10px] flex-wrap [&_legend]:mt-[0] [&_legend]:mr-[auto] [&_legend]:mb-[10px] [&_legend]:ml-[auto] [&_legend]:text-[11px] [&_legend]:[color:var(--text-667665)] [&_label]:flex [&_label]:items-center [&_label]:gap-[7px] [&_label]:pt-[10px] [&_label]:pr-[13px] [&_label]:pb-[10px] [&_label]:pl-[13px] [&_label]:[border:1px_solid_var(--border-dce4d9)] [&_label]:rounded-[8px] [&_label]:text-[12px] [&_label]:cursor-pointer [&_label]:[background:var(--surface-fff)] [&_label.is-selected]:[background:var(--surface-edf3e9)] [&_label.is-selected]:[border-color:var(--text-719375)] [&_label.is-selected]:[color:var(--text-3e6747)] [&_input]:[accent-color:var(--text-4f7857)] [&_label:focus-within]:[outline:2px_solid_var(--focus-ring)] [&_label:focus-within]:[outline-offset:3px]"}>
           <legend>Search source</legend>
           {Object.entries(SOURCES).map(([value, label]) => <label key={value} className={classes(source === value ? 'is-selected' : '')}>
@@ -221,7 +247,7 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
         <form className={"real-search-form light:[&.real-search-form_button]:[background:var(--day-action)] light:[&.real-search-form_button]:[color:var(--day-on-action)] light:[&.real-search-form_button:disabled]:[background:#aeb9ac] h-[62px] [background:var(--surface-fff)] [border:1px_solid_var(--border-dce4d9)] rounded-[11px] flex items-center pt-[6px] pr-[7px] pb-[6px] pl-[17px] [box-shadow:0_10px_35px_var(--shadow-384a3610)] [&_input]:h-[100%] [&_input]:min-w-[0] [&_input]:[flex:1] [&_input]:[border:0] [&_input]:[background:transparent] [&_input]:[color:var(--text-374237)] [&_input]:[font-style:normal] [&_input]:[font-weight:normal] [&_input]:text-[13px] [&_input]:leading-[normal] [&_input]:[font-family:'DM_Sans',sans-serif] [&_input:focus-visible]:[outline:2px_solid_var(--focus-ring)] [&_input:focus-visible]:[outline-offset:3px] [&_input:focus-visible]:rounded-[2px] [&_input::placeholder]:[color:var(--text-a1aaa0)] [&_button]:h-[46px] [&_button]:pt-[0] [&_button]:pr-[18px] [&_button]:pb-[0] [&_button]:pl-[18px] [&_button]:[border:0] [&_button]:rounded-[7px] [&_button]:[background:var(--surface-4f7857)] [&_button]:[color:white] [&_button]:[font-style:normal] [&_button]:font-semibold [&_button]:text-[12px] [&_button]:leading-[normal] [&_button]:[font-family:'DM_Sans',sans-serif] [&_button]:cursor-pointer [&_button:disabled]:[background:var(--surface-aeb9ac)] [&_button:disabled]:cursor-not-allowed [&_button_span]:text-[17px] [&_button_span]:ml-[10px] max-[600.01px]:h-[56px] max-[600.01px]:pl-[12px] max-[600.01px]:[&_button]:h-[42px] max-[600.01px]:[&_button]:pt-[0] max-[600.01px]:[&_button]:pr-[12px] max-[600.01px]:[&_button]:pb-[0] max-[600.01px]:[&_button]:pl-[12px] max-[600.01px]:[&_button]:text-[11px] dark:[&.real-search-form]:[border-color:#608368] dark:shadow-[0_0_0_4px_#a9c49708,0_16px_40px_#050d0926] dark:[&.real-search-form_button]:[background:#c9ddb5] dark:[&.real-search-form_button]:[color:#17251b] dark:[&.real-search-form_button:hover:not(:disabled)]:[background:#deebd0] dark:[&.real-search-form_button:disabled]:[background:#324337] dark:[&.real-search-form_button:disabled]:[color:#a3b3a5]"} onSubmit={submitSearch}>
           <span className={"search-glass text-[28px] [color:var(--text-879587)] leading-[1] mr-[11px] [transform:rotate(-20deg)]"} aria-hidden="true">⌕</span>
           <input autoFocus maxLength={512} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Try ‘wireless headphones’ or ‘mascara’" aria-label="Search products" />
-          <button type="submit" disabled={!input.trim() || loading}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
+          <button type="submit" disabled={!input.trim() || loading || preferences.busy}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
         </form>
         <span className={"search-data-note block mt-[11px] text-[10px] [color:var(--text-a1a99f)]"}>{shopping ? 'Google Shopping products, ranked when our search models are available. Prices and availability can change.' : 'Semantic catalog search with spelling suggestions. Images and prices may be unavailable.'}</span>
       </section>
