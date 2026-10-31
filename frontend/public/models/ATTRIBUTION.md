@@ -11,3 +11,5 @@
 Modifications: embedded textures resized to at most 1024px and encoded as WebP, reducing the GLB from 18.03 MB to 3.26 MB. Geometry preserved. The application normalizes scale and position, adds studio lighting and scroll animation, and offers a desaturated silver color study alongside the original green textures. Silver is a visual color study, not an exact reproduction of Apple's silver finish.
 
 AirPods Max is an Apple product. This independent educational landing page is not affiliated with Apple. Product information refers to the original generation: https://support.apple.com/en-us/111858
+
+- `airpods-max-meshopt-v1.glb`: lossless EXT_meshopt_compression geometry encoding; original WebP textures retained. Decoded geometry buffers verified byte-for-byte against the source. Version the filename when changing the asset because it is cached for one year.
