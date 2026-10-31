@@ -7,7 +7,7 @@ import type { SearchProduct } from '@/lib/types';
 
 export interface HistoryEntry {
   id: string; query: string; source: 'mongo' | 'serpapi'; fuzzy: boolean;
-  resultCount: number; searchedAt: string;
+  resultCount: number; searchedAt: string; usePreferences?: boolean;
 }
 export interface PersonalData {
   searchCount: number; savedCount: number; recentSearches: HistoryEntry[];

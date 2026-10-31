@@ -179,3 +179,15 @@ def test_preference_filters_currency_stock_and_exact_brand():
 def test_all_new_account_endpoints_require_authentication(method, path, body):
     response = getattr(TestClient(app), method)(path, **({'json': body} if body is not None else {}))
     assert response.status_code == 401
+
+
+@pytest.mark.parametrize('minimum,maximum,expected', [
+    (None, None, [5, 10, 20, 30]), (10, None, [10, 20, 30]),
+    (None, 20, [5, 10, 20]), (10, 20, [10, 20]), (0, 0, []),
+])
+def test_preference_budget_bounds_remain_inclusive(minimum, maximum, expected):
+    preferences = features.Preferences(currency='USD', minBudget=minimum, maxBudget=maximum).model_dump()
+    products = [{'title': 'Product', 'price': amount, 'currency': 'USD'} for amount in [5, 10, 20, 30]]
+    result = apply_preferences({'results': products, 'warning': 'Provider notice.'}, preferences)
+    assert [product['price'] for product in result['results']] == expected
+    assert result['warning'].startswith('Provider notice.')
