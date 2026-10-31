@@ -87,6 +87,13 @@ async def prevent_cached_results(request: Request, call_next):
     return response
 
 
+@app.get("/healthz")
+@app.get("/api/health/live")
+async def check_liveness():
+    """Cheap public ping: no database calls, authentication, or model inference."""
+    return {"ok": True, "service": "semantic-product-search"}
+
+
 @app.get("/")
 @app.get("/api/health")
 def check_health():
