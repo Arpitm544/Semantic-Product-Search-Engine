@@ -102,10 +102,10 @@ class TestReviewFixes(unittest.TestCase):
                 patch.object(search_service, 'load_reranker'), \
                 patch.object(search_service, 'get_candidate_ranker'), \
                 patch.object(search_service, 'ProductSearch', return_value=new):
-            self.assertEqual(api.search_products(api.search_options('coat'), session={'sub': 'user_test'}).status_code, 503)
+            self.assertEqual(api.search_products('coat', options=api.SearchOptions(), session={'sub': 'user_test'}).status_code, 503)
             self.assertFalse(ready.is_set())
             self.assertEqual(api.check_health().status_code, 503)
-            self.assertEqual(api.search_products(api.search_options('coat'), session={'sub': 'user_test'}), {'results': []})
+            self.assertEqual(api.search_products('coat', options=api.SearchOptions(), session={'sub': 'user_test'}), {'results': []})
             self.assertTrue(ready.is_set())
             self.assertEqual(api.check_health().status_code, 200)
 

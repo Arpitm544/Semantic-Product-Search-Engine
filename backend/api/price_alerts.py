@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from pymongo import ReturnDocument
-from pymongo.errors import PyMongoError
+from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from api.auth import require_session
 from api.account_store import PrivateDataRoute, store, saved_items, owned, now, iso, new_id
@@ -78,13 +78,6 @@ def list_alerts(offset: int = Query(0, ge=0, le=100000), session=Depends(require
             'intervalSeconds': interval_seconds(), 'schedulerEnabled': os.environ.get('PRICE_ALERTS_ENABLED', '1') == '1'}
 
 
-def alert_target(body, price):
-    target = body.targetPrice if body.targetPrice is not None else price['amount']
-    if target > price['amount']:
-        raise HTTPException(422, 'Target price must not exceed the saved price.')
-    return target
-
-
 @router.put('/api/price-alerts')
 def create_alert(body: AlertInput, session=Depends(require_session)):
     user = session['sub']
@@ -92,33 +85,54 @@ def create_alert(body: AlertInput, session=Depends(require_session)):
     price, reason = eligibility(item)
     if reason:
         raise HTTPException(422, reason)
-    target = alert_target(body, price)
+    target = body.targetPrice if body.targetPrice is not None else price['amount']
+    if target > price['amount']:
+        raise HTTPException(422, 'Target price must not exceed the saved price.')
     identifier = sha256(f'{user}:{body.savedId}'.encode()).hexdigest()
     previous = store('price_alerts').find_one({'_id': identifier, 'user_id': user})
     if previous:
         raise HTTPException(409, 'An alert already exists for this product. Manage it below.')
-    if store('price_alerts').count_documents({'user_id': user, 'enabled': True}) >= 50:
-        raise HTTPException(409, 'Pause or remove an alert before enabling more than 50 active alerts.')
     timestamp = now()
     row = {'_id': identifier, 'user_id': user, 'saved_id': body.savedId,
            'product': item['product'], 'source': item['source'], 'identity': item['identity'],
            'currency': price['currency'], 'baseline_price': price['amount'], 'min_price': price['amount'],
            'target_price': target, 'enabled': True, 'status': 'pending', 'market': market_settings(),
            'revision': new_id(), 'next_check_at': timestamp, 'updated_at': timestamp}
-    store('price_alerts').update_one({'_id': identifier, 'user_id': user}, {'$setOnInsert': row}, upsert=True)
+    reserve_active_slot(user, row)
     return public_alert(owned('price_alerts', identifier, user))
+
+
+def reserve_active_slot(user, row, resume=False):
+    alerts = store('price_alerts')
+    # Legacy enabled alerts have no slot. Keep that many slots reserved until
+    # they are paused; all new/resumed alerts use the unique partial index.
+    legacy = alerts.count_documents({'user_id': user, 'enabled': True, 'active_slot': {'$exists': False}})
+    for slot in range(legacy, 50):
+        try:
+            if resume:
+                result = alerts.update_one({'_id': row['_id'], 'user_id': user, 'enabled': False},
+                    {'$set': {'active_slot': slot, 'enabled': True, 'revision': new_id(), 'updated_at': now()}})
+                if not result.matched_count:
+                    owned('price_alerts', row['_id'], user)
+            else:
+                alerts.update_one({'_id': row['_id'], 'user_id': user},
+                    {'$setOnInsert': {**row, 'active_slot': slot}}, upsert=True)
+            return
+        except DuplicateKeyError:
+            continue
+    raise HTTPException(409, 'Pause or remove an alert before enabling more than 50 active alerts.')
 
 
 @router.patch('/api/price-alerts/{identifier}')
 def toggle_alert(identifier: str, body: AlertUpdate, session=Depends(require_session)):
     user = session['sub']
     row = owned('price_alerts', identifier, user)
-    if body.enabled:
+    if body.enabled and not row['enabled']:
         saved_items(user, [row['saved_id']])
-        if not row['enabled'] and store('price_alerts').count_documents({'user_id': user, 'enabled': True}) >= 50:
-            raise HTTPException(409, 'Pause another alert before resuming more than 50 active alerts.')
-    store('price_alerts').update_one({'_id': identifier, 'user_id': user},
-        {'$set': {'enabled': body.enabled, 'revision': new_id(), 'updated_at': now()}})
+        reserve_active_slot(user, row, resume=True)
+    elif not body.enabled:
+        store('price_alerts').update_one({'_id': identifier, 'user_id': user},
+            {'$set': {'enabled': False, 'revision': new_id(), 'updated_at': now()}})
     return {'ok': True}
 
 
@@ -128,12 +142,11 @@ def delete_alert(identifier: str, session=Depends(require_session)):
     return {'ok': True}
 
 
-def catalog_product(alert):
+def catalog_offer(alert):
     before = catalog.version()
-    identity = alert['identity']
-    identities = [identity]
-    if identity.isdigit() and len(identity) < 20:
-        identities.append(int(identity))
+    identities = [alert['identity']]
+    if alert['identity'].isdigit() and len(alert['identity']) < 20:
+        identities.append(int(alert['identity']))
     product = catalog.database()[catalog.COLLECTION].find_one({'id': {'$in': identities}}, {'_id': 0})
     if catalog.version() != before:
         raise ValueError('The catalog is updating. A later check will retry.')
@@ -148,7 +161,7 @@ def same_offer(item, alert):
     return str(item.get('merchant') or '').casefold() == alert['product']['merchant'].casefold()
 
 
-def shopping_product(alert):
+def shopping_offer(alert):
     if alert['market'] != market_settings():
         raise ValueError('Shopping region settings changed. Recreate this alert for the new region.')
     candidates = search_shopping(alert['product']['title'])['results']
@@ -159,9 +172,11 @@ def shopping_product(alert):
 
 
 def observe_price(alert):
-    product = catalog_product(alert) if alert['source'] == 'mongo' else shopping_product(alert)
+    product = catalog_offer(alert) if alert['source'] == 'mongo' else shopping_offer(alert)
     quote = price_info(product)
-    if not quote or quote['currency'] != alert['currency']:
+    if not quote:
+        raise ValueError('A comparable price in the original currency is unavailable.')
+    if quote['currency'] != alert['currency']:
         raise ValueError('A comparable price in the original currency is unavailable.')
     return quote['amount']
 

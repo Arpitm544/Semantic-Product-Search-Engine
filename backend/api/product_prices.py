@@ -15,15 +15,25 @@ def numeric(value):
         return None
 
 
+def label_currencies(label):
+    explicit = {value for value in CURRENCIES if re.search(r'\b' + value + r'\b', label, re.I)}
+    tokens = {'₹': 'INR', '€': 'EUR', '£': 'GBP', 'US$': 'USD', 'CA$': 'CAD',
+              'A$': 'AUD', 'NZ$': 'NZD', 'S$': 'SGD', 'HK$': 'HKD'}
+    # Longest tokens prevent US$ matching S$, or CA$ matching A$.
+    pattern = '|'.join(re.escape(symbol) for symbol in sorted(tokens, key=len, reverse=True))
+    return explicit | {tokens[match.group()] for match in re.finditer(pattern, label)}
+
+
 def currency_of(product):
     code = str(product.get('currency') or '').upper().strip()
-    label = str(product.get('priceLabel') or '')
-    explicit = {value for value in CURRENCIES if re.search(r'\b' + value + r'\b', label, re.I)}
-    symbols = [('₹', 'INR'), ('€', 'EUR'), ('£', 'GBP'), ('US$', 'USD'), ('CA$', 'CAD'), ('A$', 'AUD'), ('NZ$', 'NZD'), ('S$', 'SGD'), ('HK$', 'HKD')]
-    found = explicit | {currency for symbol, currency in symbols if symbol in label}
-    if code:
-        return code if code in CURRENCIES and (not found or found == {code}) else None
-    return found.pop() if len(found) == 1 else None
+    found = label_currencies(str(product.get('priceLabel') or ''))
+    if not code:
+        return found.pop() if len(found) == 1 else None
+    if code not in CURRENCIES:
+        return None
+    if found and found != {code}:
+        return None
+    return code
 
 
 def price_info(product):
@@ -33,22 +43,22 @@ def price_info(product):
     return {'amount': amount, 'currency': currency}
 
 
-def within_budget(product, preferences):
-    minimum, maximum = preferences['minBudget'], preferences['maxBudget']
-    if minimum is None and maximum is None:
+def matches_budget(product, preferences):
+    low, high = preferences['minBudget'], preferences['maxBudget']
+    if low is None and high is None:
         return True
     price = price_info(product)
-    if not price or price['currency'] != preferences['currency']:
+    if not price:
         return False
-    return price_in_range(price['amount'], minimum, maximum)
+    if price['currency'] != preferences['currency']:
+        return False
+    return within_budget(price['amount'], low, high)
 
 
-def price_in_range(amount, minimum, maximum):
-    if minimum is not None and amount < minimum:
+def within_budget(amount, low, high):
+    if low is not None and amount < low:
         return False
-    if maximum is not None and amount > maximum:
-        return False
-    return True
+    return high is None or amount <= high
 
 
 def matches_detail(product, field, values):
@@ -57,18 +67,18 @@ def matches_detail(product, field, values):
     return str(product.get(field) or '').casefold() in {v.casefold() for v in values}
 
 
-def matches_stock(product, preferences):
-    if not preferences['inStockOnly']:
+def matches_stock(product, required):
+    if not required:
         return True
     stock = numeric(product.get('stock'))
     return stock is not None and stock > 0
 
 
 def matches_preferences(product, preferences):
-    return all((within_budget(product, preferences),
+    return all((matches_budget(product, preferences),
                 matches_detail(product, 'category', preferences['categories']),
                 matches_detail(product, 'brand', preferences['brands']),
-                matches_stock(product, preferences)))
+                matches_stock(product, preferences['inStockOnly'])))
 
 
 def apply_preferences(payload, preferences):

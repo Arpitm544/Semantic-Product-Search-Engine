@@ -29,12 +29,6 @@ class ComparisonInput(Named):
         return self
 
 
-def budget_is_reversed(minimum, maximum):
-    if minimum is None or maximum is None:
-        return False
-    return minimum > maximum
-
-
 class Preferences(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
     defaultSource: Literal['mongo', 'serpapi'] = 'mongo'
@@ -55,8 +49,13 @@ class Preferences(BaseModel):
 
     @model_validator(mode='after')
     def valid_budget(self):
-        if budget_is_reversed(self.minBudget, self.maxBudget):
+        if self.minBudget is None or self.maxBudget is None:
+            return self.normalize_filters()
+        if self.minBudget > self.maxBudget:
             raise ValueError('Minimum budget must not exceed maximum budget.')
+        return self.normalize_filters()
+
+    def normalize_filters(self):
         self.categories = list(dict.fromkeys(self.categories))
         self.brands = list(dict.fromkeys(self.brands))
         return self
@@ -139,6 +138,26 @@ def add_collection_product(identifier: str, saved_id: str, session=Depends(requi
         {'$addToSet': {'product_ids': saved_id}, '$set': {'updated_at': now()}})
     if not updated.matched_count:
         raise HTTPException(409, 'This collection can hold up to 100 products.')
+    return {'ok': True}
+
+
+class CollectionProducts(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    savedIds: list[Identifier] = Field(min_length=1, max_length=10)
+
+
+@router.put('/api/collections/{identifier}/products')
+def add_collection_products(identifier: str, body: CollectionProducts, session=Depends(require_session)):
+    user = session['sub']
+    owned('product_collections', identifier, user)
+    ids = list(dict.fromkeys(body.savedIds))
+    saved_items(user, ids)
+    result = store('product_collections').update_one(
+        {'_id': identifier, 'user_id': user,
+         '$expr': {'$lte': [{'$size': {'$setUnion': ['$product_ids', ids]}}, 100]}},
+        {'$addToSet': {'product_ids': {'$each': ids}}, '$set': {'updated_at': now()}})
+    if not result.matched_count:
+        raise HTTPException(409, 'Adding these products would exceed the 100-product limit. No products were added.')
     return {'ok': True}
 
 

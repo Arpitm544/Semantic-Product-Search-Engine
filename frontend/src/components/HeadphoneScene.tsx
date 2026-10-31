@@ -10,7 +10,8 @@ import HeadphonePoster from './HeadphonePoster';
 
 // AirPods Max by Mr.Philin, CC BY 4.0. See public/models/ATTRIBUTION.md.
 async function loadHeadphones(T: typeof THREE, GLTFLoader: typeof Loader) {
-  const gltf = await new GLTFLoader().loadAsync('/models/airpods-max.glb');
+  const { MeshoptDecoder } = await import('three/addons/libs/meshopt_decoder.module.js');
+  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('/models/airpods-max-meshopt-v1.glb');
   const asset = gltf.scene;
   asset.updateMatrixWorld(true);
   const bounds = new T.Box3().setFromObject(asset);
@@ -102,6 +103,18 @@ function makeMeaningSpace(T: typeof THREE) {
   return field;
 }
 
+function updateFieldOpacity(T: typeof THREE, field: THREE.Group, opacity: number) {
+  field.traverse((object) => {
+    if (!(object instanceof T.Mesh || object instanceof T.Points || object instanceof T.Line)) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) {
+      if (material.userData.originalOpacity === undefined) material.userData.originalOpacity = material.opacity;
+      material.opacity = material.userData.originalOpacity * opacity;
+      material.transparent = true;
+    }
+  });
+}
+
 export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef, onFailure }: { progressRef: MutableRefObject<number>; appearanceRef: MutableRefObject<string>; rotationRef: MutableRefObject<number>; onFailure: () => void }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
@@ -137,11 +150,15 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
       let pointerMove: ((event: PointerEvent) => void) | undefined;
       let pointerUp: (() => void) | undefined;
       let cleaned = false;
+      let requestRender = () => {};
+      const invalidate = () => requestRender();
       const onContextLost = (event: Event) => { event.preventDefault(); fail(); };
       const cleanup = () => {
         if (cleaned) return;
         cleaned = true;
         cancelAnimationFrame(frame);
+        window.removeEventListener('scroll', invalidate);
+        document.removeEventListener('click', invalidate);
         resizeObserver?.disconnect(); visibilityObserver?.disconnect();
         if (onVisibilityChange) document.removeEventListener('visibilitychange', onVisibilityChange);
         if (renderer?.domElement) {
@@ -192,33 +209,27 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
           const width = host.clientWidth, height = host.clientHeight;
           if (!width || !height) return;
           camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height);
+          invalidate();
         };
         resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); resize();
         let visible = false, dragging = false, lastX = 0, manualRotation = 0;
         let smoothed = progressRef.current;
         const lerp = T.MathUtils.lerp;
-        const animate = (time = 0) => {
+        const animate = () => {
+          frame = 0;
           if (disposed || !visible || document.hidden) return;
-          smoothed = lerp(smoothed, progressRef.current, .09);
+          smoothed = Math.abs(smoothed - progressRef.current) < .0001 ? progressRef.current : lerp(smoothed, progressRef.current, .09);
           const cloud = T.MathUtils.smoothstep(smoothed, .43, .56) * (1 - T.MathUtils.smoothstep(smoothed, .72, .81));
           headphones.visible = cloud < .98;
           const scale = lerp(1 + T.MathUtils.smoothstep(smoothed, .12, .38) * .12, .34, cloud);
           headphones.scale.setScalar(scale);
-          headphones.position.set(lerp(0, 1.6, cloud), Math.sin(time * .00065) * .04 - .05, lerp(0, -.8, cloud));
+          headphones.position.set(lerp(0, 1.6, cloud), -.05, lerp(0, -.8, cloud));
           headphones.rotation.set(.12 + cloud * .12, -.95 + smoothed * Math.PI * 2 + manualRotation + rotationRef.current, -.06 + Math.sin(smoothed * Math.PI) * .12);
           headphones.userData.finish.value = appearanceRef.current === 'sage' ? 0 : 1;
           field.visible = cloud > .01;
           field.rotation.y = -.2 + smoothed * .45;
           field.scale.setScalar(lerp(.4, 1.04, cloud));
-          field.traverse((object) => {
-            if (!(object instanceof T.Mesh || object instanceof T.Points || object instanceof T.Line)) return;
-            const materials = Array.isArray(object.material) ? object.material : [object.material];
-            for (const material of materials) {
-              if (material.userData.originalOpacity === undefined) material.userData.originalOpacity = material.opacity;
-              material.opacity = material.userData.originalOpacity * cloud;
-              material.transparent = true;
-            }
-          });
+          updateFieldOpacity(T, field, cloud);
           try {
             renderer.render(scene, camera);
           } catch {
@@ -229,13 +240,17 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
             host.dataset.sceneReady = 'true';
             setReady(true);
           }
-          frame = requestAnimationFrame(animate);
+          if (smoothed !== progressRef.current) frame = requestAnimationFrame(animate);
         };
-        const start = () => { cancelAnimationFrame(frame); if (visible && !document.hidden) frame = requestAnimationFrame(animate); };
-        visibilityObserver = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; start(); }, { rootMargin: '100px' });
+        // Render only while scroll easing is active or an input changes the scene.
+        const start = () => { cancelAnimationFrame(frame); frame = 0; if (visible && !document.hidden) frame = requestAnimationFrame(animate); };
+        requestRender = start;
+        window.addEventListener('scroll', invalidate, { passive: true });
+        document.addEventListener('click', invalidate);
+        visibilityObserver = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; start(); }, { rootMargin: '0px' });
         visibilityObserver.observe(host);
         pointerDown = (event) => { if (event.button !== 0) return; event.preventDefault(); dragging = true; lastX = event.clientX; renderer.domElement.setPointerCapture(event.pointerId); };
-        pointerMove = (event) => { if (!dragging) return; manualRotation += (event.clientX - lastX) * .009; lastX = event.clientX; };
+        pointerMove = (event) => { if (!dragging) return; manualRotation += (event.clientX - lastX) * .009; lastX = event.clientX; start(); };
         pointerUp = () => { dragging = false; };
         renderer.domElement.addEventListener('pointerdown', pointerDown);
         renderer.domElement.addEventListener('pointermove', pointerMove);

@@ -8,22 +8,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pymongo.errors import PyMongoError
 
-from api.account_store import clean_saved_links
+from api.account_store import clean_saved_links, iso
 from api.auth import require_session
 from src.data.db import get_database
 
 router = APIRouter(prefix="/api/saved-products", tags=["Saved products"])
 
 
-def validate_numeric_detail(value):
-    import math
-    if isinstance(value, float) and not math.isfinite(value):
-        raise ValueError('Numeric details must be finite.')
-
-
-def validate_text_detail(value):
-    if isinstance(value, str) and len(value) > 200:
+def bounded_numeric_text(value):
+    if len(value) > 200:
         raise ValueError('Product details are too long.')
+    return value
 
 
 class ProductSnapshot(BaseModel):
@@ -41,10 +36,13 @@ class ProductSnapshot(BaseModel):
     @field_validator('price', 'rating', 'reviews', 'stock', mode='before')
     @classmethod
     def bounded_values(cls, value):
+        import math
         if isinstance(value, bool):
             raise ValueError('Numeric details cannot be booleans.')
-        validate_numeric_detail(value)
-        validate_text_detail(value)
+        if isinstance(value, str):
+            return bounded_numeric_text(value)
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError('Numeric details must be finite.')
         return value
 
     @field_validator('attributes')
@@ -82,7 +80,7 @@ def saved_id(user_id, source, identity):
 
 def public_item(item):
     return {"id": item["_id"], "source": item["source"], "identity": item["identity"],
-            "product": item["product"], "savedAt": item["saved_at"].isoformat()}
+            "product": item["product"], "savedAt": iso(item["saved_at"])}
 
 
 def unavailable():

@@ -38,6 +38,8 @@ def store(name):
     result.create_index([('user_id', 1), ('updated_at', -1), ('_id', 1)])
     if name == 'price_alerts':
         result.create_index([('enabled', 1), ('next_check_at', 1)])
+        result.create_index([('user_id', 1), ('active_slot', 1)], unique=True,
+            partialFilterExpression={'enabled': True, 'active_slot': {'$type': 'int'}})
     return result
 
 

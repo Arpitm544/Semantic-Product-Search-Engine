@@ -1,5 +1,5 @@
 'use client';
-import { useAccountResource, safeProductUrl as webUrl, type Preferences } from '@/lib/account';
+import { useAccountResource, type Preferences } from '@/lib/account';
 import SaveProductButton from '@/components/SaveProductButton';
 import ThemeToggle from '@/components/ThemeToggle';
 import { classes } from '@/lib/classes';
@@ -12,23 +12,108 @@ import { useAuth, UserButton } from '@clerk/nextjs';
 
 const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi' };
 
-function priceAmount(value: SearchProduct['price']) {
+function searchParams({ query, source, fuzzy, usePreferences }: { query: string; source: string; fuzzy: boolean; usePreferences: boolean }) {
+  return new URLSearchParams({ q: query, source, fuzzy: fuzzy ? '1' : '0', preferences: usePreferences ? '1' : '0' });
+}
+
+function validSearchProduct(product: unknown): product is SearchProduct {
+  if (!product) return false;
+  if (typeof product !== 'object') return false;
+  if (!('title' in product)) return false;
+  return typeof product.title === 'string';
+}
+interface SearchPayload {
+  results: SearchProduct[];
+  candidateCount: number;
+  correctedQuery?: string;
+  warning?: string;
+  historySaved?: boolean;
+}
+function isSearchPayload(value: unknown): value is Record<string, unknown> {
+  if (value === null) return false;
+  return typeof value === 'object';
+}
+
+async function readSearchJson(response: Response): Promise<unknown> {
+  try { return await response.json(); }
+  catch { throw new Error('Search returned an unreadable response. Please try again shortly.'); }
+}
+
+function searchFailureMessage(payload: unknown) {
+  const fallback = 'Search could not be completed. Please try again shortly.';
+  if (!isSearchPayload(payload)) return fallback;
+  return typeof payload.error === 'string' ? payload.error : fallback;
+}
+
+function requireSearchSuccess(response: Response, payload: unknown) {
+  if (!response.ok) throw new Error(searchFailureMessage(payload));
+}
+
+function validateSearchResults(payload: unknown): SearchPayload {
+  const message = 'Search returned an invalid response. Please try again shortly.';
+  if (!isSearchPayload(payload)) throw new Error(message);
+  if (!Array.isArray(payload.results)) throw new Error(message);
+  if (!payload.results.every(validSearchProduct)) throw new Error(message);
+  return payload as unknown as SearchPayload;
+}
+
+async function readSearchResponse(response: Response): Promise<SearchPayload> {
+  const payload = await readSearchJson(response);
+  requireSearchSuccess(response, payload);
+  return validateSearchResults(payload);
+}
+
+function searchDetails(payload: SearchPayload) {
+  return {
+    total: Number.isFinite(payload.candidateCount) ? payload.candidateCount : payload.results.length,
+    correctedQuery: typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null,
+    warning: searchWarning(payload),
+  };
+}
+function searchWarning(payload: SearchPayload) {
+  return [typeof payload.warning === 'string' ? payload.warning : '', payload.historySaved === false ? 'Results are ready, but this search could not be saved to your history.' : ''].filter(Boolean).join(' ');
+}
+
+function searchError(reason: unknown, timedOut: boolean) {
+  if (timedOut) return 'Search took too long. Please try again.';
+  if (reason instanceof TypeError) return 'Cannot reach the search service. Make sure the backend is running and try again.';
+  if (reason instanceof Error) return reason.message || 'Search could not be completed.';
+  return 'Search could not be completed.';
+}
+
+function numericSearchPrice(value: SearchProduct['price']) {
   if (value == null) return null;
   if (value === '') return null;
-  const amount = Number(value);
-  return Number.isFinite(amount) ? amount : null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
-function formatPrice(amount: number, product: SearchProduct) {
-  // Shopping prices without a currency label must not be assigned a guessed currency.
-  if (product.matchSources?.includes('google-shopping')) return new Intl.NumberFormat('en-IN').format(amount);
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: product.currency || 'INR', maximumFractionDigits: 0 }).format(amount);
+
+function searchPriceOptions(product: SearchProduct): Intl.NumberFormatOptions {
+  if (!product.currency) return {};
+  // Shopping prices without an explicit label must not get a guessed currency.
+  if (product.matchSources?.includes('google-shopping')) return {};
+  return { style: 'currency', currency: product.currency, maximumFractionDigits: 0 };
 }
+
+function formatSearchPrice(amount: number, product: SearchProduct) {
+  try { return new Intl.NumberFormat('en-IN', searchPriceOptions(product)).format(amount); }
+  catch { return 'Price unavailable'; }
+}
+
 function money(product: SearchProduct) {
   if (product.priceLabel) return product.priceLabel;
-  const amount = priceAmount(product.price);
+  const amount = numericSearchPrice(product.price);
   if (amount === null) return 'Price unavailable';
-  try { return formatPrice(amount, product); }
-  catch { return 'Price unavailable'; }
+  return formatSearchPrice(amount, product);
+}
+
+function webUrl(value: string | undefined) {
+  try {
+    const url = new URL(value ?? '');
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
+  } catch {
+    return null;
+  }
 }
 
 function ProductImage({ product, index }: { product: SearchProduct; index: number }) {
@@ -41,51 +126,6 @@ function ProductImage({ product, index }: { product: SearchProduct; index: numbe
         : <span role="img" aria-label="Product image unavailable">{product.title?.slice(0, 1) || 'P'}</span>}
     </div>
   );
-}
-
-function validProduct(product: unknown): product is SearchProduct {
-  if (!product || typeof product !== 'object') return false;
-  if (!('title' in product)) return false;
-  return typeof product.title === 'string';
-}
-async function readSearchJson(response: Response) {
-  try { return await response.json(); }
-  catch { throw new Error('Search returned an unreadable response. Please try again shortly.'); }
-}
-function responseError(payload: { error?: unknown } | null) {
-  return typeof payload?.error === 'string' ? payload.error : 'Search could not be completed. Please try again shortly.';
-}
-function validateResults(results: unknown): asserts results is SearchProduct[] {
-  if (!Array.isArray(results)) throw new Error('Search returned an invalid response. Please try again shortly.');
-  if (!results.every(validProduct)) throw new Error('Search returned an invalid response. Please try again shortly.');
-}
-async function searchResponse(response: Response) {
-  const payload = await readSearchJson(response);
-  if (!response.ok) throw new Error(responseError(payload));
-  validateResults(payload?.results);
-  return payload as { results: SearchProduct[]; candidateCount?: number; correctedQuery?: string; warning?: string; historySaved?: boolean };
-}
-function searchSummary(payload: Awaited<ReturnType<typeof searchResponse>>) {
-  return {
-    total: Number.isFinite(payload.candidateCount) ? payload.candidateCount! : payload.results.length,
-    correction: typeof payload.correctedQuery === 'string' ? payload.correctedQuery : null,
-    warning: searchWarning(payload),
-  };
-}
-function searchWarning(payload: { warning?: string; historySaved?: boolean }) {
-  const warnings = [typeof payload.warning === 'string' ? payload.warning : ''];
-  if (payload.historySaved === false) warnings.push('Results are ready, but this search could not be saved to your history.');
-  return warnings.filter(Boolean).join(' ');
-}
-function searchError(reason: unknown, timedOut: boolean) {
-  if (timedOut) return 'Search took too long. Please try again.';
-  if (reason instanceof TypeError) return 'Cannot reach the search service. Make sure the backend is running and try again.';
-  if (reason instanceof Error && reason.message) return reason.message;
-  return 'Search could not be completed.';
-}
-
-function searchParameters(query: string, options: { source: string; fuzzy: boolean; preferences: boolean }) {
-  return new URLSearchParams({ q: query, source: options.source, fuzzy: options.fuzzy ? '1' : '0', preferences: options.preferences ? '1' : '0' });
 }
 
 export default function ProductSearchPage({ initialQuery = '', initialSource = 'mongo', initialFuzzy = true, initialPreferences = false }: {
@@ -146,14 +186,6 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
     await runSearch(input.trim());
   }
 
-  function displayResults(payload: Awaited<ReturnType<typeof searchResponse>>) {
-    setResults(payload.results);
-    const summary = searchSummary(payload);
-    setTotal(summary.total);
-    setCorrectedQuery(summary.correction);
-    setWarning(summary.warning);
-  }
-
   async function runSearch(query: string, fuzzy = true) {
     if (!query) return;
     pending.current?.abort();
@@ -170,11 +202,15 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
     setWarning('');
     setCorrectedQuery(null);
     try {
-      const params = searchParameters(query, { source, fuzzy, preferences: usePreferences });
+      const params = searchParams({ query, source, fuzzy, usePreferences });
       const response = await authenticatedFetch(`${API_BASE}/api/search?${params}`, { signal: controller.signal });
-      const payload = await searchResponse(response);
+      const payload = await readSearchResponse(response);
       if (pending.current !== controller) return;
-      displayResults(payload);
+      setResults(payload.results);
+      const details = searchDetails(payload);
+      setTotal(details.total);
+      setCorrectedQuery(details.correctedQuery);
+      setWarning(details.warning);
     } catch (reason) {
       if (pending.current !== controller) return;
       if (controller.signal.aborted && !timedOut) return;
@@ -190,7 +226,7 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
 
   return (
     <main className={"product-search-page min-h-[100vh] [background:var(--surface-fafbf8)] [color:var(--text-263127)] [font-family:'DM_Sans',sans-serif]"}>
-      <header className={"search-page-header h-[72px] [border-bottom:1px_solid_var(--border-e8ece6)] [background:var(--surface-fff)] flex items-center justify-between pt-[0] pr-[max(6vw,24px)] pb-[0] pl-[max(6vw,24px)] max-[600.01px]:h-[60px]"}><a className={"search-page-brand [font-style:normal] font-extrabold text-[20px] leading-[normal] [font-family:Manrope,sans-serif] tracking-[-1px] [color:var(--text-263127)] no-underline [&>span:first-child]:[color:var(--text-739b72)] [&>span:first-child]:text-[24px] [&>span:first-child]:mr-[6px] [&>span:last-child]:[color:var(--text-7caa7c)]"} href="/"><span>✳</span> semantic<span>.</span></a><div className="flex items-center gap-3"><a href="/saved" className="text-xs font-semibold">Saved products</a><ThemeToggle /><UserButton /><a className={"back-dashboard text-[12px] font-semibold [color:var(--text-667665)] no-underline [&_span]:ml-[6px]"} href="/dashboard">Back to dashboard <span>↗</span></a></div></header>
+      <header className={"search-page-header min-h-[72px] gap-3 py-3 [border-bottom:1px_solid_var(--border-e8ece6)] [background:var(--surface-fff)] flex items-center justify-between pr-[max(6vw,24px)] pl-[max(6vw,24px)] max-[600.01px]:min-h-[60px]"}><a className={"search-page-brand shrink-0 whitespace-nowrap [font-style:normal] font-extrabold text-[20px] leading-[normal] [font-family:Manrope,sans-serif] tracking-[-1px] [color:var(--text-263127)] no-underline [&>span:first-child]:[color:var(--text-739b72)] [&>span:first-child]:text-[24px] [&>span:first-child]:mr-[6px] [&>span:last-child]:[color:var(--text-7caa7c)]"} href="/"><span>✳</span> semantic<span>.</span></a><div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3"><a href="/saved" className="text-xs font-semibold">Saved products</a><ThemeToggle /><UserButton /><a className={"back-dashboard text-[12px] font-semibold [color:var(--text-667665)] no-underline [&_span]:ml-[6px]"} href="/dashboard">Back to dashboard <span>↗</span></a></div></header>
       <section className={"search-hero pt-[70px] pr-[24px] pb-[47px] pl-[24px] text-center max-w-[820px] mt-[auto] mr-[auto] mb-[auto] ml-[auto] [&_h1]:[font-style:normal] [&_h1]:font-bold [&_h1]:text-[clamp(40px,6vw,65px)] [&_h1]:leading-[1.04] [&_h1]:[font-family:Manrope,sans-serif] [&_h1]:tracking-[-3px] [&_h1]:mt-[15px] [&_h1]:mr-[0] [&_h1]:mb-[13px] [&_h1]:ml-[0] [&_h1]:[color:var(--text-29382e)] [&_h1_em]:[color:var(--text-79937a)] [&_h1_em]:font-medium [&>p]:text-[14px] [&>p]:[color:var(--text-838d82)] [&>p]:mt-[0] [&>p]:mr-[0] [&>p]:mb-[27px] [&>p]:ml-[0] max-[600.01px]:pt-[52px] max-[600.01px]:pr-[18px] max-[600.01px]:pb-[35px] max-[600.01px]:pl-[18px] max-[600.01px]:[&_h1]:tracking-[-2px] max-[600.01px]:[&>p]:text-[12px] max-[600.01px]:[&>p]:leading-[1.5]"}>
         <span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>PRODUCT DISCOVERY</span>
         <h1>Find what you’re<br/><em>looking for.</em></h1>
