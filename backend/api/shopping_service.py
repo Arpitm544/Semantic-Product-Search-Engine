@@ -94,6 +94,7 @@ def normalize_products(payload, limit):
             "url": url,
             "rating": rating if rating is not None and rating <= 5 else None,
             "reviews": number(row.get("reviews")),
+            "attributes": [text(value)[:500] for value in row.get("extensions", []) if isinstance(value, str)][:40] if isinstance(row.get("extensions", []), list) else [],
             "matchSources": ["google-shopping"],
         })
         if len(results) >= limit:

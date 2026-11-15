@@ -102,10 +102,10 @@ class TestReviewFixes(unittest.TestCase):
                 patch.object(search_service, 'load_reranker'), \
                 patch.object(search_service, 'get_candidate_ranker'), \
                 patch.object(search_service, 'ProductSearch', return_value=new):
-            self.assertEqual(api.search_products('coat').status_code, 503)
+            self.assertEqual(api.search_products('coat', options=api.SearchOptions(), session={'sub': 'user_test'}).status_code, 503)
             self.assertFalse(ready.is_set())
             self.assertEqual(api.check_health().status_code, 503)
-            self.assertEqual(api.search_products('coat'), {'results': []})
+            self.assertEqual(api.search_products('coat', options=api.SearchOptions(), session={'sub': 'user_test'}), {'results': []})
             self.assertTrue(ready.is_set())
             self.assertEqual(api.check_health().status_code, 200)
 
@@ -194,3 +194,7 @@ class TestReviewFixes(unittest.TestCase):
             with patch.object(download_esci, 'download_verified'):
                 download_esci.download_dataset(Namespace(output_dir=root, revision=None), Mock())
             self.assertEqual(json.loads(path.read_text())['revision'], metadata['revision'])
+
+
+import pytest
+pytestmark = pytest.mark.usefixtures("authenticated_api")
