@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { API_BASE, useAuthenticatedFetch } from '@/lib/api';
-import type { SearchProduct } from '@/lib/types';
+import type { SearchProduct, SearchSource } from '@/lib/types';
 
-type SaveProductProps = { product: SearchProduct; source: 'mongo' | 'serpapi' };
+type SaveProductProps = { product: SearchProduct; source: SearchSource };
 
 function productIdentity(product: SearchProduct) {
   return String(product.id ?? product.url ?? `${product.title}:${product.merchant || ''}`);

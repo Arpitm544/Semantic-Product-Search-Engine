@@ -1,4 +1,5 @@
 'use client';
+import { productSourceLabel } from '@/lib/types';
 import { useAuth } from '@clerk/nextjs';
 import { useEffect, useState } from 'react';
 import { accountError, useAccountApi, type SavedItem, type Page } from '@/lib/account';
@@ -37,7 +38,7 @@ function usePickerProducts() {
 }
 type PickerProps = { selected: string[]; onChange: (value: string[]) => void; max: number; disabled: boolean };
 function PickerOption({ item, selected, onChange, max, disabled }: PickerProps & { item: SavedItem }) {
-  return <label key={item.id} className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1" checked={selected.includes(item.id)} disabled={disabled || (!selected.includes(item.id) && selected.length >= max)} onChange={event => onChange(event.target.checked ? [...selected, item.id] : selected.filter(id => id !== item.id))} /><span className="min-w-0 break-words">{item.product.title}<small className="block opacity-60">{item.source === 'mongo' ? 'Catalog' : item.product.merchant || 'Google Shopping'}</small></span></label>;
+  return <label key={item.id} className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1" checked={selected.includes(item.id)} disabled={disabled || (!selected.includes(item.id) && selected.length >= max)} onChange={event => onChange(event.target.checked ? [...selected, item.id] : selected.filter(id => id !== item.id))} /><span className="min-w-0 break-words">{item.product.title}<small className="block opacity-60">{productSourceLabel(item.source, item.product)}</small></span></label>;
 }
 export function SavedProductPicker({ selected, onChange, max = 4, disabled = false }: { selected: string[]; onChange: (value: string[]) => void; max?: number; disabled?: boolean }) {
   const { items, more, busy, error, loadMore } = usePickerProducts();

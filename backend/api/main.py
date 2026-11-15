@@ -33,6 +33,7 @@ from api import search_service
 from api.search_service import get_search_engine, _search_ready
 from src.data.catalog import CatalogUpdatingError
 from api.shopping_service import ShoppingError, search_shopping, rank_shopping_response
+from api.shops_service import search_shops, rank_shops_response
 
 PORT = int(os.environ.get("PORT", "8000"))
 FRONTEND_ORIGINS = [
@@ -152,8 +153,8 @@ class SearchOptions:
 
 
 def search_validation(query, source):
-    if source not in ("mongo", "serpapi"):
-        return JSONResponse(status_code=400, content={"error": "Choose a valid search source: mongo or serpapi."})
+    if source not in ("mongo", "serpapi", "shops"):
+        return JSONResponse(status_code=400, content={"error": "Choose a valid search source: mongo, serpapi, or shops."})
     if len(query) > 512:
         return JSONResponse(status_code=400, content={"error": "Search queries must be 512 characters or fewer."})
     return None
@@ -161,7 +162,7 @@ def search_validation(query, source):
 
 @app.get("/api/search")
 def search_products(q: str = "", options: SearchOptions = Depends(SearchOptions), session=Depends(require_session)):
-    """Choose MongoDB semantic search or Google Shopping via SerpApi."""
+    """Choose MongoDB semantic search, Google Shopping via SerpApi, or free online shops."""
     query = q.strip()
     invalid = search_validation(query, options.source)
     if invalid is not None:
@@ -175,6 +176,8 @@ def search_products(q: str = "", options: SearchOptions = Depends(SearchOptions)
     context = SearchContext(session['sub'], query, options.source, options.fuzzy, options.preferences)
     if options.source == "serpapi":
         return shopping_search(context, values)
+    if options.source == "shops":
+        return shops_search(context, values)
     return catalog_search(context, values)
 
 
@@ -185,6 +188,16 @@ def shopping_search(context, preferences):
     except ShoppingError as error:
         return JSONResponse(status_code=error.status, content={
             "error": str(error), "code": error.code, "source": "serpapi",
+        })
+
+
+def shops_search(context, preferences):
+    try:
+        payload = rank_shops_response(search_shops(context.query))
+        return finish_search(context, payload, preferences)
+    except ShoppingError as error:
+        return JSONResponse(status_code=error.status, content={
+            "error": str(error), "code": error.code, "source": "shops",
         })
 
 
@@ -218,7 +231,7 @@ def catalog_search(context, preferences):
 
 def finish_search(context, payload, preferences):
     if preferences is not None:
-        payload = apply_preferences(payload, preferences)
+        payload = apply_preferences(payload, preferences, context.source)
     return remember_search(context, payload)
 
 

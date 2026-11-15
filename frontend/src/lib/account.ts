@@ -2,12 +2,12 @@
 import { useAuth } from '@clerk/nextjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE, useAuthenticatedFetch } from './api';
-import type { SearchProduct } from './types';
+import type { SearchProduct, SearchSource } from './types';
 
-export interface SavedItem { id: string; identity: string; source: 'mongo' | 'serpapi'; product: SearchProduct; savedAt: string }
+export interface SavedItem { id: string; identity: string; source: SearchSource; product: SearchProduct; savedAt: string }
 export interface ProductCollection { id: string; name: string; productIds: string[]; updatedAt: string; items?: SavedItem[] }
 export interface Comparison { id: string; name: string; updatedAt: string; products: { savedId: string; source: string; product: SearchProduct }[] }
-export interface Preferences { defaultSource: 'mongo' | 'serpapi'; applyByDefault: boolean; currency: string; minBudget: number | null; maxBudget: number | null; categories: string[]; brands: string[]; inStockOnly: boolean }
+export interface Preferences { defaultSource: SearchSource; applyByDefault: boolean; currency: string; minBudget: number | null; maxBudget: number | null; categories: string[]; brands: string[]; inStockOnly: boolean }
 export type Page<T> = { items: T[]; hasMore: boolean };
 export function useAccountApi() {
   const request = useAuthenticatedFetch();

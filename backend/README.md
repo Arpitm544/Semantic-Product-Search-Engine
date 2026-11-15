@@ -23,6 +23,7 @@ starts reuse saved vectors.
 | `http://127.0.0.1:8000/api/search?q=headphones` | Product search |
 | `http://127.0.0.1:8000/api/search?q=headphones&fuzzy=0` | Search with spelling correction disabled |
 | `http://127.0.0.1:8000/api/search?q=headphones&source=serpapi` | Google Shopping through SerpApi |
+| `http://127.0.0.1:8000/api/search?q=headphones&source=shops` | Free online shops (eBay, independent stores) |
 | `http://127.0.0.1:8000/api/dashboard` | Catalog summary and preview |
 | `http://127.0.0.1:8000/docs` | Interactive API documentation |
 
@@ -84,6 +85,81 @@ a readable `error`. HTTP 400 validation errors contain only `error`; provider
 response bodies and credential-bearing URLs are never sent to the frontend.
 See [SerpApi's documentation](https://serpapi.com/google-shopping-api) for product
 fields and [error codes](https://serpapi.com/api-status-and-error-codes).
+
+## Online shops search (free, optional)
+
+`source=shops` searches several shops' own product APIs at once, without paid
+search quota, then ranks the merged results with the same encoder and reranker
+as Google Shopping. On the search page it is **Online shops · eBay, stores**.
+Each shop turns on once its keys (or, for independent stores, its entry in
+`SHOP_STORES`) are in `backend/.env`; restart the backend after changing them.
+With no shop configured, the source returns HTTP 503 with `code=shops_not_configured`.
+
+| Shop | Free account | Settings |
+|---|---|---|
+| eBay | [eBay Developers Program](https://developer.ebay.com/) production keyset (Browse API) | `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, optional `EBAY_MARKETPLACE_ID` (default `EBAY_US`) |
+
+```dotenv
+EBAY_CLIENT_ID=your_client_id
+EBAY_CLIENT_SECRET=your_client_secret
+```
+
+How it behaves:
+
+- Shops are searched in parallel with a 15-second shared deadline. A shop that
+  fails or times out is listed in `providers` with its `status` and `message`,
+  and a `warning` names it; results from the other shops are still returned. If
+  every configured shop fails, the API returns HTTP 503 with `code=shops_unavailable`.
+- Each shop contributes up to 10 results, merged round-robin
+  so no shop crowds out the others, then ranked by our models. If the models are
+  unavailable, the shops' own order is kept with `rankingStatus=unavailable`.
+- Results are cached per shop and query for five minutes. eBay application
+  tokens last two hours and are reused; eBay allows 1,000 token requests a day.
+- `EBAY_DAILY_CALLS` (default 4,000) caps eBay search calls per backend process
+  per UTC day, to stay inside the free quota.
+  Per-user searches are limited by `SHOPS_SEARCHES_PER_MINUTE` (default 10).
+- Results can be saved, collected, and compared. Price alerts are not available
+  yet for shop results. Saved preferences apply only the budget filter, because
+  not every shop reports brand, category, or stock.
+- Each result has an `id` of `<shop>:<shop product id>`, `merchant` (`eBay` or
+  the store's domain), `price` and `currency`, and, where the shop
+  provides them, `brand`, `category`, `inStock`, an image, and a link to the
+  product on the shop's site.
+
+### Independent stores (no keys)
+
+Many independent stores built on Shopify or WooCommerce publish their product
+data openly. List the stores to include in `SHOP_STORES`, as comma-separated
+`platform:host[:CURRENCY]` entries:
+
+```dotenv
+SHOP_STORES=shopify:www.example-store.in:INR,woocommerce:shop.example.com
+```
+
+- `platform` is `shopify` or `woocommerce`. `host` is the store's final public
+  domain, with no `https://`, path, or port; IP addresses and `localhost` are
+  rejected. `CURRENCY` defaults to `INR`. Up to 20 stores; invalid entries are
+  skipped with a warning in the backend log.
+- **Shopify:** the public `/products.json` catalog is downloaded (up to
+  `SHOP_STORE_MAX_PRODUCTS`, default 1,000) and refreshed every six hours, then
+  searched by keyword before our models rank the results. Shopify's default
+  robots.txt disallows `/search`, so storefront search pages are never used.
+  Shopify catalogs have no currency, so it comes from the entry. The first search
+  after a refresh can exceed the 15-second deadline for a large catalog; the
+  download still finishes, and that store answers from the next search.
+- **WooCommerce:** searched live through the public Store API
+  (`/wp-json/wc/store/v1/products?search=`), which reports its own currency.
+- Every store's robots.txt is read first (cached for a day) and respected: a
+  store that disallows access is skipped, with `status=blocked` and a warning.
+  Requests use the generic user agent `SemanticProductSearch/1.0` and never
+  include user data. Redirects are not followed; a store that redirects is
+  reported with `status=redirect`, so you can list its final domain instead.
+- `SHOP_STORE_DAILY_CALLS` (default 2,000) caps requests to each store per
+  backend process per UTC day.
+
+Only list stores whose terms allow this use. Product data comes from each shop's
+official API or the store's own public product data; protected pages and
+storefront search pages are never fetched.
 
 ## Start the frontend separately
 

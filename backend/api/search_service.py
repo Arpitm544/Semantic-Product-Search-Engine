@@ -21,6 +21,15 @@ def get_search_engine():
     with _search_lock:
         try:
             engine = build_search_engine()
+        except CatalogUpdatingError:
+            if _search_engine is None:
+                _search_ready.clear()
+                _search_error = None
+                raise
+            # An import is in progress or the catalog changed mid-load. Keep
+            # serving the last complete engine; the next request retries.
+            _search_ready.set()
+            return _search_engine
         except Exception as error:
             _search_ready.clear()
             _search_error = None if isinstance(error, CatalogUpdatingError) else str(error)

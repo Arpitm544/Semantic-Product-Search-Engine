@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { API_BASE, useAuthenticatedFetch } from '@/lib/api';
-import type { SearchProduct } from '@/lib/types';
+import type { SearchProduct, SearchSource } from '@/lib/types';
 
 export interface HistoryEntry {
-  id: string; query: string; source: 'mongo' | 'serpapi'; fuzzy: boolean;
+  id: string; query: string; source: SearchSource; fuzzy: boolean;
   resultCount: number; searchedAt: string; usePreferences?: boolean;
 }
 export interface PersonalData {

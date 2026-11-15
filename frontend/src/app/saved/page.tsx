@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth, UserButton } from '@clerk/nextjs';
 import ThemeToggle from '@/components/ThemeToggle';
 import { API_BASE, readJsonResponse, requireResponseOk, useAuthenticatedFetch } from '@/lib/api';
-import type { SearchProduct } from '@/lib/types';
+import { productSourceLabel, type SearchProduct } from '@/lib/types';
 import { productPrice, safeProductUrl } from '@/lib/account';
 
 type SavedItem = { id: string; source: string; product: SearchProduct; savedAt: string };
@@ -77,8 +77,7 @@ function useSavedProducts() {
 }
 
 function savedSourceLabel(source: string, product: SearchProduct) {
-  if (source === 'serpapi') return product.merchant || 'Google Shopping';
-  return 'Product catalog';
+  return productSourceLabel(source, product);
 }
 
 function SavedProductCard({ item, disabled, removing, remove }: {
