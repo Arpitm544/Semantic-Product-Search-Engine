@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { productPrice } from '@/lib/account';
 import { usePersonalDashboard, type HistoryEntry, type PersonalData } from '@/lib/usePersonalDashboard';
-import type { SearchProduct } from '@/lib/types';
+import { SOURCE_LABELS, type SearchProduct } from '@/lib/types';
 
 type DashboardState = ReturnType<typeof usePersonalDashboard>;
 const panel = 'rounded-xl border border-[var(--line)] bg-[var(--surface-fff)] p-5';
@@ -65,7 +65,7 @@ function HistoryRow({ entry, state }: { entry: HistoryEntry; state: DashboardSta
   const { mutation, blocked, mutate } = state;
   return <li key={entry.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
           <div className="min-w-0 flex-1 basis-40"><a href={repeatUrl(entry)} className="block break-words text-sm font-semibold hover:underline">{entry.query}</a>
-            <p className="mt-1 text-xs opacity-65">{entry.source === 'serpapi' ? 'Google Shopping' : 'Product catalog'} · {entry.resultCount} shown</p>
+            <p className="mt-1 text-xs opacity-65">{SOURCE_LABELS[entry.source] ?? SOURCE_LABELS.mongo} · {entry.resultCount} shown</p>
             <time dateTime={entry.searchedAt} className="mt-1 block text-[11px] opacity-60">{new Date(entry.searchedAt).toLocaleString()}</time></div>
           <div className="flex items-center gap-2"><a className={action} href={repeatUrl(entry)}>Search again</a><button className={action} aria-label={`Delete search for ${entry.query}`} disabled={blocked} onClick={() => mutate(entry.id)}>{mutation === entry.id ? 'Removing…' : 'Delete'}</button></div>
         </li>;

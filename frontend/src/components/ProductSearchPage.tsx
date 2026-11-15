@@ -5,12 +5,22 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { classes } from '@/lib/classes';
 
 import { useEffect, useRef, useState } from 'react';
-import type { SearchProduct } from '@/lib/types';
+import type { SearchProduct, SearchSource } from '@/lib/types';
 import type { FormEvent } from 'react';
 import { API_BASE, useAuthenticatedFetch } from '@/lib/api';
 import { useAuth, UserButton } from '@clerk/nextjs';
 
-const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi' };
+const SOURCES: Record<SearchSource, string> = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi', shops: 'Online shops · eBay, Flipkart' };
+const SOURCE_NOTES: Record<SearchSource, string> = {
+  mongo: 'Semantic catalog search with spelling suggestions. Images and prices may be unavailable.',
+  serpapi: 'Google Shopping products, ranked when our search models are available. Prices and availability can change.',
+  shops: 'Products from eBay and Flipkart, searched together and ranked by our search models. Prices and availability can change.',
+};
+const SOURCE_FOOTERS: Record<SearchSource, string> = {
+  mongo: 'MongoDB product catalog · Spelling suggestions available',
+  serpapi: 'Products from Google Shopping · Open a product to check its latest offer',
+  shops: 'Products from online shops · Open a product to check its latest offer on the shop’s site',
+};
 
 function searchParams({ query, source, fuzzy, usePreferences }: { query: string; source: string; fuzzy: boolean; usePreferences: boolean }) {
   return new URLSearchParams({ q: query, source, fuzzy: fuzzy ? '1' : '0', preferences: usePreferences ? '1' : '0' });
@@ -129,7 +139,7 @@ function ProductImage({ product, index }: { product: SearchProduct; index: numbe
 }
 
 export default function ProductSearchPage({ initialQuery = '', initialSource = 'mongo', initialFuzzy = true, initialPreferences = false }: {
-  initialQuery?: string; initialSource?: 'mongo' | 'serpapi'; initialFuzzy?: boolean; initialPreferences?: boolean;
+  initialQuery?: string; initialSource?: SearchSource; initialFuzzy?: boolean; initialPreferences?: boolean;
 }) {
   const authenticatedFetch = useAuthenticatedFetch();
   const { isLoaded, isSignedIn } = useAuth();
@@ -156,7 +166,8 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
       setUsePreferences(preferences.data.applyByDefault);
     }
   }, [preferences.data, initialQuery]);
-  const shopping = source === 'serpapi';
+  // Google Shopping and online shops both return external offers with a merchant.
+  const shopping = source !== 'mongo';
 
   useEffect(() => () => pending.current?.abort(), []);
 
@@ -249,7 +260,7 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
           <input autoFocus maxLength={512} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Try ‘wireless headphones’ or ‘mascara’" aria-label="Search products" />
           <button type="submit" disabled={!input.trim() || loading || preferences.busy}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
         </form>
-        <span className={"search-data-note block mt-[11px] text-[10px] [color:var(--text-a1a99f)]"}>{shopping ? 'Google Shopping products, ranked when our search models are available. Prices and availability can change.' : 'Semantic catalog search with spelling suggestions. Images and prices may be unavailable.'}</span>
+        <span className={"search-data-note block mt-[11px] text-[10px] [color:var(--text-a1a99f)]"}>{SOURCE_NOTES[source]}</span>
       </section>
 
       <section className={"search-results-section max-w-[990px] min-h-[290px] mt-[0] mr-[auto] mb-[0] ml-[auto] pt-[0] pr-[24px] pb-[50px] pl-[24px] max-[600.01px]:pl-[17px] max-[600.01px]:pr-[17px]"} aria-live="polite" aria-busy={loading}>
@@ -269,14 +280,14 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
                 <span className={"search-result-category text-[9px] [color:var(--text-899587)] uppercase tracking-[.55px]"}>{shopping ? product.merchant || 'Google Shopping' : [product.category, product.brand].filter(Boolean).join(' · ')}</span>
                 <h3>{url ? <a href={url} target="_blank" rel="noopener noreferrer">{product.title} <span aria-hidden="true">↗</span></a> : product.title}</h3>
                 {product.description && <p>{product.description}</p>}
-                <div className={"search-result-meta flex items-center gap-[13px] mt-[7px] text-[10px] [color:var(--text-828d81)] [&_strong]:text-[11px] [&_strong]:[color:var(--text-455b48)] max-[600.01px]:gap-[8px] max-[600.01px]:text-[9px] max-[600.01px]:flex-wrap"}><strong>{money(product)}</strong>{product.rating != null && <span>★ {Number(product.rating).toFixed(1)}{product.reviews != null ? ` (${Number(product.reviews).toLocaleString()} reviews)` : ''}</span>}{product.stock != null && <span>{product.stock} in stock</span>}</div>
+                <div className={"search-result-meta flex items-center gap-[13px] mt-[7px] text-[10px] [color:var(--text-828d81)] [&_strong]:text-[11px] [&_strong]:[color:var(--text-455b48)] max-[600.01px]:gap-[8px] max-[600.01px]:text-[9px] max-[600.01px]:flex-wrap"}><strong>{money(product)}</strong>{product.rating != null && <span>★ {Number(product.rating).toFixed(1)}{product.reviews != null ? ` (${Number(product.reviews).toLocaleString()} reviews)` : ''}</span>}{product.stock != null && <span>{product.stock} in stock</span>}{product.inStock === false && <span>Out of stock</span>}</div>
               </div>
-              <span className={"relevance-score self-start mt-[3px] mr-[3px] mb-[0] ml-[0] rounded-[14px] pt-[5px] pr-[8px] pb-[5px] pl-[8px] [background:var(--surface-f0f4ee)] [color:var(--text-577658)] text-[10px] font-bold whitespace-nowrap [&_small]:text-[8px] [&_small]:font-medium [&_small]:ml-[4px] [&_small]:[color:var(--text-82927f)] max-[600.01px]:text-[9px] max-[600.01px]:pt-[4px] max-[600.01px]:pr-[6px] max-[600.01px]:pb-[4px] max-[600.01px]:pl-[6px] max-[600.01px]:ml-[66px] max-[600.01px]:[&_small]:hidden"}>{shopping ? product.matchSources?.includes('reranker') ? 'Engine ranked' : 'Google ranked' : product.matchSources?.some((source) => source === 'fuzzy' || source === 'semantic-corrected') ? 'Spelling match' : product.matchSources?.includes('keyword') ? 'Product match' : 'Related match'}</span>
+              <span className={"relevance-score self-start mt-[3px] mr-[3px] mb-[0] ml-[0] rounded-[14px] pt-[5px] pr-[8px] pb-[5px] pl-[8px] [background:var(--surface-f0f4ee)] [color:var(--text-577658)] text-[10px] font-bold whitespace-nowrap [&_small]:text-[8px] [&_small]:font-medium [&_small]:ml-[4px] [&_small]:[color:var(--text-82927f)] max-[600.01px]:text-[9px] max-[600.01px]:pt-[4px] max-[600.01px]:pr-[6px] max-[600.01px]:pb-[4px] max-[600.01px]:pl-[6px] max-[600.01px]:ml-[66px] max-[600.01px]:[&_small]:hidden"}>{shopping ? product.matchSources?.includes('reranker') ? 'Engine ranked' : source === 'shops' ? 'Shop order' : 'Google ranked' : product.matchSources?.some((source) => source === 'fuzzy' || source === 'semantic-corrected') ? 'Spelling match' : product.matchSources?.includes('keyword') ? 'Product match' : 'Related match'}</span>
             </article>;
           })}</div> : <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:var(--text-677567)] text-[13px] [&_small]:text-[11px] [&_small]:[color:var(--text-929c91)] search-no-results [&_strong]:text-[13px] [&_strong]:font-semibold"}><strong>No matching products found.</strong><small>Try a shorter query or choose another search source.</small></div>}
         </>}
       </section>
-      <footer className={"search-page-footer pt-[19px] pr-[24px] pb-[19px] pl-[24px] text-center [border-top:1px_solid_var(--border-e8ece6)] [color:var(--text-9aa398)] text-[10px]"}>{shopping ? 'Products from Google Shopping · Open a product to check its latest offer' : 'MongoDB product catalog · Spelling suggestions available'}</footer>
+      <footer className={"search-page-footer pt-[19px] pr-[24px] pb-[19px] pl-[24px] text-center [border-top:1px_solid_var(--border-e8ece6)] [color:var(--text-9aa398)] text-[10px]"}>{SOURCE_FOOTERS[source]}</footer>
     </main>
   );
 }

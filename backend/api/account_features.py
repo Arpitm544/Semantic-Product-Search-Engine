@@ -31,7 +31,7 @@ class ComparisonInput(Named):
 
 class Preferences(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
-    defaultSource: Literal['mongo', 'serpapi'] = 'mongo'
+    defaultSource: Literal['mongo', 'serpapi', 'shops'] = 'mongo'
     applyByDefault: bool = False
     currency: str = Field(default='INR', pattern=r'^[A-Z]{3}$')
     minBudget: Optional[float] = Field(default=None, ge=0, le=1e12)

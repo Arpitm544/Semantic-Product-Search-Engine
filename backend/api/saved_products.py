@@ -61,7 +61,7 @@ class ProductSnapshot(BaseModel):
 
 class SaveProduct(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    source: Literal["mongo", "serpapi"]
+    source: Literal["mongo", "serpapi", "shops"]
     identity: str = Field(min_length=1, max_length=2048)
     product: ProductSnapshot
 
@@ -98,7 +98,7 @@ def list_saved(offset: int = Query(0, ge=0, le=100000), session=Depends(require_
 
 
 @router.get("/status")
-def saved_status(source: Literal["mongo", "serpapi"], identity: str = Query(min_length=1, max_length=2048),
+def saved_status(source: Literal["mongo", "serpapi", "shops"], identity: str = Query(min_length=1, max_length=2048),
                  session=Depends(require_session)):
     key = saved_id(session["sub"], source, identity)
     try:

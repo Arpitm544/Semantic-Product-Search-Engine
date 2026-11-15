@@ -16,11 +16,18 @@ def collection():
     return value
 
 
+RATE_SETTINGS = {
+    'serpapi': ('SHOPPING_SEARCHES_PER_MINUTE', 5),
+    'shops': ('SHOPS_SEARCHES_PER_MINUTE', 10),
+}
+
+
 def check_search_rate(user, source):
+    name, default = RATE_SETTINGS.get(source, ('CATALOG_SEARCHES_PER_MINUTE', 30))
     try:
-        limit = max(1, int(os.environ.get('SHOPPING_SEARCHES_PER_MINUTE' if source == 'serpapi' else 'CATALOG_SEARCHES_PER_MINUTE', '5' if source == 'serpapi' else '30')))
+        limit = max(1, int(os.environ.get(name, str(default))))
     except ValueError:
-        limit = 5 if source == 'serpapi' else 30
+        limit = default
     timestamp = datetime.now(timezone.utc)
     window = int(timestamp.timestamp()) // 60
     key = sha256(f'{user}:{source}:{window}'.encode()).hexdigest()

@@ -23,6 +23,7 @@ starts reuse saved vectors.
 | `http://127.0.0.1:8000/api/search?q=headphones` | Product search |
 | `http://127.0.0.1:8000/api/search?q=headphones&fuzzy=0` | Search with spelling correction disabled |
 | `http://127.0.0.1:8000/api/search?q=headphones&source=serpapi` | Google Shopping through SerpApi |
+| `http://127.0.0.1:8000/api/search?q=headphones&source=shops` | Free online shops (eBay, Flipkart) |
 | `http://127.0.0.1:8000/api/dashboard` | Catalog summary and preview |
 | `http://127.0.0.1:8000/docs` | Interactive API documentation |
 
@@ -84,6 +85,51 @@ a readable `error`. HTTP 400 validation errors contain only `error`; provider
 response bodies and credential-bearing URLs are never sent to the frontend.
 See [SerpApi's documentation](https://serpapi.com/google-shopping-api) for product
 fields and [error codes](https://serpapi.com/api-status-and-error-codes).
+
+## Online shops search (free, optional)
+
+`source=shops` searches several shops' own product APIs at once, without paid
+search quota, then ranks the merged results with the same encoder and reranker
+as Google Shopping. On the search page it is **Online shops · eBay, Flipkart**.
+Each shop turns on once its keys are in `backend/.env`; restart the backend after
+adding them. With no shop configured, the source returns HTTP 503 with
+`code=shops_not_configured`.
+
+| Shop | Free account | Settings |
+|---|---|---|
+| eBay | [eBay Developers Program](https://developer.ebay.com/) production keyset (Browse API) | `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, optional `EBAY_MARKETPLACE_ID` (default `EBAY_US`) |
+| Flipkart | [Flipkart Affiliate Program](https://affiliate.flipkart.com/) tracking ID and API token | `FLIPKART_AFFILIATE_ID`, `FLIPKART_AFFILIATE_TOKEN` |
+
+```dotenv
+EBAY_CLIENT_ID=your_client_id
+EBAY_CLIENT_SECRET=your_client_secret
+FLIPKART_AFFILIATE_ID=your_tracking_id
+FLIPKART_AFFILIATE_TOKEN=your_api_token
+```
+
+How it behaves:
+
+- Shops are searched in parallel with a 15-second shared deadline. A shop that
+  fails or times out is listed in `providers` with its `status` and `message`,
+  and a `warning` names it; results from the other shops are still returned. If
+  every configured shop fails, the API returns HTTP 503 with `code=shops_unavailable`.
+- Each shop contributes up to 10 results (Flipkart's maximum), merged round-robin
+  so no shop crowds out the others, then ranked by our models. If the models are
+  unavailable, the shops' own order is kept with `rankingStatus=unavailable`.
+- Results are cached per shop and query for five minutes. eBay application
+  tokens last two hours and are reused; eBay allows 1,000 token requests a day.
+- `EBAY_DAILY_CALLS` (default 4,000) and `FLIPKART_DAILY_CALLS` (default 5,000)
+  cap search calls per backend process per UTC day, to stay inside free quotas.
+  Per-user searches are limited by `SHOPS_SEARCHES_PER_MINUTE` (default 10).
+- Results can be saved, collected, and compared. Price alerts are not available
+  yet for shop results. Saved preferences apply only the budget filter, because
+  not every shop reports brand, category, or stock.
+- Each result has an `id` of `<shop>:<shop product id>`, `merchant` (`eBay` or
+  `Flipkart`), `price` and `currency`, and, where the shop provides them, `brand`,
+  `category`, `inStock`, an image, and a link to the product on the shop's site.
+
+Product data is taken only from each shop's official API. The project does not
+scrape shop websites.
 
 ## Start the frontend separately
 
