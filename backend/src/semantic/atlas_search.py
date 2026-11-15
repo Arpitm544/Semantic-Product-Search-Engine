@@ -17,6 +17,15 @@ def index_definition(dimensions):
                         'numDimensions': dimensions, 'similarity': 'cosine'}]}
 
 
+def definition_matches(actual, dimensions):
+    """Whether an existing index has the vector fields we define.
+
+    Atlas adds server defaults to `latestDefinition` (for example
+    `numPartitions: 1`), so only the `fields` we set are compared.
+    """
+    return isinstance(actual, dict) and actual.get('fields') == index_definition(dimensions)['fields']
+
+
 class AtlasVectorSearch:
     # The lock guards only local encoding; Atlas network calls run without it.
     manages_model_lock = True
@@ -33,7 +42,7 @@ class AtlasVectorSearch:
         indexes = list(self.collection.list_search_indexes(name=index_name()))
         dimensions = encoder.get_sentence_embedding_dimension()
         if (not indexes or not indexes[0].get('queryable')
-                or indexes[0].get('latestDefinition') != index_definition(dimensions)):
+                or not definition_matches(indexes[0].get('latestDefinition'), dimensions)):
             raise RuntimeError('Atlas vector index is not ready or has a different definition. Run scripts/setup_atlas_vectors.py.')
 
     def search(self, query, top_k=10):

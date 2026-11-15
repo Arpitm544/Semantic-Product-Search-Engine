@@ -10,7 +10,7 @@ from pymongo import ReplaceOne
 from pymongo.operations import SearchIndexModel
 from src.config import PROJECT_ROOT
 from src.data.catalog import database, load_products, version
-from src.semantic.atlas_search import collection_name, index_definition, index_name
+from src.semantic.atlas_search import collection_name, definition_matches, index_definition, index_name
 from src.semantic.identity import vector_generation
 from scripts.import_catalog import catalog_import_lock
 
@@ -53,7 +53,7 @@ def setup(timeout=900):
         if not indexes:
             collection.create_search_index(model=SearchIndexModel(
                 definition=definition, name=index_name(), type='vectorSearch'))
-        elif indexes[0].get('latestDefinition') != definition:
+        elif not definition_matches(indexes[0].get('latestDefinition'), dimensions):
             raise RuntimeError('Existing index definition differs. Choose another ATLAS_VECTOR_INDEX name.')
         deadline = time.monotonic() + timeout
         while True:
