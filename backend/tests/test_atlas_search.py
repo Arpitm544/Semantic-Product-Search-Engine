@@ -43,6 +43,27 @@ def test_wrong_index_dimensions_cannot_serve():
         AtlasVectorSearch(db, [{'id': 'esci:1'}], encoder, 'model', 'generation')
 
 
+def test_index_with_atlas_server_defaults_can_serve():
+    # Atlas reports server defaults such as numPartitions in latestDefinition.
+    db, encoder = engine()
+    db.__getitem__.return_value.list_search_indexes.return_value = [{'queryable': True, 'latestDefinition': {
+        'fields': [{'type': 'vector', 'path': 'embedding', 'numDimensions': 2, 'similarity': 'cosine'}],
+        'numPartitions': 1}}]
+    AtlasVectorSearch(db, [{'id': 'esci:1'}], encoder, 'model', 'generation')
+
+
+@pytest.mark.parametrize('actual,expected', [
+    ({'fields': index_definition(2)['fields'], 'numPartitions': 1}, True),
+    (index_definition(2), True),
+    ({'fields': [{'type': 'vector', 'path': 'embedding', 'numDimensions': 2, 'similarity': 'euclidean'}]}, False),
+    ({'fields': [{'type': 'vector', 'path': 'vector', 'numDimensions': 2, 'similarity': 'cosine'}]}, False),
+    ({'numPartitions': 1}, False), (None, False),
+])
+def test_definition_matches_compares_only_our_fields(actual, expected):
+    from src.semantic.atlas_search import definition_matches
+    assert definition_matches(actual, 2) is expected
+
+
 def test_api_loads_atlas_and_propagates_setup_errors(monkeypatch):
     from api import search_service
     from src.data import catalog
