@@ -110,9 +110,14 @@ How it behaves:
   fails or times out is listed in `providers` with its `status` and `message`,
   and a `warning` names it; results from the other shops are still returned. If
   every configured shop fails, the API returns HTTP 503 with `code=shops_unavailable`.
-- Each shop contributes up to 10 results, merged round-robin
-  so no shop crowds out the others, then ranked by our models. If the models are
-  unavailable, the shops' own order is kept with `rankingStatus=unavailable`.
+- Each shop contributes up to 10 candidates (at most 100 in all, merged
+  round-robin). Our models rank the whole pool, results the cross-encoder scores
+  as clearly unrelated (below -5) are dropped, and the top 20 are returned, so a
+  shop with many good matches is not limited to a few slots. Store keyword search
+  ignores filler words such as "with". If nothing clears the relevance floor, the
+  nearest products are kept with `warningCode=shops_no_close_match` and a notice.
+  `candidateCount` is the size of the ranked pool. If the models are unavailable,
+  the shops' own order is kept (top 20) with `rankingStatus=unavailable`.
 - Results are cached per shop and query for five minutes. eBay application
   tokens last two hours and are reused; eBay allows 1,000 token requests a day.
 - `EBAY_DAILY_CALLS` (default 4,000) caps eBay search calls per backend process
