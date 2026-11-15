@@ -21,6 +21,13 @@ def alert_row(**overrides):
             'updated_at': now(), **overrides}
 
 
+@pytest.fixture(autouse=True)
+def daily_budget():
+    """Allow provider checks unless a test exhausts a budget explicitly."""
+    with patch.object(alerts, 'take_daily_slot', return_value=True) as slot:
+        yield slot
+
+
 @pytest.fixture
 def client(mockdb):
     previous = app.dependency_overrides.copy()
@@ -157,3 +164,68 @@ def test_pending_notification_can_be_retried_after_database_failure(mockdb):
     db['price_alerts'].update_one.assert_not_called()
     alerts.flush_notification(row)
     assert db['price_alerts'].update_one.call_args.args[1] == {'$unset': {'pending_notification': ''}}
+
+
+def shopping_alert():
+    return alert_row(source='serpapi', identity='serpapi:1234567')
+
+
+def test_shopping_check_spends_user_and_global_daily_budget(daily_budget):
+    offer = {'id': 'serpapi:1234567', 'merchant': 'Store', 'price': 80, 'currency': 'USD'}
+    with patch.object(alerts, 'search_shopping', return_value={'results': [offer]}) as provider:
+        assert alerts.observe_price(shopping_alert()) == 80
+    provider.assert_called_once()
+    scopes = [call.args for call in daily_budget.call_args_list]
+    assert scopes == [('price-alerts:user:alice', 10), ('price-alerts:all', 200)]
+
+
+@pytest.mark.parametrize('budgets,message', [([False], 'Your daily limit'), ([True, False], 'paused for today')])
+def test_exhausted_daily_budget_skips_the_provider(daily_budget, budgets, message):
+    daily_budget.side_effect = budgets
+    with patch.object(alerts, 'search_shopping') as provider:
+        with pytest.raises(ValueError, match=message):
+            alerts.observe_price(shopping_alert())
+    provider.assert_not_called()
+
+
+def test_exhausted_budget_marks_alert_unavailable_without_notifying(mockdb, daily_budget):
+    db, _ = mockdb
+    daily_budget.return_value = False
+    with patch.object(alerts, 'search_shopping') as provider:
+        alerts.check_claimed(shopping_alert())
+    provider.assert_not_called()
+    fields = db['price_alerts'].update_one.call_args.args[1]['$set']
+    assert fields['status'] == 'unavailable' and 'daily limit' in fields['message']
+    db['price_notifications'].update_one.assert_not_called()
+
+
+def test_catalog_checks_do_not_spend_shopping_budget(daily_budget):
+    catalog = MagicMock()
+    catalog.__getitem__.return_value.find_one.return_value = {'id': 'catalog-1', 'price': 80, 'currency': 'USD'}
+    with patch.object(alerts.catalog, 'version', return_value={'status': 'ready'}), \
+            patch.object(alerts.catalog, 'database', return_value=catalog):
+        alerts.observe_price(alert_row())
+    daily_budget.assert_not_called()
+
+
+def test_daily_budget_settings_are_configurable(daily_budget, monkeypatch):
+    monkeypatch.setenv('PRICE_ALERT_SHOPPING_CHECKS_PER_USER_PER_DAY', '3')
+    monkeypatch.setenv('PRICE_ALERT_SHOPPING_CHECKS_PER_DAY', 'not-a-number')
+    alerts.reserve_shopping_check('alice')
+    assert [call.args[1] for call in daily_budget.call_args_list] == [3, 200]
+
+
+def test_daily_slot_is_atomic_and_bounded():
+    from pymongo.errors import DuplicateKeyError
+    from api import search_limits
+    store = MagicMock()
+    with patch.object(search_limits, 'collection', return_value=store):
+        assert search_limits.take_daily_slot('scope', 0) is False
+        store.find_one_and_update.assert_not_called()
+        store.find_one_and_update.return_value = {'count': 1}
+        assert search_limits.take_daily_slot('scope', 5) is True
+        query, update = store.find_one_and_update.call_args.args
+        assert query['count'] == {'$lt': 5} and update['$inc'] == {'count': 1}
+        assert store.find_one_and_update.call_args.kwargs['upsert'] is True
+        store.find_one_and_update.side_effect = DuplicateKeyError('full')
+        assert search_limits.take_daily_slot('scope', 5) is False
