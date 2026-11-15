@@ -282,3 +282,68 @@ def test_each_source_uses_its_own_per_minute_limit(monkeypatch, source, env, exp
     with patch.object(search_limits, 'collection', return_value=store):
         search_limits.check_search_rate('alice', source)
     assert store.find_one_and_update.call_args.args[0]['count'] == {'$lt': expected}
+
+
+# --- Ranking the whole pool and dropping unrelated results ------------------
+
+class ScoringRanker:
+    """Stand-in for the real ranker: scores by whether the title has 'earbuds'."""
+
+    def __init__(self):
+        self.seen = []
+
+    def rank(self, query, products):
+        self.seen = list(products)
+        scored = [{**p, 'rerankerScore': 8.0 if 'earbuds' in p['title'] else -11.0, 'semanticScore': 0.0}
+                  for p in products]
+        return sorted(scored, key=lambda p: -p['rerankerScore'])
+
+
+def shop_items(shop, titles):
+    return [{'id': f'{shop}:{i}', 'title': title, 'matchSources': [shop]} for i, title in enumerate(titles)]
+
+
+def test_models_rank_every_shops_candidates_before_the_cut():
+    boat = fake_provider('boat', shop_items('boat', [f'earbuds model {i}' for i in range(10)]))
+    others = [fake_provider(f'shop{n}', shop_items(f'shop{n}', [f'sweater {i}' for i in range(10)])) for n in range(7)]
+    ranker = ScoringRanker()
+    with patch.object(shops_service, 'enabled_providers', return_value=[boat, *others]), \
+            patch.object(shops_service, 'get_candidate_ranker', return_value=ranker):
+        result = shops_service.rank_shops_response(shops_service.search_shops('wireless earbuds'))
+    assert len(ranker.seen) == 80  # every candidate from all 8 shops
+    # All 10 relevant earbuds survive even though round-robin would give boat only 3 of 20 slots.
+    assert [r['title'] for r in result['results']] == [f'earbuds model {i}' for i in range(10)]
+    assert result['total'] == 10 and result['candidateCount'] == 80 and 'limit' not in result
+
+
+def test_unrelated_results_are_kept_with_a_notice_when_nothing_is_relevant():
+    shops = [fake_provider('shop1', shop_items('shop1', ['sweater', 'lip gloss']))]
+    with patch.object(shops_service, 'enabled_providers', return_value=shops), \
+            patch.object(shops_service, 'get_candidate_ranker', return_value=ScoringRanker()):
+        result = shops_service.rank_shops_response(shops_service.search_shops('earbuds'))
+    assert [r['title'] for r in result['results']] == ['sweater', 'lip gloss']
+    assert result['warningCode'] == 'shops_no_close_match' and 'No close matches' in result['warning']
+
+
+def test_relevant_results_have_no_close_match_notice():
+    shops = [fake_provider('shop1', shop_items('shop1', ['wireless earbuds', 'sweater']))]
+    with patch.object(shops_service, 'enabled_providers', return_value=shops), \
+            patch.object(shops_service, 'get_candidate_ranker', return_value=ScoringRanker()):
+        result = shops_service.rank_shops_response(shops_service.search_shops('earbuds'))
+    assert [r['title'] for r in result['results']] == ['wireless earbuds'] and 'warning' not in result
+
+
+def test_results_are_capped_at_the_limit_after_ranking():
+    shops = [fake_provider(f'shop{n}', shop_items(f'shop{n}', [f'earbuds {n}-{i}' for i in range(10)])) for n in range(4)]
+    with patch.object(shops_service, 'enabled_providers', return_value=shops), \
+            patch.object(shops_service, 'get_candidate_ranker', return_value=ScoringRanker()):
+        result = shops_service.rank_shops_response(shops_service.search_shops('earbuds'))
+    assert len(result['results']) == 20 and result['candidateCount'] == 40
+
+
+def test_fallback_order_is_capped_at_the_limit():
+    shops = [fake_provider(f'shop{n}', shop_items(f'shop{n}', [f'item {i}' for i in range(10)])) for n in range(3)]
+    with patch.object(shops_service, 'enabled_providers', return_value=shops), \
+            patch.object(shops_service, 'get_candidate_ranker', side_effect=OSError('missing weights')):
+        result = shops_service.rank_shops_response(shops_service.search_shops('item'))
+    assert result['rankingStatus'] == 'unavailable' and len(result['results']) == 20 and 'limit' not in result

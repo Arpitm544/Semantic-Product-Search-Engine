@@ -18,6 +18,12 @@ from api.shopping_service import ShoppingError
 logger = logging.getLogger(__name__)
 
 PER_PROVIDER = 10
+# Candidates gathered across all shops before ranking; the top `limit` are kept.
+MAX_CANDIDATES = 100
+# The cross-encoder scores clear matches far above zero and unrelated products
+# far below it (about +8 versus -11 in practice). Results under this floor are
+# dropped once at least one result clears it, so a search never ends up empty.
+RELEVANCE_FLOOR = -5.0
 DEADLINE_SECONDS = 15
 CACHE_SECONDS = 300
 CACHE_SIZE = 256
@@ -100,24 +106,45 @@ def search_shops(query, limit=20):
     if not lists:
         raise ShoppingError('None of the configured online shops responded. Please try again shortly.',
                             'shops_unavailable', 503)
-    results = interleave(lists, limit)
-    response.update(results=results, total=len(results))
+    # Keep the whole pool so the models can rank every shop's candidates;
+    # rank_shops_response cuts it to `limit` after ranking.
+    candidates = interleave(lists, MAX_CANDIDATES)
+    response.update(results=candidates, total=min(len(candidates), limit), limit=limit,
+                    candidateCount=len(candidates))
     failed = [item['label'] for item in response['providers'] if item['status'] != 'ok']
     if failed:
         response['warning'] = f"Results from {', '.join(failed)} are unavailable right now."
     return response
 
 
+def relevant(results):
+    """Drop clearly unrelated results. Returns (results, close_match_found);
+    when nothing clears the floor, every result is kept so the search isn't empty."""
+    kept = [item for item in results if item.get('rerankerScore', 0) >= RELEVANCE_FLOOR]
+    return (kept, True) if kept else (results, False)
+
+
 def rank_shops_response(response):
-    """Rank merged shop results with the same models as the other sources."""
-    if not response['results']:
+    """Rank the whole candidate pool with our models, then keep the top results."""
+    response = dict(response)
+    limit = response.pop('limit', 20)
+    candidates = response['results']
+    if not candidates:
         return {**response, 'rankingStatus': 'empty'}
     try:
-        results = get_candidate_ranker().rank(response['query'], response['results'])
+        ranked = get_candidate_ranker().rank(response['query'], candidates)
     except Exception as error:
         logger.warning('Shop result ranking failed (%s).', type(error).__name__, exc_info=True)
         notice = "Our search models are unavailable. Showing the shops' original order. Please try again shortly."
-        return {**response, 'rankingStatus': 'unavailable', 'warningCode': 'shops_ranking_unavailable',
+        results = candidates[:limit]
+        return {**response, 'results': results, 'total': len(results), 'rankingStatus': 'unavailable',
+                'warningCode': 'shops_ranking_unavailable',
                 'warning': ' '.join(filter(None, [response.get('warning'), notice]))}
-    return {**response, 'results': results, 'searchMode': 'online-shops-semantic-reranked',
+    results, close_match = relevant(ranked)
+    results = results[:limit]
+    if not close_match:
+        notice = 'No close matches in the online shops; showing the nearest products.'
+        response['warning'] = ' '.join(filter(None, [response.get('warning'), notice]))
+        response['warningCode'] = 'shops_no_close_match'
+    return {**response, 'results': results, 'total': len(results), 'searchMode': 'online-shops-semantic-reranked',
             'semanticModel': 'fine-tuned', 'rankingStatus': 'ranked'}

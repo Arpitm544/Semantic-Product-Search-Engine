@@ -28,7 +28,8 @@ from urllib.robotparser import RobotFileParser
 import requests
 
 from api.shop_providers.base import DailyBudget, ProviderError, TIMEOUT, get_json, product
-from src.keyword_search.bm25 import fit_bm25, search_bm25
+from src.keyword_search.bm25 import fit_bm25, search_bm25, tokenize
+from src.search.typos import STOP_WORDS
 
 USER_AGENT = 'SemanticProductSearch/1.0 (product search; respects robots.txt)'
 HEADERS = {'User-Agent': USER_AGENT, 'Accept': 'application/json'}
@@ -127,6 +128,12 @@ def fetch_robots(host):
         return response.status_code, response.text if response.status_code == 200 else ''
 
 
+def keyword_query(query):
+    """Drop filler words such as "with" so they don't match unrelated products."""
+    words = [word for word in tokenize(query) if word not in STOP_WORDS]
+    return ' '.join(words) or query
+
+
 def shopify_product(store, row):
     if not isinstance(row, dict) or not row.get('handle'):
         return None
@@ -206,7 +213,7 @@ class StoreProvider:
                              search=query, per_page=str(max(1, min(limit, 20))))
             return [p for p in (woocommerce_product(self.config, row) for row in rows) if p][:limit]
         index = self._shopify_index()
-        return [entry['product'] for entry, _ in search_bm25(index, query, limit)]
+        return [entry['product'] for entry, _ in search_bm25(index, keyword_query(query), limit)]
 
     def _shopify_index(self):
         with self._lock:

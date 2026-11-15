@@ -186,3 +186,16 @@ def test_stores_join_the_online_shops_search(monkeypatch):
     assert result['providers'] == [{'name': 'store:shop.example.com', 'label': 'shop.example.com',
                                     'status': 'ok', 'count': 1, 'cached': False}]
     assert result['results'][0]['merchant'] == 'shop.example.com'
+
+
+def test_filler_words_do_not_match_unrelated_store_products():
+    assert stores.keyword_query('wireless earbuds with noise cancellation') == 'wireless earbuds noise cancellation'
+    assert stores.keyword_query('with the') == 'with the'
+    sunscreen = {**SHOPIFY_ROW, 'id': 3, 'handle': 'sunscreen', 'title': 'Sunscreen With Vitamin C',
+                 'body_html': '<p>Glow with every use.</p>', 'tags': [], 'product_type': 'Skin'}
+    earbuds = {**SHOPIFY_ROW, 'id': 4, 'handle': 'buds', 'title': 'Wireless Earbuds', 'tags': [],
+               'body_html': '', 'product_type': 'Audio'}
+    provider = StoreProvider(SHOPIFY)
+    with robots(), patch.object(base.requests, 'get', return_value=response(payload={'products': [sunscreen, earbuds]})):
+        titles = [p['title'] for p in provider.search('earbuds with noise cancellation', 10)]
+    assert titles == ['Wireless Earbuds']
