@@ -8,7 +8,7 @@ import type { FormEvent } from 'react';
 import { API_BASE, useAuthenticatedFetch } from '@/lib/api';
 import { UserButton } from '@clerk/nextjs';
 
-const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi', shopify: 'Shopify store' };
+const SOURCES = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi' };
 
 function money(product: SearchProduct) {
   if (product.priceLabel) return product.priceLabel;
@@ -59,22 +59,6 @@ export default function SearchPage() {
   const shopping = source === 'serpapi';
 
   useEffect(() => () => pending.current?.abort(), []);
-
-  useEffect(() => {
-    if (source !== 'shopify') return;
-    const controller = new AbortController();
-    authenticatedFetch(`${API_BASE}/api/shopify/status`, { signal: controller.signal })
-      .then(async response => {
-        if (!response.ok) throw new Error('Cannot check Shopify status.');
-        const state = await response.json();
-        if (controller.signal.aborted) return;
-        if (state.status === 'disabled') setWarning('Shopify is not configured. Connect the store in the backend first.');
-        else if (state.status === 'initial_sync') setWarning('Shopify is waiting for its first product sync.');
-        else if (state.status === 'degraded') setWarning('The latest Shopify sync failed. Results may reflect the previous sync.');
-      })
-      .catch(() => { if (!controller.signal.aborted) setWarning('Cannot check Shopify status.'); });
-    return () => controller.abort();
-  }, [source, authenticatedFetch]);
 
   function changeSource(value: keyof typeof SOURCES) {
     pending.current?.abort();

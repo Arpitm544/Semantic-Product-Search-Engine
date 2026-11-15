@@ -27,7 +27,7 @@ no paid plan is selected in source. The two PyTorch models need benchmarking;
 start with an instance with sufficient RAM (4 GB is an initial estimate).
 
 Set the requested secrets and model artifact variables in Render. Add any
-optional SerpApi/Shopify secrets separately if those features are enabled. Allow
+optional SerpApi secrets separately if those features are enabled. Allow
 Render outbound IPs in Atlas network access. Add the deployed website origin
 to `FRONTEND_ORIGINS` and configure Clerk for that domain.
 

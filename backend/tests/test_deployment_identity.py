@@ -21,3 +21,4 @@ def test_exported_identity_survives_server_move_and_detects_changed_weights(tmp_
     (deployed / 'model.safetensors').write_bytes(b'tampered')
     with pytest.raises(ValueError, match='content differs'):
         vector_generation(str(deployed), 'catalog')
+
