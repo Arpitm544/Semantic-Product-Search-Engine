@@ -66,8 +66,9 @@ def load_semantic_search(products, model_path, catalog_hash):
     from src.semantic.identity import vector_generation
 
     resolved = str((PROJECT_ROOT / model_path).resolve())
-    return AtlasVectorSearch(database(), products, get_candidate_ranker().encoder,
-                             resolved, vector_generation(resolved, catalog_hash))
+    ranker = get_candidate_ranker()
+    return AtlasVectorSearch(database(), products, ranker.encoder, resolved,
+                             vector_generation(resolved, catalog_hash), model_lock=ranker.lock)
 
 
 def load_reranker(model_path):

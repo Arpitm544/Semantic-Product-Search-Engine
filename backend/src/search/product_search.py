@@ -73,23 +73,28 @@ class ProductSearch:
         if not query or limit <= 0:
             return response
 
-        # Only one request uses the shared search models at a time.
-        with self.lock:
-            # 2. Find possible matches with keyword and semantic search.
+        # 2. Find possible matches with keyword and semantic search.
+        # Only one request uses the shared models at a time, but network-backed
+        # semantic search (Atlas) locks just its encoding so other requests are
+        # not blocked while it waits on the database.
+        if getattr(self.semantic, "manages_model_lock", False) is True:
             candidate_ids, match_sources = self.find_candidates(query_variations, query)
-            if not candidate_ids:
-                return response
+        else:
+            with self.lock:
+                candidate_ids, match_sources = self.find_candidates(query_variations, query)
+        if not candidate_ids:
+            return response
 
-            # 3. Put the best matches first, then build the response.
-            ranked_ids, scores = self.rank_candidates(corrected_query, candidate_ids)
-            response["candidateCount"] = len(ranked_ids)
-            for product_id in ranked_ids[:limit]:
-                product = self.by_id[product_id]
-                response["results"].append({
-                    **product,
-                    "score": scores[product_id],
-                    "matchSources": sorted(match_sources[product_id]) + ["reranker"],
-                })
+        # 3. Put the best matches first, then build the response.
+        ranked_ids, scores = self.rank_candidates(corrected_query, candidate_ids)
+        response["candidateCount"] = len(ranked_ids)
+        for product_id in ranked_ids[:limit]:
+            product = self.by_id[product_id]
+            response["results"].append({
+                **product,
+                "score": scores[product_id],
+                "matchSources": sorted(match_sources[product_id]) + ["reranker"],
+            })
         return response
 
     def find_candidates(self, query_variations, original_query):
@@ -122,9 +127,10 @@ class ProductSearch:
             product = self.by_id[product_id]
             text = product.get("representation_text") or product.get("title", "")
             query_product_pairs.append((query, text))
-        model_scores = self.reranker.predict(
-            query_product_pairs, batch_size=32, show_progress_bar=False,
-        )
+        with self.lock:
+            model_scores = self.reranker.predict(
+                query_product_pairs, batch_size=32, show_progress_bar=False,
+            )
 
         # On a tied model score, keep the original retrieval order.
         reranked_indexes = sorted(

@@ -59,6 +59,87 @@ def test_api_loads_atlas_and_propagates_setup_errors(monkeypatch):
     assert constructor.call_args.args[0] is db
     assert constructor.call_args.args[2] is ranker.encoder
     assert constructor.call_args.args[-1] == 'generation'
+    assert constructor.call_args.kwargs['model_lock'] is ranker.lock
     constructor.side_effect = RuntimeError('Index not ready')
     with pytest.raises(RuntimeError, match='Index not ready'):
         search_service.load_semantic_search(products, 'model', 'hash')
+
+
+def test_encoding_holds_the_model_lock_but_the_atlas_query_does_not():
+    from threading import Lock
+    db, encoder = engine()
+    lock = Lock()
+    product = {'id': 'esci:1', 'title': 'Headphones'}
+    semantic = AtlasVectorSearch(db, [product], encoder, 'model', 'generation', model_lock=lock)
+    held = {}
+
+    def encode(*args, **kwargs):
+        held['encode'] = lock.locked()
+        return np.array([[1., 0.]])
+
+    def aggregate(*args, **kwargs):
+        held['atlas'] = lock.locked()
+        return [{'id': 'esci:1', 'score': .9}]
+
+    encoder.encode.side_effect = encode
+    semantic.collection.aggregate.side_effect = aggregate
+    assert semantic.search('headphones', 5) == [(product, .9)]
+    assert held == {'encode': True, 'atlas': False}
+
+
+def test_slow_atlas_query_does_not_block_other_model_users():
+    """A search waiting on Atlas must not stall Shopping ranking or other searches."""
+    from threading import Event, Lock, Thread
+    from src.search.product_search import ProductSearch
+    db, encoder = engine()
+    lock = Lock()
+    product = {'id': 'esci:1', 'title': 'Headphones', 'representation_text': 'headphones'}
+    semantic = AtlasVectorSearch(db, [product], encoder, 'model', 'generation', model_lock=lock)
+    in_atlas, release = Event(), Event()
+
+    def slow_aggregate(*args, **kwargs):
+        in_atlas.set()
+        assert release.wait(5)
+        return [{'id': 'esci:1', 'score': .9}]
+
+    semantic.collection.aggregate.side_effect = slow_aggregate
+    reranker = MagicMock()
+    reranker.predict.side_effect = lambda pairs, **kwargs: [1.0] * len(pairs)
+    search = ProductSearch([product], semantic, reranker, model_lock=lock)
+    results = []
+    worker = Thread(target=lambda: results.append(search.search('headphones', fuzzy=False)))
+    worker.start()
+    try:
+        assert in_atlas.wait(5)
+        # Another request (e.g. Shopping ranking) can use the models meanwhile.
+        assert lock.acquire(timeout=1)
+        lock.release()
+    finally:
+        release.set()
+        worker.join(5)
+    assert results and results[0]['results'][0]['id'] == 'esci:1'
+
+
+def test_reranking_and_unmanaged_semantic_search_stay_serialized():
+    from threading import Lock
+    from src.search.product_search import ProductSearch
+    lock = Lock()
+    product = {'id': 'p', 'title': 'Headphones', 'representation_text': 'headphones'}
+    held = {}
+    semantic = MagicMock(model_name='local')
+    semantic.manages_model_lock = MagicMock()  # not literally True
+
+    def local_search(query, top_k):
+        held['semantic'] = lock.locked()
+        return [(product, 1.0)]
+
+    def predict(pairs, **kwargs):
+        held['reranker'] = lock.locked()
+        return [1.0] * len(pairs)
+
+    semantic.search.side_effect = local_search
+    reranker = MagicMock()
+    reranker.predict.side_effect = predict
+    assert ProductSearch([product], semantic, reranker, model_lock=lock).search('headphones', fuzzy=False)['results']
+    assert held == {'semantic': True, 'reranker': True}
+    assert not lock.locked()
