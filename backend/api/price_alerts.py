@@ -35,6 +35,8 @@ def market_settings():
 
 
 def eligibility(saved):
+    if saved['source'] not in ('mongo', 'serpapi'):
+        return None, 'Price alerts are not available yet for online shop results.'
     price = price_info(saved['product'])
     if not price or price['amount'] <= 0:
         return None, 'A positive numeric price and an unambiguous currency are required.'
