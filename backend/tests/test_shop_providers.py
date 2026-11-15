@@ -4,7 +4,6 @@ Every network call is replaced with a stand-in response shaped like the
 providers' documented APIs, so these tests never need real keys or quota.
 """
 import base64
-import json
 from threading import Event
 from unittest.mock import MagicMock, patch
 
@@ -13,11 +12,11 @@ import requests
 from fastapi.testclient import TestClient
 
 from api import shops_service
-from api.shop_providers import base, ebay, flipkart
+from api.shop_providers import base, ebay, stores
 from api.shop_providers.base import DailyBudget, ProviderError
 from api.shopping_service import ShoppingError
 
-# Shapes follow eBay's Browse API spec (ItemSummary) and Flipkart's 1.0 search docs.
+# Shapes follow eBay's Browse API spec (ItemSummary) and Shopify's public /products.json.
 EBAY_ITEM = {
     'itemId': 'v1|1234567890|0', 'title': 'Sony WH-1000XM5 Wireless Headphones',
     'price': {'value': '279.99', 'currency': 'USD'},
@@ -27,24 +26,13 @@ EBAY_ITEM = {
     'condition': 'New', 'categories': [{'categoryId': '112529', 'categoryName': 'Headphones'}],
     'shortDescription': 'Industry-leading noise cancelling.',
 }
-FLIPKART_ROW = {
-    'productBaseInfoV1': {
-        'productId': 'ACCGHHZ9TZWQ7VZT', 'title': 'Sony WH-1000XM5 Bluetooth Headset',
-        'productDescription': 'Noise cancelling headphones.',
-        'imageUrls': {'200x200': 'https://rukminim1.flixcart.com/a-200.jpeg',
-                      '400x400': 'https://rukminim1.flixcart.com/a-400.jpeg'},
-        'maximumRetailPrice': {'amount': 34990, 'currency': 'INR'},
-        'flipkartSellingPrice': {'amount': 26990, 'currency': 'INR'},
-        'flipkartSpecialPrice': {'amount': 24990, 'currency': 'INR'},
-        'productUrl': 'http://dl.flipkart.com/dl/sony-wh-1000xm5/p/itm123?pid=ACCGHHZ9TZWQ7VZT&affid=demo',
-        'productBrand': 'Sony', 'inStock': True,
-        'categoryPath': json.dumps([[{'node_id': 20001, 'node_name': 'FLIPKART_TREE'},
-                                     {'node_id': 1, 'node_name': 'Audio'},
-                                     {'node_id': 2, 'node_name': 'Headphones'}]]),
-        'attributes': {'size': '', 'color': 'Black', 'storage': '', 'sizeUnit': '', 'displaySize': ''},
-    },
-    'productShippingInfoV1': {'sellerName': 'RetailNet'},
-}
+# An independent Shopify store's product: it reports brand, INR price, and stock.
+STORE_PRODUCT = stores.shopify_product(stores.StoreConfig('shopify', 'www.example-store.in', 'INR'), {
+    'id': 7001, 'title': 'Sony WH-1000XM5 Bluetooth Headset', 'handle': 'sony-wh-1000xm5',
+    'body_html': '<p>Noise cancelling headphones.</p>', 'vendor': 'Sony', 'product_type': 'Headphones',
+    'variants': [{'price': '24990.00', 'available': True}],
+    'images': [{'src': 'https://cdn.shopify.com/s/files/1/sony.jpg'}],
+})
 
 
 def response(status=200, payload=None):
@@ -57,12 +45,10 @@ def response(status=200, payload=None):
 
 @pytest.fixture(autouse=True)
 def clean_state(monkeypatch):
-    for name in ('EBAY_CLIENT_ID', 'EBAY_CLIENT_SECRET', 'FLIPKART_AFFILIATE_ID', 'FLIPKART_AFFILIATE_TOKEN',
-                 'EBAY_DAILY_CALLS', 'FLIPKART_DAILY_CALLS', 'EBAY_MARKETPLACE_ID'):
+    for name in ('EBAY_CLIENT_ID', 'EBAY_CLIENT_SECRET', 'EBAY_DAILY_CALLS', 'EBAY_MARKETPLACE_ID', 'SHOP_STORES'):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(ebay, '_token', None)
     monkeypatch.setattr(ebay, 'budget', DailyBudget('EBAY_DAILY_CALLS', 4000))
-    monkeypatch.setattr(flipkart, 'budget', DailyBudget('FLIPKART_DAILY_CALLS', 5000))
     shops_service._cache.clear()
     yield
     shops_service._cache.clear()
@@ -71,11 +57,6 @@ def clean_state(monkeypatch):
 def enable_ebay(monkeypatch):
     monkeypatch.setenv('EBAY_CLIENT_ID', 'client-id')
     monkeypatch.setenv('EBAY_CLIENT_SECRET', 'client-secret')
-
-
-def enable_flipkart(monkeypatch):
-    monkeypatch.setenv('FLIPKART_AFFILIATE_ID', 'affiliate-id')
-    monkeypatch.setenv('FLIPKART_AFFILIATE_TOKEN', 'affiliate-token')
 
 
 # --- eBay -----------------------------------------------------------------
@@ -123,32 +104,6 @@ def test_ebay_rejected_credentials_are_reported_without_secrets(monkeypatch):
     assert error.value.code == 'auth' and 'client-secret' not in str(error.value)
 
 
-# --- Flipkart -------------------------------------------------------------
-
-def test_flipkart_row_maps_special_price_category_and_stock():
-    result = flipkart.to_product(FLIPKART_ROW)
-    assert result['id'] == 'flipkart:ACCGHHZ9TZWQ7VZT' and result['merchant'] == 'Flipkart'
-    assert result['price'] == 24990 and result['currency'] == 'INR'
-    assert result['imageUrl'].endswith('a-400.jpeg') and result['brand'] == 'Sony'
-    assert result['category'] == 'Headphones' and result['inStock'] is True
-    assert result['attributes'] == ['Color: Black', 'Seller: RetailNet']
-
-
-def test_flipkart_falls_back_to_selling_price_and_handles_bad_category():
-    info = {**FLIPKART_ROW['productBaseInfoV1'], 'flipkartSpecialPrice': None, 'categoryPath': 'not json'}
-    result = flipkart.to_product({'productBaseInfoV1': info})
-    assert result['price'] == 26990 and result['category'] is None
-
-
-def test_flipkart_search_sends_affiliate_headers_and_caps_results(monkeypatch):
-    enable_flipkart(monkeypatch)
-    with patch.object(base.requests, 'get', return_value=response(payload={'productInfoList': [FLIPKART_ROW]})) as get:
-        assert len(flipkart.search('headphones', 20)) == 1
-    assert get.call_args.args[0] == 'https://affiliate-api.flipkart.net/affiliate/1.0/search.json'
-    assert get.call_args.kwargs['params'] == {'query': 'headphones', 'resultCount': '10'}
-    assert get.call_args.kwargs['headers'] == {'Fk-Affiliate-Id': 'affiliate-id', 'Fk-Affiliate-Token': 'affiliate-token'}
-
-
 # --- Shared HTTP handling and budgets ------------------------------------
 
 @pytest.mark.parametrize('status,code', [(401, 'auth'), (403, 'auth'), (429, 'quota'), (500, 'unavailable'), (410, 'unavailable')])
@@ -171,12 +126,14 @@ def test_provider_timeout_and_invalid_json_are_sanitized():
 
 
 def test_daily_budget_stops_calls_before_reaching_the_provider(monkeypatch):
-    enable_flipkart(monkeypatch)
-    monkeypatch.setenv('FLIPKART_DAILY_CALLS', '1')
-    with patch.object(base.requests, 'get', return_value=response(payload={'productInfoList': []})) as get:
-        flipkart.search('one', 10)
+    enable_ebay(monkeypatch)
+    monkeypatch.setenv('EBAY_DAILY_CALLS', '1')
+    token = response(payload={'access_token': 'app-token', 'expires_in': 7200})
+    with patch.object(ebay.requests, 'post', return_value=token), \
+            patch.object(base.requests, 'get', return_value=response(payload={'itemSummaries': []})) as get:
+        ebay.search('one', 10)
         with pytest.raises(ProviderError) as error:
-            flipkart.search('two', 10)
+            ebay.search('two', 10)
     assert error.value.code == 'quota' and get.call_count == 1
 
 
@@ -209,19 +166,19 @@ def test_no_configured_shop_is_a_clear_setup_error():
 
 def test_results_from_all_shops_are_interleaved():
     shops = [fake_provider('ebay', [item('ebay', i) for i in range(3)]),
-             fake_provider('flipkart', [item('flipkart', i) for i in range(2)])]
+             fake_provider('store', [item('store', i) for i in range(2)])]
     with patch.object(shops_service, 'enabled_providers', return_value=shops):
         result = shops_service.search_shops('headphones')
-    assert [r['id'] for r in result['results']] == ['ebay:0', 'flipkart:0', 'ebay:1', 'flipkart:1', 'ebay:2']
+    assert [r['id'] for r in result['results']] == ['ebay:0', 'store:0', 'ebay:1', 'store:1', 'ebay:2']
     assert [p['status'] for p in result['providers']] == ['ok', 'ok'] and 'warning' not in result
 
 
 def test_one_failing_shop_does_not_hide_the_others():
     shops = [fake_provider('ebay', error=ProviderError('eBay rejected the configured credentials.', 'auth')),
-             fake_provider('flipkart', [item('flipkart', 0)])]
+             fake_provider('store', [item('store', 0)])]
     with patch.object(shops_service, 'enabled_providers', return_value=shops):
         result = shops_service.search_shops('headphones')
-    assert [r['id'] for r in result['results']] == ['flipkart:0']
+    assert [r['id'] for r in result['results']] == ['store:0']
     assert result['providers'][0] == {'name': 'ebay', 'label': 'Ebay', 'status': 'auth',
                                       'message': 'eBay rejected the configured credentials.', 'count': 0}
     assert 'Ebay' in result['warning']
@@ -229,7 +186,7 @@ def test_one_failing_shop_does_not_hide_the_others():
 
 def test_all_shops_failing_is_a_service_error():
     shops = [fake_provider('ebay', error=ProviderError('down', 'unavailable')),
-             fake_provider('flipkart', error=RuntimeError('boom'))]
+             fake_provider('store', error=RuntimeError('boom'))]
     with patch.object(shops_service, 'enabled_providers', return_value=shops):
         with pytest.raises(ShoppingError) as error:
             shops_service.search_shops('headphones')
@@ -238,7 +195,7 @@ def test_all_shops_failing_is_a_service_error():
 
 def test_slow_shop_is_skipped_at_the_deadline(monkeypatch):
     release = Event()
-    shops = [fake_provider('ebay', [item('ebay', 0)]), fake_provider('flipkart', [item('flipkart', 0)], wait_for=release)]
+    shops = [fake_provider('ebay', [item('ebay', 0)]), fake_provider('store', [item('store', 0)], wait_for=release)]
     monkeypatch.setattr(shops_service, 'DEADLINE_SECONDS', 0.2)
     try:
         with patch.object(shops_service, 'enabled_providers', return_value=shops):
@@ -258,11 +215,11 @@ def test_repeat_searches_are_served_from_cache():
 
 
 def test_ranking_falls_back_to_shop_order_when_models_fail():
-    payload = {'query': 'headphones', 'results': [item('ebay', 0)], 'warning': 'Results from Flipkart are unavailable right now.'}
+    payload = {'query': 'headphones', 'results': [item('ebay', 0)], 'warning': 'Results from www.example-store.in are unavailable right now.'}
     with patch.object(shops_service, 'get_candidate_ranker', side_effect=OSError('missing weights')):
         result = shops_service.rank_shops_response(payload)
     assert result['rankingStatus'] == 'unavailable' and result['results'] == payload['results']
-    assert result['warning'].startswith('Results from Flipkart') and "shops' original order" in result['warning']
+    assert result['warning'].startswith('Results from www.example-store.in') and "shops' original order" in result['warning']
 
 
 # --- API route and account features --------------------------------------
@@ -294,17 +251,17 @@ def test_search_route_serves_shops_and_reports_setup_errors(client):
 def test_shop_preferences_apply_budget_but_skip_brand():
     from api.account_features import Preferences
     from api.product_prices import apply_preferences
-    rows = [{**ebay.to_product(EBAY_ITEM)}, {**flipkart.to_product(FLIPKART_ROW)}]
+    rows = [{**ebay.to_product(EBAY_ITEM)}, {**STORE_PRODUCT}]
     prefs = Preferences(currency='INR', maxBudget=30000, brands=['Sony']).model_dump()
     result = apply_preferences({'results': rows}, prefs, 'shops')
-    assert [r['id'] for r in result['results']] == ['flipkart:ACCGHHZ9TZWQ7VZT']
+    assert [r['id'] for r in result['results']] == [STORE_PRODUCT['id']]
     assert result['skippedPreferences'] == ['brands'] and 'online shop results' in result['warning']
 
 
 def test_shop_results_can_be_saved_but_not_price_alerted():
     from api.saved_products import SaveProduct
     from api import price_alerts
-    saved = SaveProduct(source='shops', identity='flipkart:ACCGHHZ9TZWQ7VZT', product=flipkart.to_product(FLIPKART_ROW))
+    saved = SaveProduct(source='shops', identity=STORE_PRODUCT['id'], product=STORE_PRODUCT)
     assert saved.product.brand == 'Sony'
     quote, reason = price_alerts.eligibility({'source': 'shops', 'identity': saved.identity,
                                                'product': saved.product.model_dump(mode='json')})

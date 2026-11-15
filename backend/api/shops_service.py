@@ -73,8 +73,9 @@ def search_shops(query, limit=20):
         return response
     providers = enabled_providers()
     if not providers:
-        raise ShoppingError('No online shops are configured. Add eBay or Flipkart API keys in backend/.env '
-                            'and restart the backend, or choose another source.', 'shops_not_configured', 503)
+        raise ShoppingError('No online shops are configured. Add eBay API keys, or stores in '
+                            'SHOP_STORES, in backend/.env and restart the backend, or choose another source.',
+                            'shops_not_configured', 503)
 
     futures = {_pool.submit(fetch, provider, query): provider for provider in providers}
     done, _ = wait(futures, timeout=DEADLINE_SECONDS)

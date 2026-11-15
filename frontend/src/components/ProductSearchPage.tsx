@@ -10,11 +10,11 @@ import type { FormEvent } from 'react';
 import { API_BASE, useAuthenticatedFetch } from '@/lib/api';
 import { useAuth, UserButton } from '@clerk/nextjs';
 
-const SOURCES: Record<SearchSource, string> = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi', shops: 'Online shops · eBay, Flipkart' };
+const SOURCES: Record<SearchSource, string> = { mongo: 'MongoDB catalog', serpapi: 'Google Shopping · SerpApi', shops: 'Online shops · eBay, stores' };
 const SOURCE_NOTES: Record<SearchSource, string> = {
   mongo: 'Semantic catalog search with spelling suggestions. Images and prices may be unavailable.',
   serpapi: 'Google Shopping products, ranked when our search models are available. Prices and availability can change.',
-  shops: 'Products from eBay and Flipkart, searched together and ranked by our search models. Prices and availability can change.',
+  shops: 'Products from eBay and independent online stores, searched together and ranked by our search models. Prices and availability can change.',
 };
 const SOURCE_FOOTERS: Record<SearchSource, string> = {
   mongo: 'MongoDB product catalog · Spelling suggestions available',

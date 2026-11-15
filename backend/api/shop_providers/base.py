@@ -54,8 +54,12 @@ class DailyBudget:
             return True
 
 
-def get_json(url, provider, **kwargs):
-    """GET a provider endpoint with bounded timeouts and sanitized errors."""
+def get_json(url, provider, expect=dict, **kwargs):
+    """GET a provider endpoint with bounded timeouts and sanitized errors.
+
+    Redirects are not followed, so a configured address cannot silently move
+    requests elsewhere; a redirect is reported so the address can be fixed.
+    """
     try:
         response = requests.get(url, timeout=TIMEOUT, allow_redirects=False, **kwargs)
     except requests.Timeout:
@@ -64,6 +68,8 @@ def get_json(url, provider, **kwargs):
         raise ProviderError(f'Cannot reach {provider} right now.', 'unavailable') from None
     with response:
         status = response.status_code
+        if 300 <= status < 400:
+            raise ProviderError(f'{provider} redirects to another address. Configure its final address.', 'redirect')
         if status in (401, 403):
             raise ProviderError(f'{provider} rejected the configured credentials.', 'auth')
         if status == 429:
@@ -74,7 +80,7 @@ def get_json(url, provider, **kwargs):
             payload = response.json()
         except ValueError:
             raise ProviderError(f'{provider} returned an invalid response.', 'invalid_response') from None
-    if not isinstance(payload, dict):
+    if not isinstance(payload, expect):
         raise ProviderError(f'{provider} returned an invalid response.', 'invalid_response')
     return payload
 

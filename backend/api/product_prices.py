@@ -84,7 +84,7 @@ FILTER_LABELS = {'budget': 'budget', 'categories': 'category', 'brands': 'brand'
 # Only filter on details a source actually provides. The Amazon catalog has
 # brands and categories but no prices or stock; Google Shopping results have
 # prices but no brand, category, or stock fields. Online-shop results always
-# have prices, but only some shops (Flipkart) report brand or stock.
+# have prices, but only some shops (independent stores) report brand or stock.
 SOURCE_FILTERS = {'mongo': {'categories', 'brands'}, 'serpapi': {'budget'}, 'shops': {'budget'}}
 SOURCE_NAMES = {'mongo': 'catalog', 'serpapi': 'Google Shopping', 'shops': 'online shop'}
 
