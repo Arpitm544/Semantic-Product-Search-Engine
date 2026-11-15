@@ -74,15 +74,57 @@ def matches_stock(product, required):
     return stock is not None and stock > 0
 
 
-def matches_preferences(product, preferences):
-    return all((matches_budget(product, preferences),
-                matches_detail(product, 'category', preferences['categories']),
-                matches_detail(product, 'brand', preferences['brands']),
-                matches_stock(product, preferences['inStockOnly'])))
+FILTERS = {
+    'budget': lambda product, preferences: matches_budget(product, preferences),
+    'categories': lambda product, preferences: matches_detail(product, 'category', preferences['categories']),
+    'brands': lambda product, preferences: matches_detail(product, 'brand', preferences['brands']),
+    'inStockOnly': lambda product, preferences: matches_stock(product, preferences['inStockOnly']),
+}
+FILTER_LABELS = {'budget': 'budget', 'categories': 'category', 'brands': 'brand', 'inStockOnly': 'in-stock'}
+# Only filter on details a source actually provides. The Amazon catalog has
+# brands and categories but no prices or stock; Google Shopping results have
+# prices but no brand, category, or stock fields.
+SOURCE_FILTERS = {'mongo': {'categories', 'brands'}, 'serpapi': {'budget'}}
+SOURCE_NAMES = {'mongo': 'catalog', 'serpapi': 'Google Shopping'}
 
 
-def apply_preferences(payload, preferences):
-    results = [item for item in payload.get('results', []) if matches_preferences(item, preferences)]
-    notice = 'Saved preferences filter the returned candidates. Products with unavailable details for an active filter are excluded.'
+def active_filters(preferences):
+    active = {
+        'budget': preferences['minBudget'] is not None or preferences['maxBudget'] is not None,
+        'categories': bool(preferences['categories']),
+        'brands': bool(preferences['brands']),
+        'inStockOnly': bool(preferences['inStockOnly']),
+    }
+    return [name for name in FILTERS if active[name]]
+
+
+def matches_preferences(product, preferences, filters=tuple(FILTERS)):
+    return all(FILTERS[name](product, preferences) for name in filters)
+
+
+def skipped_notice(skipped, source):
+    labels = [FILTER_LABELS[name] for name in skipped]
+    names = labels[0] if len(labels) == 1 else ', '.join(labels[:-1]) + ' and ' + labels[-1]
+    plural = 'filters were' if len(labels) > 1 else 'filter was'
+    return (f'Your {names} {plural} not applied because {SOURCE_NAMES.get(source, source)} '
+            'results do not include those details.')
+
+
+def apply_preferences(payload, preferences, source=None):
+    """Filter results by saved preferences the source has data for.
+
+    With no source, every active filter applies.
+    """
+    active = active_filters(preferences)
+    supported = SOURCE_FILTERS.get(source, set(FILTERS)) if source else set(FILTERS)
+    applied = [name for name in active if name in supported]
+    skipped = [name for name in active if name not in supported]
+    results = [item for item in payload.get('results', []) if matches_preferences(item, preferences, applied)]
+    notices = [payload.get('warning')]
+    if applied:
+        notices.append('Saved preferences filter the returned candidates. Products with unavailable details for an active filter are excluded.')
+    if skipped:
+        notices.append(skipped_notice(skipped, source))
     return {**payload, 'results': results, 'preferencesApplied': True,
-            'warning': ' '.join(filter(None, [payload.get('warning'), notice]))}
+            'appliedPreferences': applied, 'skippedPreferences': skipped,
+            'warning': ' '.join(filter(None, notices))}

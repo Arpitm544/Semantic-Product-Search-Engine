@@ -159,16 +159,20 @@ def test_preference_search_filters_before_recording_and_keeps_query_options(clie
             patch.object(main, 'load_preferences', return_value=preferences), \
             patch.object(history, 'collection') as factory:
         response = client.get(f'/api/search?q=%20headphones%20&source={source}&fuzzy=0&preferences=true')
+    # Google Shopping has prices, so the budget applies. The catalog has no
+    # prices, so its budget filter is skipped (and named) instead of emptying results.
+    expected = payload['results'][:1] if source == 'serpapi' else payload['results']
     assert response.status_code == 200
-    assert response.json()['results'] == payload['results'][:1]
+    assert response.json()['results'] == expected
     assert response.json()['preferencesApplied'] is True
+    assert response.json()['skippedPreferences'] == ([] if source == 'serpapi' else ['budget'])
     recorded = factory.return_value.update_one.call_args.args[1]['$set']
     assert recorded['user_id'] == 'alice'
     assert recorded['query'] == 'headphones'
     assert recorded['source'] == source
     assert recorded['fuzzy'] is False
     assert recorded['use_preferences'] is True
-    assert recorded['result_count'] == 1
+    assert recorded['result_count'] == len(expected)
 
 
 def test_history_distinguishes_searches_with_and_without_preferences():

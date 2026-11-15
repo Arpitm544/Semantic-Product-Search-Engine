@@ -191,3 +191,54 @@ def test_preference_budget_bounds_remain_inclusive(minimum, maximum, expected):
     result = apply_preferences({'results': products, 'warning': 'Provider notice.'}, preferences)
     assert [product['price'] for product in result['results']] == expected
     assert result['warning'].startswith('Provider notice.')
+
+
+# Real result shapes: the catalog has brand/category but no price or stock;
+# Google Shopping results have a price but no brand, category, or stock.
+CATALOG_ROW = {'id': 'esci:us:1', 'title': 'WH-1000XM5 Headphones', 'brand': 'Sony', 'category': 'Headphones'}
+CATALOG_OTHER = {'id': 'esci:us:2', 'title': 'Mascara', 'brand': 'Maybelline', 'category': 'Beauty'}
+SHOPPING_ROW = {'id': 'serpapi:123456', 'title': 'Sony WH-1000XM5', 'merchant': 'Croma', 'price': 24990, 'priceLabel': '₹24,990'}
+SHOPPING_PRICEY = {**SHOPPING_ROW, 'id': 'serpapi:654321', 'price': 59990, 'priceLabel': '₹59,990'}
+
+
+def prefs(**values):
+    return features.Preferences(currency='INR', **values).model_dump()
+
+
+def test_catalog_budget_and_stock_preferences_are_skipped_not_emptying_results():
+    result = apply_preferences({'results': [CATALOG_ROW, CATALOG_OTHER]},
+                               prefs(maxBudget=5000, inStockOnly=True), 'mongo')
+    assert result['results'] == [CATALOG_ROW, CATALOG_OTHER]
+    assert result['appliedPreferences'] == [] and result['skippedPreferences'] == ['budget', 'inStockOnly']
+    assert 'budget and in-stock filters were not applied because catalog results' in result['warning']
+    assert 'Saved preferences filter' not in result['warning']
+
+
+def test_catalog_still_filters_by_brand_and_category():
+    result = apply_preferences({'results': [CATALOG_ROW, CATALOG_OTHER]},
+                               prefs(brands=['sony'], categories=['Headphones'], maxBudget=5000), 'mongo')
+    assert result['results'] == [CATALOG_ROW]
+    assert result['appliedPreferences'] == ['categories', 'brands'] and result['skippedPreferences'] == ['budget']
+    assert 'Your budget filter was not applied' in result['warning']
+
+
+def test_shopping_applies_budget_but_skips_brand_category_and_stock():
+    result = apply_preferences({'results': [SHOPPING_ROW, SHOPPING_PRICEY]},
+                               prefs(maxBudget=30000, brands=['Sony'], categories=['Headphones'], inStockOnly=True), 'serpapi')
+    assert result['results'] == [SHOPPING_ROW]
+    assert result['appliedPreferences'] == ['budget']
+    assert result['skippedPreferences'] == ['categories', 'brands', 'inStockOnly']
+    assert 'category, brand and in-stock filters were not applied because Google Shopping results' in result['warning']
+
+
+def test_no_active_preferences_adds_no_notice():
+    result = apply_preferences({'results': [CATALOG_ROW]}, prefs(), 'mongo')
+    assert result['results'] == [CATALOG_ROW] and 'warning' in result and result['warning'] == ''
+
+
+def test_search_route_passes_its_source_to_the_preference_filter():
+    from api import main
+    context = main.SearchContext('alice', 'headphones', 'mongo', True, True)
+    with patch.object(main, 'remember_search', lambda ctx, payload: payload):
+        result = main.finish_search(context, {'results': [CATALOG_ROW]}, prefs(maxBudget=5000))
+    assert result['results'] == [CATALOG_ROW] and result['skippedPreferences'] == ['budget']
