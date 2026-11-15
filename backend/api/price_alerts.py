@@ -15,6 +15,7 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 from api.auth import require_session
 from api.account_store import PrivateDataRoute, store, saved_items, owned, now, iso, new_id
 from api.product_prices import price_info
+from api.search_limits import take_daily_slot
 from api.shopping_service import search_shopping, ShoppingError
 from src.data import catalog
 
@@ -27,6 +28,22 @@ def interval_seconds():
         return max(3600, int(os.environ.get('PRICE_ALERT_INTERVAL_SECONDS', '21600')))
     except ValueError:
         return 21600
+
+
+def daily_limit(name, default):
+    try:
+        return max(0, int(os.environ.get(name, str(default))))
+    except ValueError:
+        return default
+
+
+def reserve_shopping_check(user):
+    """Spend one per-user and one global daily slot before calling SerpApi."""
+    if not take_daily_slot(f'price-alerts:user:{user}',
+                           daily_limit('PRICE_ALERT_SHOPPING_CHECKS_PER_USER_PER_DAY', 10)):
+        raise ValueError('Your daily limit for Google Shopping price checks is reached. A later check will retry.')
+    if not take_daily_slot('price-alerts:all', daily_limit('PRICE_ALERT_SHOPPING_CHECKS_PER_DAY', 200)):
+        raise ValueError('Google Shopping price checks are paused for today. A later check will retry.')
 
 
 def market_settings():
@@ -166,6 +183,7 @@ def same_offer(item, alert):
 def shopping_offer(alert):
     if alert['market'] != market_settings():
         raise ValueError('Shopping region settings changed. Recreate this alert for the new region.')
+    reserve_shopping_check(alert['user_id'])
     candidates = search_shopping(alert['product']['title'])['results']
     product = next((item for item in candidates if same_offer(item, alert)), None)
     if product is None:

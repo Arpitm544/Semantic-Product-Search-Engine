@@ -1,5 +1,6 @@
 """Atlas vector retrieval using the same encoder as the local reranker pipeline."""
 import os
+from threading import Lock
 
 
 def index_name():
@@ -17,9 +18,13 @@ def index_definition(dimensions):
 
 
 class AtlasVectorSearch:
-    def __init__(self, db, products, encoder, model_name, generation):
+    # The lock guards only local encoding; Atlas network calls run without it.
+    manages_model_lock = True
+
+    def __init__(self, db, products, encoder, model_name, generation, model_lock=None):
         self.model_name = model_name
         self.encoder = encoder
+        self.model_lock = model_lock if model_lock is not None else Lock()
         self.by_id = {p['id']: p for p in products}
         self.collection = db[collection_name(generation)]
         metadata = db['vector_manifests'].find_one({'_id': generation})
@@ -37,8 +42,9 @@ class AtlasVectorSearch:
         limit = min(top_k, len(self.by_id))
         if not limit:
             return []
-        vector = self.encoder.encode([query], normalize_embeddings=True,
-                                     show_progress_bar=False)[0].tolist()
+        with self.model_lock:
+            vector = self.encoder.encode([query], normalize_embeddings=True,
+                                         show_progress_bar=False)[0].tolist()
         pipeline = [
             {'$vectorSearch': {'index': index_name(), 'path': 'embedding',
                               'queryVector': vector, 'numCandidates': max(100, limit * 20),

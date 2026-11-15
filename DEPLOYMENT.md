@@ -81,6 +81,12 @@ host will check overdue alerts after it resumes.
   stable region/language/location settings. Changing the market makes old alerts
   unavailable until recreated. Calls use provider quota and normal request
   timeouts; unsupported offers never silently match by title alone.
+- Google Shopping alert checks have their own daily SerpApi budgets, separate
+  from the per-minute search limits: `PRICE_ALERT_SHOPPING_CHECKS_PER_USER_PER_DAY=10`
+  per user and `PRICE_ALERT_SHOPPING_CHECKS_PER_DAY=200` across all users (UTC
+  days, shared through MongoDB). When a budget is used up, the alert shows as
+  unavailable and retries at its next scheduled check. `0` pauses these checks.
+  Catalog alerts do not use SerpApi and are not limited.
 - Notifications are in-app only. This implementation does not send emails or SMS.
 - Include `python -m pytest tests/test_account_features.py tests/test_price_alerts.py`
   in release checks. Tests use mocks and never consume real provider quota.
