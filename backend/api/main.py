@@ -218,7 +218,7 @@ def catalog_search(context, preferences):
 
 def finish_search(context, payload, preferences):
     if preferences is not None:
-        payload = apply_preferences(payload, preferences)
+        payload = apply_preferences(payload, preferences, context.source)
     return remember_search(context, payload)
 
 
