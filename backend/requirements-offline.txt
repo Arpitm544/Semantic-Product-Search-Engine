@@ -1,0 +1,3 @@
+# Optional offline FAISS evaluation tools; not needed by the Atlas application.
+-r requirements.txt
+faiss-cpu>=1.7.4,<2

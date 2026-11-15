@@ -6,6 +6,7 @@
 - [Architecture](architecture.md): responsibilities, storage, and configuration.
 - [Commands](commands.md): startup, dataset import, training, and evaluation.
 
+
 ## Training and learning
 
 - [Colab training](colab-training.md): hosted GPU setup and checkpoints.

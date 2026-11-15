@@ -98,3 +98,61 @@ is performed by the backend.
 The backend uses FastAPI with function-based routes. Uvicorn starts when you run
 `api/main.py`; the startup script sets the local CPU thread limits.
 Interactive API documentation is available at http://127.0.0.1:8000/docs.
+
+## MongoDB Atlas Vector Search setup
+
+The API defaults to Atlas vector retrieval. Keyword search and reranking remain
+local; the existing trained Sentence Transformer generates query embeddings.
+The application uses Atlas exclusively; no local vector index is loaded or generated.
+
+1. Create an Atlas cluster supporting Vector Search. Create a database user with
+   read/write access to the application database and permission to create/list
+   Search indexes. Add your backend machine's IP to the Atlas network access list.
+2. In `backend/.env`, set `MONGO_URI` to your Atlas connection string (URL-encode
+   special characters in the password). Keep credentials out of Git. Set:
+
+   ```dotenv
+   MONGO_DB_NAME=semantic_product_search
+   MONGO_COLLECTION=amazon_products
+   ATLAS_VECTOR_INDEX=product_vectors
+   SEMANTIC_MODEL_PATH=models/colab-export/esci-minilm-20k
+   ```
+
+   Use the actual local trained model directory if different. The same model
+   weights must be available when uploading embeddings and running the API.
+3. From the repository root, install dependencies and run:
+
+   ```sh
+   backend/.venv/bin/python -m pip install -r backend/requirements.txt
+   cd backend
+   .venv/bin/python scripts/import_catalog.py
+   .venv/bin/python scripts/setup_atlas_vectors.py
+   ```
+
+   The importer reads `backend/data/dataset/prepared/products.json` by default;
+   supply `--source /absolute/path/products.json` if needed. Import writes to
+   the database selected by `MONGO_URI`, so set the Atlas URI first.
+4. Start/restart the backend using the existing launch command. Missing vectors
+   or an unready index fail explicitly; the API does not silently use FAISS.
+
+The setup command batches normalized embeddings into a separate MongoDB
+collection and creates a cosine Vector Search index with dimensions detected
+from the encoder. It waits up to 900 seconds for the index to become queryable
+(`--timeout` changes this). Atlas indexing is eventually consistent: recently
+uploaded vectors can take additional time to appear in searches.
+
+Each catalog/model fingerprint gets its own vector collection, preventing searches
+from mixing model weights or catalog generations. Existing product documents are
+not enlarged with embeddings, and vectors are excluded from API product payloads.
+Rerun setup after importing a catalog or changing model weights. Retired vector
+collections are retained; remove them manually only after confirming they are no
+longer used. Index and storage limits apply to every retained generation.
+The existing catalog import lock also serializes vector setup with imports; see
+interrupted-import recovery above if a process is forcibly terminated.
+
+Without Atlas credentials, upload, index creation, and live retrieval cannot be
+verified. Unit tests exercise query construction and readiness checks locally.
+
+FAISS is retained only for optional offline evaluation and Colab experiments.
+Install `backend/requirements-offline.txt` if you need those tools. Local model
+weights are still required for query embeddings and cross-encoder reranking.

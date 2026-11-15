@@ -41,10 +41,12 @@ The MongoDB collection `amazon_products` stores the prepared Amazon products.
 records without deleting stale products or other collections. It refuses imports
 when the collection contains IDs outside the prepared set; use a new
 `MONGO_COLLECTION` for a different catalog. Serving does not fall back to JSON.
-The serving cache under `backend/indexes/catalog` contains vectors and product IDs;
-serving loads product records from MongoDB. Offline FAISS caches also serialize
-product metadata. Publish serving catalog changes through the importer to update
-the cache version.
+Atlas stores embeddings in `product_vectors_<generation>` collections and indexes
+those vectors for semantic retrieval. `vector_manifests` tracks completed uploads.
+Serving keeps product records and keyword search in memory; it does not read or
+write local vector indexes. Local model weights generate query embeddings and
+rerank candidates. Offline FAISS evaluation tools are optional and separate.
+Publish catalog changes through the importer, then run `setup_atlas_vectors.py`.
 
 ## Configuration
 

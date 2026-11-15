@@ -1,3 +1,1 @@
-"""
-Semantic vector search using Sentence-BERT embeddings and FAISS index.
-"""
+"""Atlas semantic retrieval and offline model training/evaluation tools."""

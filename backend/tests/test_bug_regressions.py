@@ -4,7 +4,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -13,7 +12,6 @@ from pymongo.errors import DuplicateKeyError, ConnectionFailure
 from api import main, search_limits, price_alerts
 from api.product_prices import price_info
 from api.saved_products import public_item
-from api.search_service import restore_vectors
 from api.auth import require_session
 from tests.test_account_features import mockdb, saved_row, ID, OTHER, COL, TIME
 
@@ -27,26 +25,6 @@ def test_currency_symbols_do_not_overlap(label, currency):
 def test_naive_mongo_saved_timestamp_is_explicitly_utc():
     value = public_item({'_id':ID,'source':'mongo','identity':'x','product':{},'saved_at':datetime(2026,10,29,23,30)})
     assert value['savedAt'] == '2026-10-29T23:30:00+00:00'
-
-
-@pytest.mark.parametrize('vectors', [np.ones((1,3),dtype=np.float32),np.array([[float('nan'),0],[0,1]],dtype=np.float32), np.array([[float('inf'),0],[0,1]],dtype=np.float32),np.ones((2,3),dtype=np.float32), np.array([1,2],dtype=np.float32)])
-def test_invalid_vector_cache_is_rejected(tmp_path, vectors):
-    path=tmp_path/'vectors.npz'; np.savez(path,ids=['a','b'],vectors=vectors)
-    with pytest.raises(ValueError): restore_vectors(SimpleNamespace(), [{'id':'a'},{'id':'b'}], path)
-
-
-def test_vector_cache_dimension_must_match_loaded_model(tmp_path):
-    path = tmp_path / 'vectors.npz'
-    np.savez(path, ids=['a', 'b'], vectors=np.eye(2, dtype=np.float32))
-    model = SimpleNamespace(get_sentence_embedding_dimension=lambda: 3)
-    with pytest.raises(ValueError, match='dimension'):
-        restore_vectors(SimpleNamespace(_model=model), [{'id': 'a'}, {'id': 'b'}], path)
-
-
-def test_valid_vector_cache_still_loads(tmp_path):
-    path=tmp_path/'vectors.npz'; np.savez(path,ids=['a','b'],vectors=np.eye(2,dtype=np.float32))
-    engine=SimpleNamespace(); restore_vectors(engine,[{'id':'a'},{'id':'b'}],path)
-    assert engine.index.ntotal == 2
 
 
 def test_public_health_redacts_internal_details():
