@@ -1,11 +1,10 @@
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
 @import "tailwindcss/utilities.css" layer(utilities);
 @source "../";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @custom-variant light (&:where(:root:not([data-theme="dark"]), :root:not([data-theme="dark"]) *));
-
-/* Preserve native form defaults: this project did not use a CSS reset. */
 
 @layer base {
   :root {
