@@ -6,6 +6,8 @@ services:
     buildCommand: bash scripts/render_build.sh
     startCommand: python -m uvicorn api.main:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /api/health
+    # Deploy a new commit on main only after its GitHub checks pass.
+    autoDeployTrigger: checksPass
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.11

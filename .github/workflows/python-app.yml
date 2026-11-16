@@ -1,5 +1,6 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+# Continuous integration for the frontend and backend.
+# Render deploys main only after this check passes (autoDeployTrigger: checksPass
+# in render.yaml), so a failing build never goes live.
 
 name: Python application
 
@@ -12,16 +13,27 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same PR cancels its older, now-irrelevant run.
+# Runs on main are never cancelled, so every merged commit gets a result.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
     - uses: actions/checkout@v4
+
+    # --- Frontend -------------------------------------------------------
     - uses: actions/setup-node@v4
       with:
         node-version: "22"
+        cache: npm
+        cache-dependency-path: frontend/package-lock.json
     - name: Install frontend dependencies
       working-directory: frontend
       run: npm ci
@@ -31,13 +43,30 @@ jobs:
     - name: Test frontend launcher
       working-directory: frontend
       run: npm test
+    - name: Build frontend for production
+      working-directory: frontend
+      env:
+        # Clerk needs a publishable key to prerender pages. Publishable keys are
+        # public, and this placeholder points nowhere, so CI needs no secrets.
+        # It decodes to "ci-placeholder.clerk.accounts.dev$".
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2ktcGxhY2Vob2xkZXIuY2xlcmsuYWNjb3VudHMuZGV2JA==
+      run: npm run build
+
+    # --- Backend --------------------------------------------------------
     - name: Set up Python 3.11
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
+        cache: pip
+        cache-dependency-path: |
+          requirements.txt
+          backend/requirements.txt
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        # CPU-only PyTorch, as on Render (render_build.sh): much smaller than the
+        # default CUDA build, and the tests never use a GPU.
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
         pip install flake8 pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Lint with flake8
