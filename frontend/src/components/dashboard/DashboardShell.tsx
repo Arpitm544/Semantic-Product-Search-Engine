@@ -22,7 +22,7 @@ export default function DashboardShell({ children, unreadAlerts }: { children: R
   ];
   const all = groups.flatMap(group => group.items);
 
-  return <div className="min-h-screen bg-[var(--paper)] text-[14px] text-[var(--ink)] [font-family:'DM_Sans',sans-serif] [--accent:#344f3b] [--accent-ink:#faf8f2] dark:[--accent:#c9ddb5] dark:[--accent-ink:#17251b] [&_ul]:m-0 [&_ul]:list-none [&_ul]:p-0 [&_button]:border-solid">
+  return <div className="min-h-screen bg-[var(--paper)] text-[14px] text-[var(--ink)] [font-family:'DM_Sans',sans-serif] [&_ul]:m-0 [&_ul]:list-none [&_ul]:p-0 [&_button]:border-solid">
     {/* The app has no CSS reset, so lists and inputs are normalised here. */}
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col border-r border-[var(--line)] bg-[var(--surface-fff)] px-3 py-5 lg:flex">
       <a href="/" className={`${heading} mb-7 flex items-center gap-2 px-3 text-xl`}><span className="text-[var(--accent)]">✳</span>semantic.</a>

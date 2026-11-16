@@ -24,8 +24,8 @@ Three.js is loaded near the story; rendering runs only for scroll easing, resizi
 
 Generated with the built-in imagegen tool, then copied into this frontend. They are original artwork and not borrowed 21st.dev assets.
 
-- `public/images/discovery-landscape.png`: panoramic editorial scene used in the hero.
-- `public/images/catalog-art.png`: four-quadrant studio artwork, used as a CSS image sheet for headphones, backpack, bottle, and jacket. Other product types use original SVG artwork.
+- `public/images/discovery-landscape.webp`: panoramic editorial scene used in the hero.
+- `public/images/catalog-art.webp`: four-quadrant studio artwork, used as a CSS image sheet for headphones, backpack, bottle, and jacket. Other product types use original SVG artwork.
 
 ### Final hero prompt
 

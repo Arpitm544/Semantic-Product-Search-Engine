@@ -14,9 +14,9 @@ export default function HeadphonePoster({ loading = false, failed = false, onRet
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
-    <div className="absolute inset-0 overflow-hidden rounded-[15px] bg-[var(--surface-edf2ef)]" aria-busy={loading}>
+    <div className="absolute inset-0 overflow-hidden rounded-[15px] bg-[#edf2ee]" aria-busy={loading}>
       {imageFailed ? (
-        <div className="flex h-full flex-col items-center justify-center gap-3 px-6 pb-16 text-center text-[var(--text-53615b)]">
+        <div className="flex h-full flex-col items-center justify-center gap-3 px-6 pb-16 text-center text-[#263b45]">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true">
             <path d="M4 14v-3a8 8 0 0 1 16 0v3M4 13H3v7h4v-7H4Zm16 0h1v7h-4v-7h3Z" />
           </svg>
