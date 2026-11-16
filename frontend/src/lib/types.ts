@@ -38,6 +38,7 @@ export interface SearchProduct {
   reviews?: number | string | null;
   stock?: number | string | null;
   inStock?: boolean | null;
+  tags?: string[];
   provider?: string;
   matchSources?: string[];
 }

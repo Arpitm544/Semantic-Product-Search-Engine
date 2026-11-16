@@ -31,7 +31,7 @@ from api.auth import require_session
 from api.dashboard import dashboard_data
 from api import search_service
 from api.search_service import get_search_engine, _search_ready
-from src.data.catalog import CatalogUpdatingError
+from src.data.catalog import CatalogUpdatingError, with_product_links
 from api.shopping_service import ShoppingError, search_shopping, rank_shopping_response
 from api.shops_service import search_shops, rank_shops_response
 
@@ -222,7 +222,7 @@ def catalog_search(context, preferences):
         logging.getLogger(__name__).exception("Search initialization failed")
         return search_unavailable()
     try:
-        payload = engine.search(context.query, fuzzy=context.fuzzy)
+        payload = with_product_links(engine.search(context.query, fuzzy=context.fuzzy))
         return finish_search(context, payload, preferences)
     except (ValueError, RuntimeError, OSError, PyMongoError):
         logging.getLogger(__name__).exception("Search request failed")

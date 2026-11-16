@@ -1,6 +1,7 @@
 'use client';
 import { useAccountResource, type Preferences } from '@/lib/account';
 import SaveProductButton from '@/components/SaveProductButton';
+import ProductArtwork from '@/components/ProductArtwork';
 import ThemeToggle from '@/components/ThemeToggle';
 import { classes } from '@/lib/classes';
 
@@ -133,7 +134,10 @@ function ProductImage({ product, index }: { product: SearchProduct; index: numbe
     <div className={classes(`search-result-art art-${index % 5}`)}>
       {url && !failed
         ? <img src={url} alt={product.title} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
-        : <span role="img" aria-label="Product image unavailable">{product.title?.slice(0, 1) || 'P'}</span>}
+        : <div className="relative h-full w-full" title="Illustration — no product photo available">
+            <ProductArtwork product={{ title: product.title || 'Product', id: product.id }} colors={product.tags} />
+            <span className="absolute inset-x-0 bottom-[3px] text-center font-sans text-[7px] font-semibold uppercase tracking-[.6px] opacity-55">Illustration</span>
+          </div>}
     </div>
   );
 }
@@ -277,10 +281,10 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
               <SaveProductButton key={`${source}:${product.id ?? product.url ?? product.title}`} product={product} source={source} />
               <ProductImage key={`${product.id}:${product.imageUrl}`} product={product} index={index} />
               <div className={"search-result-copy [&_h3_a]:[color:inherit] [&_h3_a]:no-underline [&_h3_a:hover]:underline [&_h3_a:focus-visible]:[outline:2px_solid_var(--focus-ring)] [&_h3_a:focus-visible]:[outline-offset:3px] min-w-[0] [flex:1] [&_h3]:[font-style:normal] [&_h3]:font-semibold [&_h3]:text-[14px] [&_h3]:leading-[normal] [&_h3]:[font-family:Manrope,sans-serif] [&_h3]:mt-[4px] [&_h3]:mr-[0] [&_h3]:mb-[4px] [&_h3]:ml-[0] [&_h3]:[color:var(--text-354136)] [&_p]:text-[11px] [&_p]:leading-[1.5] [&_p]:[color:var(--text-828d81)] [&_p]:mt-[0] [&_p]:mr-[0] [&_p]:mb-[0] [&_p]:ml-[0] [&_p]:max-w-[690px] [&_p]:[display:-webkit-box] [&_p]:[-webkit-line-clamp:2] [&_p]:[-webkit-box-orient:vertical] [&_p]:overflow-hidden max-[600.01px]:[&_h3]:text-[12px] max-[600.01px]:[&_p]:text-[10px] max-[600.01px]:basis-[calc(100%_-_70px)]"}>
-                <span className={"search-result-category text-[9px] [color:var(--text-899587)] uppercase tracking-[.55px]"}>{shopping ? product.merchant || 'Google Shopping' : [product.category, product.brand].filter(Boolean).join(' · ')}</span>
+                <span className={"search-result-category text-[9px] [color:var(--text-899587)] uppercase tracking-[.55px]"}>{shopping ? product.merchant || 'Google Shopping' : [product.category, product.brand].filter(value => value && value !== 'amazon-esci').join(' · ')}</span>
                 <h3>{url ? <a href={url} target="_blank" rel="noopener noreferrer">{product.title} <span aria-hidden="true">↗</span></a> : product.title}</h3>
                 {product.description && <p>{product.description}</p>}
-                <div className={"search-result-meta flex items-center gap-[13px] mt-[7px] text-[10px] [color:var(--text-828d81)] [&_strong]:text-[11px] [&_strong]:[color:var(--text-455b48)] max-[600.01px]:gap-[8px] max-[600.01px]:text-[9px] max-[600.01px]:flex-wrap"}><strong>{money(product)}</strong>{product.rating != null && <span>★ {Number(product.rating).toFixed(1)}{product.reviews != null ? ` (${Number(product.reviews).toLocaleString()} reviews)` : ''}</span>}{product.stock != null && <span>{product.stock} in stock</span>}{product.inStock === false && <span>Out of stock</span>}</div>
+                <div className={"search-result-meta flex items-center gap-[13px] mt-[7px] text-[10px] [color:var(--text-828d81)] [&_strong]:text-[11px] [&_strong]:[color:var(--text-455b48)] max-[600.01px]:gap-[8px] max-[600.01px]:text-[9px] max-[600.01px]:flex-wrap"}><strong>{money(product)}</strong>{product.rating != null && <span>★ {Number(product.rating).toFixed(1)}{product.reviews != null ? ` (${Number(product.reviews).toLocaleString()} reviews)` : ''}</span>}{product.stock != null && <span>{product.stock} in stock</span>}{product.inStock === false && <span>Out of stock</span>}{!shopping && url && <a href={url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">View on Amazon ↗</a>}</div>
               </div>
               <span className={"relevance-score self-start mt-[3px] mr-[3px] mb-[0] ml-[0] rounded-[14px] pt-[5px] pr-[8px] pb-[5px] pl-[8px] [background:var(--surface-f0f4ee)] [color:var(--text-577658)] text-[10px] font-bold whitespace-nowrap [&_small]:text-[8px] [&_small]:font-medium [&_small]:ml-[4px] [&_small]:[color:var(--text-82927f)] max-[600.01px]:text-[9px] max-[600.01px]:pt-[4px] max-[600.01px]:pr-[6px] max-[600.01px]:pb-[4px] max-[600.01px]:pl-[6px] max-[600.01px]:ml-[66px] max-[600.01px]:[&_small]:hidden"}>{shopping ? product.matchSources?.includes('reranker') ? 'Engine ranked' : source === 'shops' ? 'Shop order' : 'Google ranked' : product.matchSources?.some((source) => source === 'fuzzy' || source === 'semantic-corrected') ? 'Spelling match' : product.matchSources?.includes('keyword') ? 'Product match' : 'Related match'}</span>
             </article>;

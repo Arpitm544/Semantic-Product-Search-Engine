@@ -1,5 +1,6 @@
 """MongoDB is the sole serving source for product records."""
 import os
+import re
 from functools import lru_cache
 from threading import Lock
 from src.data.db import get_database
@@ -52,3 +53,26 @@ def _load_products():
     if manifest.get('sha256'):
         _products_signature, _products_cache = signature, products
     return products
+
+
+_ASIN = re.compile(r'[A-Z0-9]{10}')
+
+
+def amazon_url(product_id):
+    """Link to a catalog product's Amazon page, from its ESCI id ("esci:us:<ASIN>").
+
+    Only US ids with a well-formed ASIN get a link; anything else returns None.
+    """
+    parts = str(product_id or '').split(':')
+    if len(parts) == 3 and parts[0] == 'esci' and parts[1] == 'us' and _ASIN.fullmatch(parts[2]):
+        return f'https://www.amazon.com/dp/{parts[2]}'
+    return None
+
+
+def with_product_links(payload):
+    """Add an Amazon link to catalog results that have none."""
+    results = []
+    for item in payload.get('results', []):
+        link = None if item.get('url') else amazon_url(item.get('id'))
+        results.append({**item, 'url': link} if link else item)
+    return {**payload, 'results': results}

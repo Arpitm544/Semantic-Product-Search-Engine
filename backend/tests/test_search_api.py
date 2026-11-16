@@ -199,3 +199,25 @@ class TestSearchAPI(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@pytest.mark.parametrize('product_id,expected', [
+    ('esci:us:B07VFKBQ3K', 'https://www.amazon.com/dp/B07VFKBQ3K'),
+    ('esci:us:0007514794', 'https://www.amazon.com/dp/0007514794'),
+    ('esci:jp:B07VFKBQ3K', None), ('esci:us:short', None), ('esci:us:B07VFKBQ3K/extra', None),
+    ('serpapi:123', None), (None, None),
+])
+def test_amazon_url_is_built_only_from_valid_us_asins(product_id, expected):
+    from src.data.catalog import amazon_url
+    assert amazon_url(product_id) == expected
+
+
+def test_catalog_search_results_link_to_amazon():
+    engine = Mock()
+    engine.search.return_value = {'results': [
+        {'id': 'esci:us:B07VFKBQ3K', 'title': 'Headphones'},
+        {'id': 'esci:us:B07D4JJNSD', 'title': 'Speaker', 'url': 'https://example.com/keep'}]}
+    status, payload = request('/api/search?q=headphones', engine)
+    assert status == 200
+    assert payload['results'][0]['url'] == 'https://www.amazon.com/dp/B07VFKBQ3K'
+    assert payload['results'][1]['url'] == 'https://example.com/keep'
