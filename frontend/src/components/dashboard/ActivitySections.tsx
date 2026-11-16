@@ -100,7 +100,7 @@ export function CollectionsCard({ collections, loading }: { collections: Product
       {loading && !collections && <div className="flex gap-2"><Skeleton className="h-8 w-24 rounded-full" /><Skeleton className="h-8 w-20 rounded-full" /></div>}
       {collections && !collections.length && <p className="text-[13px] text-[var(--muted)]">Group saved products into <a href="/collections" className="font-semibold text-[var(--accent)] hover:underline">collections</a> to plan a purchase.</p>}
       {!!collections?.length && <div className="flex flex-wrap gap-2">{collections.map(item => <a key={item.id} href="/collections" className={ghostButton}><Icon name="folder" size={14} />{item.name}<span className="text-[var(--muted)]">{item.productIds.length}</span></a>)}</div>}
-      <a href="/preferences" className="mt-4 flex items-center gap-3 rounded-xl bg-[var(--sage)] px-3.5 py-3 text-[13px] hover:opacity-90">
+      <a href="/search#filters" className="mt-4 flex items-center gap-3 rounded-xl bg-[var(--sage)] px-3.5 py-3 text-[13px] hover:opacity-90">
         <Icon name="sliders" size={17} className="text-[var(--accent)]" />
         <span className="flex-1">Set your budget, brands and default search source</span>
         <Icon name="arrow" size={14} />

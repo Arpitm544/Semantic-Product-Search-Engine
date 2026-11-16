@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAuth, UserButton } from '@clerk/nextjs';
-import ThemeToggle from '@/components/ThemeToggle';
+import { useAuth } from '@clerk/nextjs';
+import DashboardShell from '@/components/dashboard/DashboardShell';
 import { API_BASE, readJsonResponse, requireResponseOk, useAuthenticatedFetch } from '@/lib/api';
 import { productSourceLabel, type SearchProduct } from '@/lib/types';
 import { productPrice, safeProductUrl } from '@/lib/account';
@@ -118,11 +118,7 @@ function SavedProductsError({ state }: { state: SavedProductsState }) {
 export default function SavedProductsPage() {
   const state = useSavedProducts();
   const { items, more, busy, removing, load, remove } = state;
-  return <main className="min-h-screen bg-[var(--paper)] text-[var(--ink)] px-5 py-6">
-    <header className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 border-b border-[var(--line)] pb-5">
-      <a href="/" className="text-xl font-bold">✳ semantic.</a>
-      <nav className="flex flex-wrap items-center gap-4 text-sm"><a href="/search">Search</a><a href="/dashboard">Dashboard</a><a href="/collections">Collections</a><a href="/comparisons">Compare</a><a href="/alerts">Price alerts</a><ThemeToggle /><UserButton /></nav>
-    </header>
+  return <DashboardShell>
     <section className="mx-auto max-w-5xl py-10">
       <h1 className="text-4xl font-semibold">Your saved products</h1>
       <p className="mt-3 mb-8 text-sm opacity-70">Good finds, kept together. Prices reflect when you saved them and may change.</p>
@@ -134,5 +130,5 @@ export default function SavedProductsPage() {
       {busy && <p role="status" className="py-6">Loading saved products…</p>}
       {more && !busy && <button onClick={() => load(items.length)} className="mt-6 rounded-full border border-current px-5 py-2">Load more</button>}
     </section>
-  </main>;
+  </DashboardShell>;
 }

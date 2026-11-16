@@ -1,5 +1,6 @@
 'use client';
 import type { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
 import ThemeToggle from '@/components/ThemeToggle';
 import { Icon, heading, type IconName } from './ui';
@@ -18,11 +19,10 @@ export default function DashboardShell({ children, unreadAlerts }: { children: R
       { href: '/comparisons', label: 'Comparisons', icon: 'columns' },
       { href: '/alerts', label: 'Price alerts', icon: 'bell', badge: unreadAlerts || undefined },
     ] },
-    { title: 'Account', items: [{ href: '/preferences', label: 'Preferences', icon: 'sliders' }] },
   ];
   const all = groups.flatMap(group => group.items);
 
-  return <div className="min-h-screen bg-[var(--paper)] text-[14px] text-[var(--ink)] [font-family:'DM_Sans',sans-serif] [--accent:#344f3b] [--accent-ink:#faf8f2] dark:[--accent:#c9ddb5] dark:[--accent-ink:#17251b] [&_ul]:m-0 [&_ul]:list-none [&_ul]:p-0 [&_input]:border-0 [&_button]:border-solid">
+  return <div className="min-h-screen bg-[var(--paper)] text-[14px] text-[var(--ink)] [font-family:'DM_Sans',sans-serif] [--accent:#344f3b] [--accent-ink:#faf8f2] dark:[--accent:#c9ddb5] dark:[--accent-ink:#17251b] [&_ul]:m-0 [&_ul]:list-none [&_ul]:p-0 [&_button]:border-solid">
     {/* The app has no CSS reset, so lists and inputs are normalised here. */}
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col border-r border-[var(--line)] bg-[var(--surface-fff)] px-3 py-5 lg:flex">
       <a href="/" className={`${heading} mb-7 flex items-center gap-2 px-3 text-xl`}><span className="text-[var(--accent)]">✳</span>semantic.</a>
@@ -63,7 +63,7 @@ export default function DashboardShell({ children, unreadAlerts }: { children: R
 }
 
 function NavLink({ item, compact }: { item: NavItem; compact?: boolean }) {
-  const active = item.href === '/dashboard';
+  const active = usePathname() === item.href;
   if (compact) {
     return <a href={item.href} aria-current={active ? 'page' : undefined} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium ${active ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-ink)]' : 'border-[var(--line)] text-[var(--ink)]'}`}>
       <Icon name={item.icon} size={15} />{item.label}{item.badge ? <span className="text-[11px] font-bold">({item.badge})</span> : null}
