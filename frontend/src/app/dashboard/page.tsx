@@ -1,6 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import DashboardShell from '@/components/dashboard/DashboardShell';
+import DashboardLoading from './loading';
 import CatalogPanel, { useCatalog } from '@/components/dashboard/CatalogPanel';
 import { CollectionsCard, RecentSearches, SavedForLater } from '@/components/dashboard/ActivitySections';
 import { Icon, ProblemBanner, StatTile, heading, primaryButton, type Problem } from '@/components/dashboard/ui';
@@ -51,6 +52,8 @@ export default function DashboardPage() {
 
   const personalLoading = personal.busy && !p;
   const overviewLoading = overview.busy && !o;
+
+  if (personalLoading && overviewLoading && catalog.busy && !catalog.data) return <DashboardLoading />;
 
   return <DashboardShell unreadAlerts={o?.unreadAlertCount}>
     <Greeting name={personal.user?.firstName || personal.user?.username} />
