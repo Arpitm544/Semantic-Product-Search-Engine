@@ -14,6 +14,25 @@ function validSuggestion(value: unknown): value is Suggestion {
   return typeof item.text === 'string' && (item.kind === 'recent' || item.kind === 'brand' || item.kind === 'catalog');
 }
 
+async function fetchSuggestions(
+  authenticatedFetch: ReturnType<typeof useAuthenticatedFetch>,
+  input: string,
+  signal: AbortSignal,
+): Promise<Suggestion[] | undefined> {
+  try {
+    const response = await authenticatedFetch(`${API_BASE}/api/suggest?${new URLSearchParams({ q: input })}`, { signal });
+    if (!response.ok) return;
+    const body = await response.json();
+    if (Array.isArray(body?.suggestions)) return body.suggestions.filter(validSuggestion);
+  } catch { /* suggestions are optional */ }
+}
+
+function moveHighlight(current: number, last: number, down: boolean) {
+  // -1 represents the typed text and sits between either end of the list.
+  if (down) return current >= last ? -1 : current + 1;
+  return current <= -1 ? last : current - 1;
+}
+
 /** Fetch suggestions shortly after typing stops. Failures just mean no suggestions. */
 export function useSearchSuggestions(input: string, enabled: boolean) {
   const authenticatedFetch = useAuthenticatedFetch();
@@ -25,15 +44,10 @@ export function useSearchSuggestions(input: string, enabled: boolean) {
     if (!enabled || input.trim().length < 2) { setItems([]); return; }
     const controller = new AbortController();
     const timer = setTimeout(async () => {
-      try {
-        const response = await authenticatedFetch(`${API_BASE}/api/suggest?${new URLSearchParams({ q: input })}`, { signal: controller.signal });
-        if (!response.ok) return;
-        const body = await response.json();
-        if (Array.isArray(body?.suggestions)) {
-          setItems(body.suggestions.filter(validSuggestion));
-          setActive(-1);
-        }
-      } catch { /* suggestions are optional */ }
+      const suggestions = await fetchSuggestions(authenticatedFetch, input, controller.signal);
+      if (!suggestions) return;
+      setItems(suggestions);
+      setActive(-1);
     }, 120);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [input, enabled, authenticatedFetch]);
@@ -45,10 +59,8 @@ export function useSearchSuggestions(input: string, enabled: boolean) {
     if (!visible) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
-      // -1 means the typed text itself; moving past either end wraps around through it.
-      const last = items.length - 1;
       const down = event.key === 'ArrowDown';
-      setActive(current => down ? (current >= last ? -1 : current + 1) : (current <= -1 ? last : current - 1));
+      setActive(current => moveHighlight(current, items.length - 1, down));
     } else if (event.key === 'Enter' && active >= 0) {
       event.preventDefault();
       choose(items[active].text);
@@ -76,9 +88,10 @@ function Highlighted({ text, typed }: { text: string; typed: string }) {
   return <span>{text}</span>;
 }
 
-export function SuggestionList({ items, active, typed, onChoose, onHover }: {
-  items: Suggestion[]; active: number; typed: string; onChoose: (text: string) => void; onHover: (index: number) => void;
+export function SuggestionList({ open, items, active, typed, onChoose, onHover }: {
+  open: boolean; items: Suggestion[]; active: number; typed: string; onChoose: (text: string) => void; onHover: (index: number) => void;
 }) {
+  if (!open) return null;
   return <ul id={LIST_ID} role="listbox" aria-label="Search suggestions" className="absolute inset-x-0 top-full z-30 m-0 mt-2 list-none overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface-fff)] p-1 text-left shadow-lg">
     {items.map((item, index) => <li key={`${item.kind}:${item.text}`} id={`${LIST_ID}-${index}`} role="option" aria-selected={index === active}
       onMouseDown={event => { event.preventDefault(); onChoose(item.text); }} onMouseEnter={() => onHover(index)}

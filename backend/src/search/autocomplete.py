@@ -41,9 +41,9 @@ def _title_phrases(title):
     words = WORD.findall(str(title or "").lower())
     phrases = set()
     for start in range(len(words)):
-        for size in range(1, MAX_WORDS + 1):
+        for size in range(1, min(MAX_WORDS, len(words) - start) + 1):
             chunk = words[start:start + size]
-            if len(chunk) == size and _good_phrase(chunk):
+            if _good_phrase(chunk):
                 phrases.add(" ".join(chunk))
     return phrases
 
@@ -61,6 +61,36 @@ def _keep_shortest(chosen, brand):
     return [other for other in chosen if other not in related] + [brand]
 
 
+def _catalog_counts(products):
+    phrase_counts = Counter()
+    brand_counts = Counter()
+    brand_names = {}
+    for product in products:
+        phrase_counts.update(_title_phrases(product.get("title")))
+        brand = normalize(product.get("brand"))
+        if brand and brand not in PLACEHOLDER_BRANDS:
+            brand_counts[brand] += 1
+            brand_names.setdefault(brand, str(product["brand"]).strip())
+    return phrase_counts, brand_counts, brand_names
+
+
+def _frequent(counts, minimum):
+    return {phrase: count for phrase, count in counts.items() if count >= minimum}
+
+
+def _typo_words(phrases):
+    words_by_start = defaultdict(list)
+    for phrase in phrases:
+        if " " not in phrase and len(phrase) >= 4:
+            words_by_start[phrase[:2]].append(phrase)
+    return words_by_start
+
+
+def _one_typo_away(fragment, word):
+    sizes = range(max(3, len(fragment) - 1), len(fragment) + 2)
+    return any(edit_distance(fragment, word[:size]) <= 1 for size in sizes)
+
+
 class SortedPrefixIndex:
     """Phrases with counts, searchable by prefix."""
 
@@ -69,9 +99,8 @@ class SortedPrefixIndex:
         self.sorted = sorted(counts)
         tops = defaultdict(list)
         for phrase, count in counts.items():
-            for size in range(1, SHORT_PREFIX + 1):
-                if len(phrase) >= size:
-                    tops[phrase[:size]].append((count, phrase))
+            for size in range(1, min(SHORT_PREFIX, len(phrase)) + 1):
+                tops[phrase[:size]].append((count, phrase))
         self.top = {prefix: [phrase for _, phrase in nlargest(TOP_PER_PREFIX, items, key=lambda item: (item[0], -len(item[1])))]
                     for prefix, items in tops.items()}
 
@@ -88,22 +117,11 @@ class Autocomplete:
     """Prefix suggestions over catalog title phrases and brand names."""
 
     def __init__(self, products):
-        phrase_counts = Counter()
-        brand_counts = Counter()
-        self.brand_names = {}
-        for product in products:
-            phrase_counts.update(_title_phrases(product.get("title")))
-            brand = normalize(product.get("brand"))
-            if brand and brand not in PLACEHOLDER_BRANDS:
-                brand_counts[brand] += 1
-                self.brand_names.setdefault(brand, str(product["brand"]).strip())
-        self.phrases = SortedPrefixIndex({p: c for p, c in phrase_counts.items() if c >= MIN_PRODUCTS})
-        self.brands = SortedPrefixIndex({b: c for b, c in brand_counts.items() if c >= MIN_BRAND_PRODUCTS})
+        phrase_counts, brand_counts, self.brand_names = _catalog_counts(products)
+        self.phrases = SortedPrefixIndex(_frequent(phrase_counts, MIN_PRODUCTS))
+        self.brands = SortedPrefixIndex(_frequent(brand_counts, MIN_BRAND_PRODUCTS))
         # Single words grouped by their first two letters, for typo-tolerant prefixes.
-        self.words_by_start = defaultdict(list)
-        for phrase in self.phrases.counts:
-            if " " not in phrase and len(phrase) >= 4:
-                self.words_by_start[phrase[:2]].append(phrase)
+        self.words_by_start = _typo_words(self.phrases.counts)
 
     def brand_matches(self, typed, limit=2):
         prefix = normalize(typed).strip()
@@ -123,19 +141,28 @@ class Autocomplete:
         unrelated words that merely start with "st". A one-word context is
         used only when longer ones find nothing."""
         text = normalize(typed)
-        if len(text.strip()) < 2:
+        typed_query = text.strip()
+        if len(typed_query) < 2 or limit <= 0:
             return []
         words = text.split()
         typing = self._still_typing(text, words)
-        found = []
+        found = self._context_completions(words, typing, limit)
+        if typing and not found:
+            found = self._typo_suggestions(words, limit)
+        return [suggestion for suggestion in found if suggestion != typed_query]
+
+    def _context_completions(self, words, typing, limit):
         for size in range(min(MAX_WORDS, len(words)), 0, -1):
-            self._add(found, self._with_context(words, size, typing, limit), limit)
-            if found:
-                break
-        if not found and typing and len(words[-1]) >= 4:
-            self._add(found, [" ".join(words[:-1] + [word]) for word in self.typo_completions(words[-1], limit)], limit)
-        # Suggesting exactly what was typed adds nothing.
-        return [suggestion for suggestion in found if suggestion != text.strip()]
+            matches = self._with_context(words, size, typing, limit)
+            if matches:
+                return matches[:limit]
+        return []
+
+    def _typo_suggestions(self, words, limit):
+        fragment = words[-1]
+        if len(fragment) < 4:
+            return []
+        return [" ".join(words[:-1] + [word]) for word in self.typo_completions(fragment, limit)]
 
     @staticmethod
     def _still_typing(text, words):
@@ -150,16 +177,6 @@ class Autocomplete:
 
     def typo_completions(self, fragment, limit):
         """Common words whose start is one typo away from the fragment."""
-        candidates = []
-        for word in self.words_by_start.get(fragment[:2], []):
-            for size in (len(fragment) - 1, len(fragment), len(fragment) + 1):
-                if size >= 3 and edit_distance(fragment, word[:size]) <= 1:
-                    candidates.append(word)
-                    break
+        words = self.words_by_start.get(fragment[:2], [])
+        candidates = (word for word in words if _one_typo_away(fragment, word))
         return nlargest(limit, candidates, key=lambda word: (self.phrases.counts[word], -len(word)))
-
-    @staticmethod
-    def _add(found, candidates, limit):
-        for candidate in candidates:
-            if candidate not in found and len(found) < limit:
-                found.append(candidate)

@@ -177,7 +177,7 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
   // Smart query filters: what the search understood, and the shopper's chip choices.
   const [queryFilters, setQueryFilters] = useState<QueryFilters | null>(null);
   const [smart, setSmart] = useState<SmartFilterChoice>(NO_CHOICE);
-  const suggestions = useSearchSuggestions(input, isLoaded && Boolean(isSignedIn));
+  const suggestions = useSearchSuggestions(input, isSignedIn === true);
   const pending = useRef<AbortController | null>(null);
   const preferences = useAccountResource<Preferences>('/api/preferences');
   const [usePreferences, setUsePreferences] = useState(initialPreferences);
@@ -302,7 +302,7 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
             autoComplete="off" {...suggestions.comboboxProps} placeholder="Try ‘wireless headphones’ or ‘mascara’" aria-label="Search products" />
           <button type="submit" disabled={!input.trim() || loading || preferences.busy}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
         </form>
-        {suggestions.open && <SuggestionList items={suggestions.items} active={suggestions.active} typed={input} onChoose={chooseSuggestion} onHover={suggestions.setActive} />}
+        <SuggestionList open={suggestions.open} items={suggestions.items} active={suggestions.active} typed={input} onChoose={chooseSuggestion} onHover={suggestions.setActive} />
         </div>
         <span className={"search-data-note block mt-[11px] text-[10px] [color:var(--text-a1a99f)]"}>{SOURCE_NOTES[source]}</span>
       </section>

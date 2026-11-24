@@ -86,10 +86,13 @@ def merge(groups, limit=LIMIT):
     seen, merged = set(), []
     for kind, texts in groups:
         for text in texts:
+            if len(merged) >= limit:
+                return merged
             key = normalize(text).strip()
-            if key and key not in seen and len(merged) < limit:
-                seen.add(key)
-                merged.append({"text": text, "kind": kind})
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            merged.append({"text": text, "kind": kind})
     return merged
 
 
