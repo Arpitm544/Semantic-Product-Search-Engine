@@ -92,6 +92,39 @@ results come from the external provider and do not use the MongoDB search index.
 Local weights and vector caches are separate from the product database.
 All local dataset files are under backend/data/dataset/, with raw/ and prepared/ subfolders.
 
+## Search quality dashboard
+
+The public `/quality` page shows how much each stage of the search pipeline
+helps, measured on held-out Amazon ESCI test queries with human relevance labels
+(Exact, Substitute, Complement, Irrelevant). It reports NDCG@10, MRR@10,
+Recall@10, Hit@5 and per-stage latency, split into clean queries and queries
+with typos, and includes examples where the pipeline helps most and where it
+still fails.
+
+| Stage | NDCG@10 | MRR@10 | Recall@10 | Hit@5 | p50 latency |
+|---|---|---|---|---|---|
+| Keyword (BM25) | 0.388 | 0.492 | 0.345 | 0.634 | 2 ms |
+| + Spelling correction | 0.433 (+12%) | 0.546 | 0.380 | 0.693 | 13 ms |
+| Semantic only | 0.440 (+13%) | 0.547 | 0.377 | 0.683 | 7 ms |
+| Hybrid retrieval | 0.524 (+35%) | 0.633 | 0.465 | 0.794 | 26 ms |
+| Hybrid + reranker (served) | 0.600 (+54%) | 0.699 | 0.532 | 0.847 | 903 ms |
+
+992 test queries (200 clean, 792 with one synthetic typo) over 42,617 products; latency measured on 2 CPU threads.
+
+The stages run the same `ProductSearch` code that serves requests. The only
+difference is semantic retrieval, which uses an exact in-memory search over the
+same embeddings instead of Atlas, so no database is needed. Rebuild the report
+after changing models or ranking:
+
+```sh
+cd backend
+.venv/bin/python scripts/evaluate_quality.py             # full test split
+.venv/bin/python scripts/evaluate_quality.py --limit 50  # quick check
+```
+
+The script writes `backend/quality/quality_report.json` (committed, served by
+`GET /api/quality`) and caches product embeddings under `backend/indexes/quality/`.
+
 See [Colab training and evaluation](docs/colab-training.md) for reproducible
 validation and test comparisons. Amazon ESCI source attribution and license
 are included with the prepared dataset.
