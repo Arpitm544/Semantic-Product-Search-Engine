@@ -1,0 +1,618 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-24T08:59:25+00:00",
+  "split": "test",
+  "dataset": "Amazon ESCI (Shopping Queries Dataset), English",
+  "datasetUrl": "https://github.com/amazon-science/esci-data",
+  "judgments": "Exact 3 \u00b7 Substitute 2 \u00b7 Complement 1 \u00b7 Irrelevant 0; unjudged results count as 0",
+  "catalogProducts": 42617,
+  "catalogSha256": "bceaabb88f2ee1a78462f60fb00d839961e498bcf27d9c54caccda6dad7319c0",
+  "models": {
+    "encoder": "esci-minilm-20k",
+    "reranker": "ms-marco-MiniLM-L6-v2"
+  },
+  "environment": {
+    "device": "cpu",
+    "threads": 2,
+    "machine": "arm64",
+    "semanticBackend": "Exact in-memory cosine search (production uses Atlas Vector Search)"
+  },
+  "commit": "b7652ba",
+  "partial": false,
+  "queryCount": 992,
+  "stages": [
+    {
+      "id": "keyword",
+      "label": "Keyword (BM25)",
+      "description": "Classic word matching over product titles and descriptions.",
+      "metrics": {
+        "all": {
+          "queries": 992,
+          "ndcg@10": 0.3884178622654443,
+          "mrr@10": 0.4917838741679464,
+          "recall@10": 0.3448666285376118,
+          "hit@5": 0.6340725806451613
+        },
+        "clean": {
+          "queries": 200,
+          "ndcg@10": 0.490181868596571,
+          "mrr@10": 0.6025178571428572,
+          "recall@10": 0.43153209017411276,
+          "hit@5": 0.76
+        },
+        "typo": {
+          "queries": 792,
+          "ndcg@10": 0.3627198808686949,
+          "mrr@10": 0.4638207471540804,
+          "recall@10": 0.32298141095263727,
+          "hit@5": 0.6022727272727273
+        }
+      },
+      "byTypoKind": {
+        "deletion": {
+          "queries": 198,
+          "ndcg@10": 0.36492079664400334,
+          "mrr@10": 0.45401434984768324,
+          "recall@10": 0.3290052795796769,
+          "hit@5": 0.5858585858585859
+        },
+        "repetition": {
+          "queries": 198,
+          "ndcg@10": 0.374686919979792,
+          "mrr@10": 0.4848184223184225,
+          "recall@10": 0.3265948900999044,
+          "hit@5": 0.6313131313131313
+        },
+        "substitution": {
+          "queries": 198,
+          "ndcg@10": 0.3522182932277932,
+          "mrr@10": 0.4494869328202662,
+          "recall@10": 0.31907924513211133,
+          "hit@5": 0.5808080808080808
+        },
+        "transposition": {
+          "queries": 198,
+          "ndcg@10": 0.35905351362319154,
+          "mrr@10": 0.4669632836299503,
+          "recall@10": 0.317246228998856,
+          "hit@5": 0.6111111111111112
+        }
+      },
+      "latencyMs": {
+        "p50": 1.7157294932985678,
+        "p95": 21.20652239245828,
+        "mean": 5.635328969894486
+      }
+    },
+    {
+      "id": "spelling",
+      "label": "+ Spelling correction",
+      "description": "Also searches catalog-aware corrections such as \u201cheadphnes\u201d \u2192 \u201cheadphones\u201d.",
+      "metrics": {
+        "all": {
+          "queries": 992,
+          "ndcg@10": 0.4331319155984939,
+          "mrr@10": 0.5462837621607778,
+          "recall@10": 0.3800031856182116,
+          "hit@5": 0.6925403225806451
+        },
+        "clean": {
+          "queries": 200,
+          "ndcg@10": 0.4912573807509241,
+          "mrr@10": 0.6031428571428572,
+          "recall@10": 0.4307656066576293,
+          "hit@5": 0.76
+        },
+        "typo": {
+          "queries": 792,
+          "ndcg@10": 0.4184537678327283,
+          "mrr@10": 0.5319254048420714,
+          "recall@10": 0.3671843924264406,
+          "hit@5": 0.6755050505050505
+        }
+      },
+      "byTypoKind": {
+        "deletion": {
+          "queries": 198,
+          "ndcg@10": 0.40598201210456164,
+          "mrr@10": 0.5136964886964887,
+          "recall@10": 0.3618726906890666,
+          "hit@5": 0.6515151515151515
+        },
+        "repetition": {
+          "queries": 198,
+          "ndcg@10": 0.43597409405115584,
+          "mrr@10": 0.5571528779862114,
+          "recall@10": 0.3736766628857769,
+          "hit@5": 0.696969696969697
+        },
+        "substitution": {
+          "queries": 198,
+          "ndcg@10": 0.41024087105184065,
+          "mrr@10": 0.5188331729998397,
+          "recall@10": 0.3640238678893805,
+          "hit@5": 0.6666666666666666
+        },
+        "transposition": {
+          "queries": 198,
+          "ndcg@10": 0.4216180941233527,
+          "mrr@10": 0.5380190796857465,
+          "recall@10": 0.3691643482415365,
+          "hit@5": 0.6868686868686869
+        }
+      },
+      "latencyMs": {
+        "p50": 12.616604508366436,
+        "p95": 42.0160291105276,
+        "mean": 16.577530448645824
+      }
+    },
+    {
+      "id": "semantic",
+      "label": "Semantic only",
+      "description": "Fine-tuned MiniLM embeddings match by meaning instead of exact words.",
+      "metrics": {
+        "all": {
+          "queries": 992,
+          "ndcg@10": 0.44009326966983353,
+          "mrr@10": 0.5467313908090111,
+          "recall@10": 0.3773340182894561,
+          "hit@5": 0.6834677419354839
+        },
+        "clean": {
+          "queries": 200,
+          "ndcg@10": 0.551733576427975,
+          "mrr@10": 0.6787876984126985,
+          "recall@10": 0.477244759510542,
+          "hit@5": 0.805
+        },
+        "typo": {
+          "queries": 792,
+          "ndcg@10": 0.4119012730137362,
+          "mrr@10": 0.5133838383838377,
+          "recall@10": 0.35210403313261635,
+          "hit@5": 0.6527777777777778
+        }
+      },
+      "byTypoKind": {
+        "deletion": {
+          "queries": 198,
+          "ndcg@10": 0.3991522808844791,
+          "mrr@10": 0.5123356581689914,
+          "recall@10": 0.3415656716484196,
+          "hit@5": 0.6464646464646465
+        },
+        "repetition": {
+          "queries": 198,
+          "ndcg@10": 0.462642814037853,
+          "mrr@10": 0.5506914381914382,
+          "recall@10": 0.3835274515173264,
+          "hit@5": 0.6818181818181818
+        },
+        "substitution": {
+          "queries": 198,
+          "ndcg@10": 0.3947497967513031,
+          "mrr@10": 0.4917889209555876,
+          "recall@10": 0.341486123104897,
+          "hit@5": 0.6616161616161617
+        },
+        "transposition": {
+          "queries": 198,
+          "ndcg@10": 0.39106020038130856,
+          "mrr@10": 0.49871933621933634,
+          "recall@10": 0.3418368862598225,
+          "hit@5": 0.6212121212121212
+        }
+      },
+      "latencyMs": {
+        "p50": 7.147916505346075,
+        "p95": 13.46254008822142,
+        "mean": 8.264114715265967
+      }
+    },
+    {
+      "id": "hybrid",
+      "label": "Hybrid retrieval",
+      "description": "Keyword, spelling and semantic lists fused with reciprocal-rank fusion.",
+      "metrics": {
+        "all": {
+          "queries": 992,
+          "ndcg@10": 0.5237385171746289,
+          "mrr@10": 0.6329737103174606,
+          "recall@10": 0.4653388875708564,
+          "hit@5": 0.7943548387096774
+        },
+        "clean": {
+          "queries": 200,
+          "ndcg@10": 0.5656033464686999,
+          "mrr@10": 0.6711924603174602,
+          "recall@10": 0.5018555680753787,
+          "hit@5": 0.815
+        },
+        "typo": {
+          "queries": 792,
+          "ndcg@10": 0.513166590585217,
+          "mrr@10": 0.6233225108225101,
+          "recall@10": 0.4561175036050672,
+          "hit@5": 0.7891414141414141
+        }
+      },
+      "byTypoKind": {
+        "deletion": {
+          "queries": 198,
+          "ndcg@10": 0.4913650076963527,
+          "mrr@10": 0.5942119608786275,
+          "recall@10": 0.43597957195198456,
+          "hit@5": 0.7676767676767676
+        },
+        "repetition": {
+          "queries": 198,
+          "ndcg@10": 0.5435500639855525,
+          "mrr@10": 0.6621352413019079,
+          "recall@10": 0.47684773282733967,
+          "hit@5": 0.8080808080808081
+        },
+        "substitution": {
+          "queries": 198,
+          "ndcg@10": 0.4981102597238208,
+          "mrr@10": 0.6136263427930092,
+          "recall@10": 0.4396686091505736,
+          "hit@5": 0.7878787878787878
+        },
+        "transposition": {
+          "queries": 198,
+          "ndcg@10": 0.5196410309351414,
+          "mrr@10": 0.6233164983164984,
+          "recall@10": 0.4719741004903729,
+          "hit@5": 0.7929292929292929
+        }
+      },
+      "latencyMs": {
+        "p50": 25.831395512796007,
+        "p95": 61.111762504151535,
+        "mean": 28.83100252282959
+      }
+    },
+    {
+      "id": "reranked",
+      "label": "Hybrid + reranker",
+      "description": "A cross-encoder rescores hybrid candidates. This is what the site serves.",
+      "metrics": {
+        "all": {
+          "queries": 992,
+          "ndcg@10": 0.5999212175429317,
+          "mrr@10": 0.6986019105222733,
+          "recall@10": 0.5322008846564875,
+          "hit@5": 0.8467741935483871
+        },
+        "clean": {
+          "queries": 200,
+          "ndcg@10": 0.6222392241977729,
+          "mrr@10": 0.7124305555555555,
+          "recall@10": 0.5518286885868053,
+          "hit@5": 0.865
+        },
+        "typo": {
+          "queries": 792,
+          "ndcg@10": 0.5942853572765563,
+          "mrr@10": 0.6951098284431614,
+          "recall@10": 0.5272443685124677,
+          "hit@5": 0.8421717171717171
+        }
+      },
+      "byTypoKind": {
+        "deletion": {
+          "queries": 198,
+          "ndcg@10": 0.5530012956159222,
+          "mrr@10": 0.6727954144620811,
+          "recall@10": 0.49832084887252565,
+          "hit@5": 0.8131313131313131
+        },
+        "repetition": {
+          "queries": 198,
+          "ndcg@10": 0.6166023274255746,
+          "mrr@10": 0.710199214365881,
+          "recall@10": 0.5470163767155642,
+          "hit@5": 0.8585858585858586
+        },
+        "substitution": {
+          "queries": 198,
+          "ndcg@10": 0.6005172909896638,
+          "mrr@10": 0.6982663940997275,
+          "recall@10": 0.5277199141169626,
+          "hit@5": 0.8535353535353535
+        },
+        "transposition": {
+          "queries": 198,
+          "ndcg@10": 0.6070205150750647,
+          "mrr@10": 0.6991782908449574,
+          "recall@10": 0.5359203343448181,
+          "hit@5": 0.8434343434343434
+        }
+      },
+      "latencyMs": {
+        "p50": 903.112041472923,
+        "p95": 1417.5055061219603,
+        "mean": 934.5281494546022
+      }
+    }
+  ],
+  "examples": {
+    "wins": [
+      {
+        "query": "coobra 29 cb radio peaked and tuned",
+        "kind": "repetition",
+        "keywordNdcg": 0.0,
+        "rerankedNdcg": 1.0,
+        "keywordTop": [
+          {
+            "title": "Ranger Professional PPR-TLM1 40 Channel AM Mobile CB Radio with TFT Display and SRA-198 Noise Cancelling Microphone",
+            "grade": "Irrelevant"
+          },
+          {
+            "title": "Pro Trucker Pickup CB Radio Kit Includes Radio, 4' Antenna, CB Antenna Mount, CB Coax, SWR Meter w/Jumper Coax, Speaker, and Spring",
+            "grade": "Irrelevant"
+          },
+          {
+            "title": "Pro Trucker JK Jeep CB Radio Kit with CB Radio, Firestik Antenna, Radio Mount, Antenna Mount, Stud, Coax, SWR Meter with Jumper Cable, and Mopar Jeep Speaker - Black",
+            "grade": "Irrelevant"
+          }
+        ],
+        "rerankedTop": [
+          {
+            "title": "Cobra 29LX Professional CB Radio - Emergency Radio, Travel Essentials, NOAA Weather Channels and Emergency Alert System, Selectable 4-Color LCD, Auto-Scan and Radio Check, Black",
+            "grade": "Exact"
+          },
+          {
+            "title": "Cobra 29LTD Professional CB Radio - Emergency Radio, Travel Essentials, Instant Channel 9, 4 Watt Output, Full 40 Channels and SWR Calibration",
+            "grade": "Substitute"
+          },
+          {
+            "title": "Ranger Professional PPR-TLM1 40 Channel AM Mobile CB Radio with TFT Display and SRA-198 Noise Cancelling Microphone",
+            "grade": "Irrelevant"
+          }
+        ]
+      },
+      {
+        "query": "the taintwd",
+        "kind": "substitution",
+        "keywordNdcg": 0.0,
+        "rerankedNdcg": 1.0,
+        "keywordTop": [
+          {
+            "title": "10inch Roti Maker by StarBlue with FREE Roti Warmer - The automatic Stainless Steel Non-Stick Electric machine to make Indian style Chapati, Tortilla, Roti AC 120V 60Hz 1200W",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "HealthmateForever YK15AB TENS unit EMS Muscle Stimulator 4 outputs 15 modes Handheld Electrotherapy device | Electronic Pulse Massager for Electrotherapy Pain Management Pain Relief Therapy: Chosen by Sufferers of Tennis Elbow, Carpal Tunnel Syndrome, Arthritis, Bursitis, Tendonitis, Plantar Fasciitis, Sciatica, Neck Back Pain, Shin Splints, Hamstrings and other Inflammation Ailments Patent No. US",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "SlowTon Dog Car Seat Belt, Pet Seatbelt Clip Tether Puppy Safety Latch Bar Attachment Harness Leash Small Medium Large Dogs Adjustable Restraint Lockable Swivel Carabiner for Doggie Travel",
+            "grade": "Unjudged"
+          }
+        ],
+        "rerankedTop": [
+          {
+            "title": "The Tainted (Dominion of Ash Book 1)",
+            "grade": "Exact"
+          },
+          {
+            "title": "The Tainted",
+            "grade": "Exact"
+          },
+          {
+            "title": "Tainted: A Young Adult Dystopian Series (The ARC Book 1)",
+            "grade": "Irrelevant"
+          }
+        ]
+      },
+      {
+        "query": "26 toneer",
+        "kind": "repetition",
+        "keywordNdcg": 0.0,
+        "rerankedNdcg": 1.0,
+        "keywordTop": [
+          {
+            "title": "ROMWE Women's Cat Print Lightweight Sweatshirt Long Sleeve Casual Pullover Shirt Light Pink L",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Angashion Women Hoodies-Tops- Floral Printed Long Sleeve Drawstring Sweatshirt Camo L",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "New Fuel Gas Tank Straps 26 or 35 Gallon Pair Set for 1994-2002 Dodge Ram Pickup Truck",
+            "grade": "Unjudged"
+          }
+        ],
+        "rerankedTop": [
+          {
+            "title": "HP 26A | CF226A | Toner-Cartridge | Black | Works with HP LaserJet Pro M402 series, M426 series",
+            "grade": "Exact"
+          },
+          {
+            "title": "HP 26X | CF226XD | 2 Toner-Cartridges | Black | Works with HP LaserJet Pro M402 series, M426 series | High Yield",
+            "grade": "Exact"
+          },
+          {
+            "title": "MICR Toner International Compatible MICR Toner Cartridge Replacement for HP CF226A 26A M402dn M402n M402dw M426fdn M426fdw",
+            "grade": "Exact"
+          }
+        ]
+      },
+      {
+        "query": "proctiv cleanser 1",
+        "kind": "deletion",
+        "keywordNdcg": 0.0,
+        "rerankedNdcg": 0.9699081556673596,
+        "keywordTop": [
+          {
+            "title": "Vitamin C Cleanser - Anti Aging Face Wash & Exfoliating Facial Cleansing Gel Reduces Wrinkles, Dark Spots, Blemishes & Breakouts for Clear Skin With Natural Aloe Vera, Coconut Water & Green Tea",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Benzoyl Peroxide Body Wash 10% - Acne Face Wash & Acne Body Wash - Butt Acne Treatment & Back Acne Treatment - Highest Grade Medical Facial Cleanser, Maximum Strength Acne Wash 6.7 oz",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Benzoyl Peroxide 5% Wash Acne Treatment Face Wash & Body Wash -Butt & Back Acne Treatment 6.7 oz",
+            "grade": "Unjudged"
+          }
+        ],
+        "rerankedTop": [
+          {
+            "title": "Proactiv Acne Cleanser - Benzoyl Peroxide Face Wash and Acne Treatment - Daily Facial Cleanser and Hyularonic Acid Moisturizer with Exfoliating Beads - 90 Day Supply, 6 Oz",
+            "grade": "Exact"
+          },
+          {
+            "title": "Proactive CLEANSE Renewing Cleanser ( STEP 1 ) - 4fl oz / 120mL / 60 days supply",
+            "grade": "Exact"
+          },
+          {
+            "title": "Proactiv Deep Cleansing Acne Body Wash - Medicated Salicylic Acid Cleanser and Exfoliating Body Wash - 90 Day Supply, 16 Oz",
+            "grade": "Substitute"
+          }
+        ]
+      }
+    ],
+    "misses": [
+      {
+        "query": "macasins for women",
+        "kind": "clean",
+        "keywordNdcg": 0.0,
+        "rerankedNdcg": 0.0,
+        "keywordTop": [
+          {
+            "title": "Solid Sleeveless V-Neck Cami (PetiteStandard) Women Long SleeveV Neck T Shirts Loose Fitting Tunic Solid Color Tops Plain Casual Blouse Camisas de Mujer Summer Womens Sexy Tank Top",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "ZEFOTIM High Waisted Leggings with Pockets - Workout Leggings for Women Stretch Power Flex Yoga Pants - Full&Capri(Blue,Large)",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "YUNIAO Summer Y2k Tops for Women, Casual Vintage Skull Short Sleeve T-Shirt, Oversize Loose Crewneck Elastic Black Tees, A04#dark Gray, Medium",
+            "grade": "Unjudged"
+          }
+        ],
+        "rerankedTop": [
+          {
+            "title": "Female Enhancement (60caps) - Hormone Balance for Women - Intimacy & Mood Support - Natural Female Enhancement Pills with Dong Quai, Ginseng & Maca Root, 1 Pack",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Nobi Nutrition Weight Loss Pills for Women to Reduce Belly Fat | Appetite Suppressant & Fat Burner (60 Count)",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Mikilon Have A Holly Jolly Christmas T-Shirt for Women Plaid Santas Hat Long Sleeve Raglan Baseball Shirt Tops Red",
+            "grade": "Unjudged"
+          }
+        ]
+      },
+      {
+        "query": "flor 15",
+        "kind": "deletion",
+        "keywordNdcg": 0.0,
+        "rerankedNdcg": 0.0,
+        "keywordTop": [
+          {
+            "title": "Birkenstock Women's Arizona Birko-Flo White Birko-Flor Sandals - 40 R EU (US Men EU's 7-7.5, US Women EU's 9-9.5",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Birkenstock Women's Arizona, Dark Brown Birko Flor, 6-6.5",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Birkenstock Gizeh Birko-Flor Graceful Pearl White Birko-Flor 41 (US Women's 10-10.5) Regular",
+            "grade": "Unjudged"
+          }
+        ],
+        "rerankedTop": [
+          {
+            "title": "Birkenstock Women's Arizona, Dark Brown Birko Flor, 6-6.5",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Birkenstock Gizeh Birko-Flor Graceful Pearl White Birko-Flor 41 (US Women's 10-10.5) Regular",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Birkenstock Women's Arizona Birko-Flo White Birko-Flor Sandals - 40 R EU (US Men EU's 7-7.5, US Women EU's 9-9.5",
+            "grade": "Unjudged"
+          }
+        ]
+      },
+      {
+        "query": "kc mills",
+        "kind": "clean",
+        "keywordNdcg": 0.0,
+        "rerankedNdcg": 0.0,
+        "keywordTop": [
+          {
+            "title": "KC Cubs Boy and Girl Kids Face Mask Washable 3-Pack Reusable & Breathable 2 Layer Cotton Face Masks for Children (Ages 3-13), Adjustable Earloops, Nose Clip & PM 2.5 Filter Slot for Extra Protection",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Simple Mills Almond Flour Crackers, Fine Ground Sea Salt, 4.25 Oz",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Benson Mills Beauvalle Extra Wide Fabric Napkins (18\" X 18\" Napkins Set of 4, Beige/Ivory)",
+            "grade": "Unjudged"
+          }
+        ],
+        "rerankedTop": [
+          {
+            "title": "EdgeStar KC1000SS Craft Brew Kegerator for 1/6 Barrel and Cornelius Kegs",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "KC Cubs Boy and Girl Kids Face Mask Washable 3-Pack Reusable & Breathable 2 Layer Cotton Face Masks for Children (Ages 3-13), Adjustable Earloops, Nose Clip & PM 2.5 Filter Slot for Extra Protection",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Arrowhead Mills Organic Amaranth, 16 oz. Bag",
+            "grade": "Unjudged"
+          }
+        ]
+      },
+      {
+        "query": "triple msk",
+        "kind": "deletion",
+        "keywordNdcg": 0.0,
+        "rerankedNdcg": 0.0,
+        "keywordTop": [
+          {
+            "title": "Triple Bristle Best Sonic Electric Toothbrush - Whiter Teeth & Brighter Smile - Rechargeable 31,000 VPM Tooth Brush is Unique & Patented 3 Brush Head Design - Perfect Angle Bristles Clean Each Tooth",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "D Mannose 1000 mg Urinary Tract Health Formula - Triple Strength Organic Cranberry Fruit Concentrate & Hibiscus. Healthy Bladder Function, Natural Yeast Cleanse & UTI Support Pills, 60 Veggie Capsules",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Dr. Brandt Do Not Age Triple Peptide Eye Cream. All-In-One Formula that Smooths Appearance of Fine Lines, and Fades Dark Circles and Reduces Puffiness (0.5 ounces)",
+            "grade": "Unjudged"
+          }
+        ],
+        "rerankedTop": [
+          {
+            "title": "Triple Bristle Best Sonic Electric Toothbrush - Whiter Teeth & Brighter Smile - Rechargeable 31,000 VPM Tooth Brush is Unique & Patented 3 Brush Head Design - Perfect Angle Bristles Clean Each Tooth",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Dr. Brandt Do Not Age Triple Peptide Eye Cream. All-In-One Formula that Smooths Appearance of Fine Lines, and Fades Dark Circles and Reduces Puffiness (0.5 ounces)",
+            "grade": "Unjudged"
+          },
+          {
+            "title": "Waterpik Triple Sonic Replacement Brush Heads, Complete Care Replacement Tooth Brush Heads, STRB-3WW, 3 Count, White",
+            "grade": "Unjudged"
+          }
+        ]
+      }
+    ]
+  }
+}

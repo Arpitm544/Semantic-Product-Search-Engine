@@ -25,6 +25,7 @@ from api.saved_products import router as saved_products_router
 from api.search_history import router as history_router, remember_search, SearchContext
 from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
+from api.quality import router as quality_router
 from api.product_prices import apply_preferences
 from api.search_limits import check_search_rate
 from api.auth import require_session
@@ -92,6 +93,7 @@ app.include_router(saved_products_router)
 app.include_router(history_router)
 app.include_router(account_router)
 app.include_router(alerts_router)
+app.include_router(quality_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,

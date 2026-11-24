@@ -851,3 +851,13 @@
   --text-577658: var(--accent);
   --focus-ring: #ff9ba7;
 }
+
+/* Search quality charts: two validated series colors per theme (clean vs typo). */
+.quality-viz {
+  --series-clean: #2a78d6;
+  --series-typo: #eb6834;
+}
+:root[data-theme="dark"] .quality-viz {
+  --series-clean: #3987e5;
+  --series-typo: #d95926;
+}

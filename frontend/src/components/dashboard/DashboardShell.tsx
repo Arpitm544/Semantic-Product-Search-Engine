@@ -7,11 +7,12 @@ import { Icon, heading, type IconName } from './ui';
 
 type NavItem = { href: string; label: string; icon: IconName; badge?: number };
 
-export default function DashboardShell({ children, unreadAlerts }: { children: ReactNode; unreadAlerts?: number }) {
+export default function DashboardShell({ children, unreadAlerts, title = 'Overview' }: { children: ReactNode; unreadAlerts?: number; title?: string }) {
   const groups: { title: string; items: NavItem[] }[] = [
     { title: 'Discover', items: [
       { href: '/dashboard', label: 'Dashboard', icon: 'grid' },
       { href: '/search', label: 'Product search', icon: 'search' },
+      { href: '/quality', label: 'Search quality', icon: 'chart' },
     ] },
     { title: 'Your library', items: [
       { href: '/saved', label: 'Saved', icon: 'heart' },
@@ -43,7 +44,7 @@ export default function DashboardShell({ children, unreadAlerts }: { children: R
       <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--surface-topbar)] backdrop-blur">
         <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
           <a href="/" className={`${heading} flex items-center gap-2 text-lg lg:hidden`}><span className="text-[var(--accent)]">✳</span>semantic.</a>
-          <p className="hidden text-[13px] text-[var(--muted)] lg:block">Overview</p>
+          <p className="hidden text-[13px] text-[var(--muted)] lg:block">{title}</p>
           <div className="flex items-center gap-3">
             <a href="/alerts" aria-label={unreadAlerts ? `${unreadAlerts} unread price drops` : 'Price alerts'} className="relative grid h-9 w-9 place-items-center rounded-full border border-[var(--line)] hover:bg-[var(--sage)]">
               <Icon name="bell" size={17} />
