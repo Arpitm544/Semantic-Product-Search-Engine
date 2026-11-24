@@ -1,7 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 
-export type IconName = 'grid' | 'search' | 'box' | 'heart' | 'folder' | 'columns' | 'bell' | 'clock' | 'sliders' | 'arrow' | 'trash' | 'refresh' | 'tag' | 'chart' | 'info';
+export type IconName = 'grid' | 'search' | 'box' | 'heart' | 'folder' | 'columns' | 'bell' | 'clock' | 'sliders' | 'arrow' | 'trash' | 'refresh' | 'tag' | 'chart' | 'info' | 'pulse';
 
 const paths: Record<IconName, ReactNode> = {
   grid: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
@@ -19,6 +19,7 @@ const paths: Record<IconName, ReactNode> = {
   tag: <><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9Z" /><circle cx="8" cy="8" r="1.5" /></>,
   chart: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
   info: <><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></>,
+  pulse: <path d="M3 12h4l2.5-6 5 12 2.5-6H21" />,
 };
 
 export function Icon({ name, size = 18, className }: { name: IconName; size?: number; className?: string }) {

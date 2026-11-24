@@ -1,4 +1,4 @@
-"""Download and verify the exported inference models during a Render build."""
+"""Download and verify an exported inference model archive."""
 import hashlib
 import os
 from pathlib import Path

@@ -166,6 +166,31 @@ Only list stores whose terms allow this use. Product data comes from each shop's
 official API or the store's own public product data; protected pages and
 storefront search pages are never fetched.
 
+## Catalog photos (optional)
+
+The Amazon ESCI catalog has no images. Catalog results show a matching,
+colour-tinted illustration and a "View on Amazon" link (`https://www.amazon.com/dp/<ASIN>`).
+Real photos can be added for products found in the Amazon Reviews 2023 item
+metadata ([McAuley Lab](https://amazon-reviews-2023.github.io)), matched by ASIN:
+
+```sh
+.venv/bin/python scripts/import_catalog_images.py matches.json          # add or update
+.venv/bin/python scripts/import_catalog_images.py matches.json --clear  # replace all
+```
+
+`matches.json` maps `ASIN → {"image": url, ...}`. Photos are stored in their own
+`catalog_images` collection (`CATALOG_IMAGES_COLLECTION`), so catalog records, the
+catalog fingerprint, and the Atlas vectors are untouched; dropping the collection
+brings back the illustrations. Only catalog products and `https://m.media-amazon.com`
+links are imported or served. The backend reloads photos every ten minutes and
+serves 300px thumbnails (Amazon's `._SL300_.` size code). If photos can't be read,
+results keep their illustrations; a photo that fails to load in the browser falls
+back to the illustration too.
+
+These photos come from a research dataset and load from Amazon's servers: fine for
+demos and portfolios. For a public commercial site, use Amazon's official API
+(Amazon Associates / Creators API) instead.
+
 ## Start the frontend separately
 
 In another terminal:
