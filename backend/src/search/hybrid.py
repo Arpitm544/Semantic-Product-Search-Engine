@@ -70,19 +70,25 @@ class HybridSearch:
         # Higher-ranked matches earn more points; repeated matches add up.
         scores = defaultdict(float)
         sources = defaultdict(list)
+        source_ranks = defaultdict(dict)   # best rank each method gave the product
+        similarity = {}                     # best semantic cosine similarity
         products_by_id = {}
         for source, weight, ranked in rankings:
-            for rank, (product, _) in enumerate(ranked, start=1):
+            for rank, (product, method_score) in enumerate(ranked, start=1):
                 product_id = product["id"]
                 products_by_id[product_id] = product
                 scores[product_id] += weight / (60 + rank)
                 sources[product_id].append(source)
+                source_ranks[product_id].setdefault(source, rank)
+                if source.startswith("semantic"):
+                    similarity[product_id] = max(similarity.get(product_id, -1.0), float(method_score))
 
         # Sort by combined score and attach the matching methods to each result.
         ranked_ids = sorted(scores, key=lambda product_id: (-scores[product_id], str(product_id)))
         results = [
             {**products_by_id[product_id], "score": scores[product_id],
-             "matchSources": sources[product_id]}
+             "matchSources": sources[product_id], "sourceRanks": source_ranks[product_id],
+             **({"semanticScore": similarity[product_id]} if product_id in similarity else {})}
             for product_id in ranked_ids[:limit]
         ]
         return ranked_ids, results

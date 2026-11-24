@@ -41,6 +41,23 @@ export interface SearchProduct {
   tags?: string[];
   provider?: string;
   matchSources?: string[];
+  explanation?: ResultExplanation;
+}
+
+/** Why a result ranked where it did: see backend/src/search/explanations.py. */
+export interface ResultExplanation {
+  candidateCount: number;
+  matchedTerms: string[];
+  keywordRank: number | null;
+  semanticRank: number | null;
+  semanticSimilarity: number | null;
+  spellingMatch: boolean;
+  providerRank: number | null;
+  retrievalRank: number;
+  rerankerRank: number;
+  rerankerScore: number | null;
+  blendedScore: number;
+  weights: { retrieval: number; reranker: number };
 }
 
 export interface DashboardData {

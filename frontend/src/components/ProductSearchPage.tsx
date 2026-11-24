@@ -3,6 +3,7 @@ import SearchFilters from '@/components/SearchFilters';
 import { useAccountResource, type Preferences } from '@/lib/account';
 import SaveProductButton from '@/components/SaveProductButton';
 import QueryFilterChips from '@/components/QueryFilterChips';
+import ResultExplanation from '@/components/ResultExplanation';
 import ProductArtwork from '@/components/ProductArtwork';
 import DashboardShell from '@/components/dashboard/DashboardShell';
 import { classes } from '@/lib/classes';
@@ -360,6 +361,7 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
                 <h3>{url ? <a href={url} target="_blank" rel="noopener noreferrer">{product.title} <span aria-hidden="true">↗</span></a> : product.title}</h3>
                 {product.description && <p>{product.description}</p>}
                 <div className={"search-result-meta flex items-center gap-[13px] mt-[7px] text-[10px] [color:var(--text-828d81)] [&_strong]:text-[11px] [&_strong]:[color:var(--text-455b48)] max-[600.01px]:gap-[8px] max-[600.01px]:text-[9px] max-[600.01px]:flex-wrap"}><strong>{money(product)}</strong>{product.rating != null && <span>★ {Number(product.rating).toFixed(1)}{product.reviews != null ? ` (${Number(product.reviews).toLocaleString()} reviews)` : ''}</span>}{product.stock != null && <span>{product.stock} in stock</span>}{product.inStock === false && <span>Out of stock</span>}{!shopping && url && <a href={url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">View on Amazon ↗</a>}</div>
+                {product.explanation && <ResultExplanation explanation={product.explanation} position={index + 1} />}
               </div>
               <span className={"relevance-score self-start mt-[3px] mr-[3px] mb-[0] ml-[0] rounded-[14px] pt-[5px] pr-[8px] pb-[5px] pl-[8px] [background:var(--surface-f0f4ee)] [color:var(--text-577658)] text-[10px] font-bold whitespace-nowrap [&_small]:text-[8px] [&_small]:font-medium [&_small]:ml-[4px] [&_small]:[color:var(--text-82927f)] max-[600.01px]:text-[9px] max-[600.01px]:pt-[4px] max-[600.01px]:pr-[6px] max-[600.01px]:pb-[4px] max-[600.01px]:pl-[6px] max-[600.01px]:ml-[66px] max-[600.01px]:[&_small]:hidden"}>{shopping ? product.matchSources?.includes('reranker') ? 'Engine ranked' : source === 'shops' ? 'Shop order' : 'Google ranked' : product.matchSources?.some((source) => source === 'fuzzy' || source === 'semantic-corrected') ? 'Spelling match' : product.matchSources?.includes('keyword') ? 'Product match' : 'Related match'}</span>
             </article>;

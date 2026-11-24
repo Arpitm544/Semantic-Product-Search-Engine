@@ -61,5 +61,7 @@ class AtlasVectorSearch:
             {'$project': {'_id': 0, 'id': 1, 'score': {'$meta': 'vectorSearchScore'}}},
         ]
         rows = self.collection.aggregate(pipeline, maxTimeMS=30000)
-        return [(self.by_id[row['id']], float(row['score']))
+        # Atlas reports cosine indexes as (1 + cosine) / 2. Convert back so scores
+        # match the offline engine and can be shown as similarity.
+        return [(self.by_id[row['id']], 2 * float(row['score']) - 1)
                 for row in rows if row['id'] in self.by_id]
