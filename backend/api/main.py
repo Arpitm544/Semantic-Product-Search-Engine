@@ -26,6 +26,7 @@ from api.search_history import router as history_router, remember_search, Search
 from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
 from api.quality import router as quality_router
+from api.suggestions import router as suggestions_router, warm_up as warm_up_suggestions
 from api.product_prices import apply_preferences
 from api.query_understanding import (
     FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, understand,
@@ -57,9 +58,10 @@ def initialize_search(max_attempts=150, retry_delay=2):
     _search_error = None
     for attempt in range(max_attempts):
         try:
-            get_search_engine()
+            engine = get_search_engine()
             _search_ready.set()
             print("Search is ready.", flush=True)
+            warm_up_suggestions(engine)
             return
         except Exception as error:
             if isinstance(error, CatalogUpdatingError) and attempt + 1 < max_attempts:
@@ -97,6 +99,7 @@ app.include_router(history_router)
 app.include_router(account_router)
 app.include_router(alerts_router)
 app.include_router(quality_router)
+app.include_router(suggestions_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
