@@ -74,9 +74,10 @@ export type QueryFilterType = 'price' | 'brand' | 'color';
 export interface QueryFilterChip { type: 'brand' | 'color'; value: string; label: string }
 export interface QueryFilters {
   searchText: string;
-  price: { label: string; text: string; applied: boolean } | null;
+  /** available: the source has prices. applied: the shopper chose the price chip. */
+  price: { label: string; text: string; available: boolean; applied: boolean } | null;
   active: QueryFilterChip[];
   suggestions: QueryFilterChip[];
 }
 /** The shopper's choices about smart filters, sent back with the next search. */
-export interface SmartFilterChoice { skip: QueryFilterType[]; brand: string; color: string }
+export interface SmartFilterChoice { skip: QueryFilterType[]; brand: string; color: string; price: boolean }
