@@ -66,7 +66,7 @@ def test_server_errors_are_counted_and_logged(log_lines):
 
 def test_memory_is_capped_no_matter_how_many_searches():
     for index in range(obs.WINDOW + 250):
-        obs.metrics.record_search("mongo", 0, f"query {index} " + "x" * 300, {"total": 10.0})
+        obs.metrics.record_search("mongo", f"query {index} " + "x" * 300, {"total": 10.0}, "no-results")
         obs.metrics.record_request("/api/search", 200, 10.0)
     assert len(obs.metrics.search_timings) == obs.WINDOW
     assert len(obs.metrics.zero_queries) == obs.ZERO_KEEP
@@ -75,10 +75,13 @@ def test_memory_is_capped_no_matter_how_many_searches():
 
 
 def test_zero_result_texts_are_grouped_and_hidden_unless_allowed():
-    for query in ("blue fliptop", "Blue  fliptop", "rare thing"):
-        obs.metrics.record_search("mongo", 0, query, {"total": 5.0})
-    obs.metrics.record_search("shops", 3, "headphones", {"total": 5.0})
-    obs.metrics.record_search("mongo", 0, "   ", {"total": 5.0})   # blank searches are not kept
+    token = obs.current_request.set(obs.RequestRecord("test-request"))
+    try:
+        for query in ("blue fliptop", "Blue  fliptop", "rare thing", "   "):
+            obs.record_search_outcome("mongo", {"results": []}, query)
+        obs.record_search_outcome("shops", {"results": [{}] * 3}, "headphones")
+    finally:
+        obs.current_request.reset(token)
     snapshot = obs.metrics.snapshot(include_queries=True)
     assert snapshot["search"]["zeroResults"] == 3 and snapshot["search"]["total"] == 5
     top = snapshot["zeroResultSearches"][0]
@@ -92,8 +95,16 @@ def test_searches_with_only_weak_matches_count_as_no_close_match():
     assert obs.miss_reason(20, floor - 6) == "no-close-match"   # results exist, none is relevant
     assert obs.miss_reason(20, floor + 9) is None
     assert obs.miss_reason(20, None) is None                    # no reranker score: unknown, not a miss
-    obs.metrics.record_search("mongo", 20, "qwxzv blorptastic", {"total": 5.0}, top_score=-11.3)
-    obs.metrics.record_search("mongo", 20, "wireless headphones", {"total": 5.0}, top_score=4.8)
+    record = obs.RequestRecord("test-request")
+    token = obs.current_request.set(record)
+    try:
+        payload = {"results": [{}] * 20}
+        record.details["topScore"] = floor - 6
+        obs.record_search_outcome("mongo", payload, "qwxzv blorptastic")
+        record.details["topScore"] = floor + 9
+        obs.record_search_outcome("mongo", payload, "wireless headphones")
+    finally:
+        obs.current_request.reset(token)
     snapshot = obs.metrics.snapshot(include_queries=True)
     assert snapshot["search"]["noCloseMatch"] == 1 and snapshot["search"]["missRate"] == 0.5
     assert snapshot["zeroResultSearches"] == [{**snapshot["zeroResultSearches"][0], "query": "qwxzv blorptastic",
@@ -166,7 +177,7 @@ def test_search_outcomes_record_counts_and_log_details():
 
 def test_health_endpoint_hides_search_text_from_non_admins(authenticated_api, monkeypatch):
     from api import main
-    obs.metrics.record_search("mongo", 0, "secret zero result", {"total": 5.0})
+    obs.metrics.record_search("mongo", "secret zero result", {"total": 5.0}, "no-results")
     client = TestClient(main.app)
     monkeypatch.setenv("OBSERVABILITY_ADMINS", "someone_else")
     body = client.get("/api/observability").json()
