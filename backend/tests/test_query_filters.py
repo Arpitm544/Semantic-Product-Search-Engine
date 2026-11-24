@@ -130,29 +130,37 @@ def titles(payload):
     return [item["title"] for item in payload["results"]]
 
 
-def test_price_applies_to_shop_results_and_brand_color_are_only_suggested(brands):
+def test_nothing_is_filtered_until_the_shopper_chooses_it(brands):
     understanding = qu.understand("black nike shoes under $100", "shops", brands)
-    assert understanding["price"]["applied"] is True
+    assert understanding["searchText"] == "black nike shoes"  # the price phrase still leaves the text
+    assert understanding["price"]["available"] is True and understanding["price"]["applied"] is False
     assert [item["type"] for item in understanding["suggestions"]] == ["brand", "color"]
     payload = qu.apply({"results": SHOP_RESULTS}, understanding)
-    # Same currency, within budget; brand and color are not forced.
+    assert titles(payload) == [item["title"] for item in SHOP_RESULTS]
+    assert "warning" not in payload
+
+
+def test_a_chosen_price_filters_shop_results(brands):
+    understanding = qu.understand("black nike shoes under $100", "shops", brands, qu.FilterChoice(price=True))
+    assert understanding["price"]["applied"] is True
+    payload = qu.apply({"results": SHOP_RESULTS}, understanding)
+    # Same currency and within budget; products without a price are left out.
     assert titles(payload) == ["Black Nike Pegasus", "Black Adidas Runner"]
     assert "USD" in payload["warning"]
 
 
 def test_chips_the_shopper_chooses_filter_strictly(brands):
     understanding = qu.understand("black nike shoes under $100", "shops", brands,
-                                   qu.FilterChoice(brand="nike", color="black"))
+                                   qu.FilterChoice(brand="nike", color="black", price=True))
     assert understanding["suggestions"] == []
     assert titles(qu.apply({"results": SHOP_RESULTS}, understanding)) == ["Black Nike Pegasus"]
 
 
-def test_catalog_searches_explain_that_price_cannot_apply(brands):
-    understanding = qu.understand("nike shoes under $100", "mongo", brands)
-    assert understanding["price"]["applied"] is False
+def test_catalog_searches_cannot_apply_a_price(brands):
+    understanding = qu.understand("nike shoes under $100", "mongo", brands, qu.FilterChoice(price=True))
+    assert understanding["price"]["available"] is False and understanding["price"]["applied"] is False
     payload = qu.apply({"results": [{"title": "Nike shoe"}], "candidateCount": 1}, understanding)
     assert titles(payload) == ["Nike shoe"]
-    assert "catalog products have no prices" in payload["warning"]
 
 
 def test_plain_queries_leave_the_payload_unchanged():
@@ -196,3 +204,9 @@ def test_search_api_sends_clean_text_and_applies_chips(authenticated_api):
 
         client.get("/api/search", params={"q": "shoes under $100", "skip": "price,unknown"})
         assert engine.search.call_args.args[0] == "shoes under $100"
+
+
+def test_the_price_chip_is_sent_as_a_query_parameter():
+    assert qu.filter_choice().price is False
+    assert qu.filter_choice(price="1").price is True
+    assert qu.filter_choice(price="yes").price is False

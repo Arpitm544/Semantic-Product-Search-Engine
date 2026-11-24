@@ -1,10 +1,13 @@
-"""Turn what a shopper typed into search text, a price filter and narrowing chips.
+"""Turn what a shopper typed into search text and one-click narrowing chips.
 
-Price limits ("under $100") are applied automatically wherever results carry
-prices. Brands and colors are offered as one-click chips instead of being
-applied silently: on Amazon ESCI test searches, forcing them as filters
-lowered ranking quality (NDCG@10 0.715 -> 0.654), because the search already
-uses those words well. A chip the shopper clicks is applied strictly.
+Nothing is filtered until the shopper chooses it. Price limits ("under $100"),
+brands and colors found in the query are offered as chips; a chip the shopper
+clicks is applied strictly. Price phrases are still removed from the search
+text, because they only add noise to retrieval.
+
+Brands and colors stay opt-in for a measured reason too: on Amazon ESCI test
+searches, forcing them as filters lowered ranking quality (NDCG@10 0.715 ->
+0.654), because the search already uses those words well.
 """
 from dataclasses import dataclass
 import logging
@@ -47,11 +50,12 @@ class FilterChoice:
     skip: frozenset = frozenset()
     brand: str = ""
     color: str = ""
+    price: bool = False   # the shopper clicked the price chip
 
 
-def filter_choice(skip: str = "", brand: str = "", color: str = "") -> FilterChoice:
+def filter_choice(skip: str = "", brand: str = "", color: str = "", price: str = "") -> FilterChoice:
     """Read the choices from query parameters (used as a FastAPI dependency)."""
-    return FilterChoice(parse_skip(skip), brand[:100], color[:30])
+    return FilterChoice(parse_skip(skip), brand[:100], color[:30], price == "1")
 
 
 NO_CHOICE = FilterChoice()
@@ -79,10 +83,14 @@ def _suggestions(found, active):
             for kind in ("brand", "color") if kind in found and kind not in chosen]
 
 
-def _price(found, source):
+def _price(found, source, chosen):
+    """The price limit found in the query. It applies only after the shopper
+    chooses it, and only to sources whose results carry prices."""
     if "price" not in found:
         return None
-    return {**found["price"], "label": price_label(found["price"]), "applied": source in PRICED_SOURCES}
+    available = source in PRICED_SOURCES
+    return {**found["price"], "label": price_label(found["price"]),
+            "available": available, "applied": chosen and available}
 
 
 def understand(query, source, brands=None, choice=NO_CHOICE):
@@ -91,7 +99,7 @@ def understand(query, source, brands=None, choice=NO_CHOICE):
     active = [item for item in (_chosen_brand(choice.brand, brands), _chosen_color(choice.color)) if item]
     return {
         "searchText": parsed["text"],
-        "price": _price(parsed["filters"], source),
+        "price": _price(parsed["filters"], source, choice.price),
         "active": active,
         "suggestions": _suggestions(parsed["filters"], active),
     }
@@ -145,10 +153,7 @@ def _limited(results, limit):
 
 def _notes(payload, price):
     notes = [payload.get("warning")]
-    if price and not price["applied"]:
-        notes.append(f"{price['label']} was not applied: catalog products have no prices. "
-                     "Choose Online shops or Google Shopping to filter by price.")
-    elif price and price["currency"]:
+    if price_applies(price) and price["currency"]:
         notes.append(f"Only products priced in {price['currency']} are shown for {price['label']}.")
     return " ".join(filter(None, notes))
 
