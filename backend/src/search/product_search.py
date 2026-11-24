@@ -12,6 +12,7 @@ from src.keyword_search.bm25 import fit_bm25
 from src.search.hybrid import HybridSearch
 from src.search.typos import FrequencySpelling
 from src.search.ranking import blend_ranks
+from src.search.explanations import RankSignals, explanation
 
 
 def brand_title(product):
@@ -78,15 +79,16 @@ class ProductSearch:
         # semantic search (Atlas) locks just its encoding so other requests are
         # not blocked while it waits on the database.
         if getattr(self.semantic, "manages_model_lock", False) is True:
-            candidate_ids, match_sources = self.find_candidates(query_variations, query)
+            candidate_ids, match_sources, signals = self.find_candidates_detailed(query_variations, query)
         else:
             with self.lock:
-                candidate_ids, match_sources = self.find_candidates(query_variations, query)
+                candidate_ids, match_sources, signals = self.find_candidates_detailed(query_variations, query)
         if not candidate_ids:
             return response
 
         # 3. Put the best matches first, then build the response.
-        ranked_ids, scores = self.rank_candidates(corrected_query, candidate_ids)
+        ranking = self.rank_candidates_detailed(corrected_query, candidate_ids)
+        ranked_ids, scores = ranking["ids"], ranking["scores"]
         response["candidateCount"] = len(ranked_ids)
         for product_id in ranked_ids[:limit]:
             product = self.by_id[product_id]
@@ -94,13 +96,25 @@ class ProductSearch:
                 **product,
                 "score": scores[product_id],
                 "matchSources": sorted(match_sources[product_id]) + ["reranker"],
+                "explanation": explanation(corrected_query, product, RankSignals(
+                    retrieval_rank=ranking["retrieval"][product_id],
+                    reranker_rank=ranking["reranker"][product_id],
+                    reranker_score=ranking["model_scores"][product_id],
+                    blended_score=scores[product_id], candidate_count=len(ranked_ids),
+                    spelling_match="fuzzy" in match_sources[product_id], **signals[product_id])),
             })
         return response
 
     def find_candidates(self, query_variations, original_query):
         """Give points to products found across the query variations."""
+        candidate_ids, match_sources, _ = self.find_candidates_detailed(query_variations, original_query)
+        return candidate_ids, match_sources
+
+    def find_candidates_detailed(self, query_variations, original_query):
+        """find_candidates(), plus each product's best keyword and semantic rank."""
         scores = defaultdict(float)
         match_sources = defaultdict(set)
+        signals = defaultdict(lambda: {"keyword_rank": None, "semantic_rank": None, "semantic_similarity": None})
         for query in query_variations:
             matches = self.hybrid.search(query, 50, fuzzy=False)
             for position, product in enumerate(matches["results"], start=1):
@@ -110,12 +124,18 @@ class ProductSearch:
                 match_sources[product_id].update(product["matchSources"])
                 if query != original_query:
                     match_sources[product_id].add("fuzzy")
+                remember_signals(signals[product_id], product)
 
         candidate_ids = sorted(scores, key=lambda product_id: (-scores[product_id], product_id))
-        return candidate_ids, match_sources
+        return candidate_ids, match_sources, signals
 
     def rank_candidates(self, query, candidate_ids):
         """Combine retrieval order (25%) with reranker order (75%)."""
+        ranking = self.rank_candidates_detailed(query, candidate_ids)
+        return ranking["ids"], ranking["scores"]
+
+    def rank_candidates_detailed(self, query, candidate_ids):
+        """rank_candidates(), plus each product's retrieval rank, reranker rank and score."""
         retrieval_positions = {
             product_id: position
             for position, product_id in enumerate(candidate_ids, start=1)
@@ -149,4 +169,23 @@ class ProductSearch:
                 -combined_scores[product_id], retrieval_positions[product_id],
             ),
         )
-        return ranked_ids, combined_scores
+        return {
+            "ids": ranked_ids, "scores": combined_scores,
+            "retrieval": retrieval_positions, "reranker": reranker_positions,
+            "model_scores": {product_id: float(model_scores[index]) for index, product_id in enumerate(candidate_ids)},
+        }
+
+
+def best_rank(current, new):
+    return new if current is None or (new is not None and new < current) else current
+
+
+def remember_signals(signals, product):
+    """Keep the best keyword rank, semantic rank and similarity seen for a product."""
+    ranks = product.get("sourceRanks", {})
+    signals["keyword_rank"] = best_rank(signals["keyword_rank"], min(
+        (rank for source, rank in ranks.items() if source in ("keyword", "fuzzy")), default=None))
+    signals["semantic_rank"] = best_rank(signals["semantic_rank"], min(
+        (rank for source, rank in ranks.items() if source.startswith("semantic")), default=None))
+    if product.get("semanticScore") is not None:
+        signals["semantic_similarity"] = max(signals["semantic_similarity"] or -1.0, product["semanticScore"])

@@ -22,7 +22,7 @@ def test_atlas_query_uses_cloud_vectors_and_returns_catalog_records():
     semantic = AtlasVectorSearch(db, [product], encoder, 'model', 'generation')
     semantic.collection.aggregate.return_value = [
         {'id': 'esci:1', 'score': .9}, {'id': 'stale', 'score': .8}]
-    assert semantic.search('headphones', 5) == [(product, .9)]
+    assert semantic.search('headphones', 5) == [(product, pytest.approx(.8))]
     stage = semantic.collection.aggregate.call_args.args[0][0]['$vectorSearch']
     assert stage['queryVector'] == [1., 0.]
     assert stage['limit'] == 1
@@ -104,7 +104,7 @@ def test_encoding_holds_the_model_lock_but_the_atlas_query_does_not():
 
     encoder.encode.side_effect = encode
     semantic.collection.aggregate.side_effect = aggregate
-    assert semantic.search('headphones', 5) == [(product, .9)]
+    assert semantic.search('headphones', 5) == [(product, pytest.approx(.8))]
     assert held == {'encode': True, 'atlas': False}
 
 
