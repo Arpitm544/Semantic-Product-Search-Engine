@@ -32,6 +32,9 @@ from api.query_understanding import (
     FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, understand,
 )
 from api.search_limits import check_search_rate
+from api.observability import instrument_engines, observe_requests, record_search_outcome
+from api.system_health import router as system_health_router
+from api import ranking_service
 from api.auth import require_session
 from api.dashboard import dashboard_data
 from api import search_service
@@ -115,6 +118,11 @@ async def prevent_cached_results(request: Request, call_next):
     return response
 
 
+# Added last, so it wraps everything: request IDs, timing and one JSON log line per request.
+app.middleware("http")(observe_requests)
+app.include_router(system_health_router)
+
+
 @app.get("/healthz")
 @app.get("/api/health/live")
 async def check_liveness():
@@ -175,6 +183,8 @@ def search_validation(query, source):
 @app.get("/api/search")
 def search_products(q: str = "", options: SearchOptions = Depends(SearchOptions), session=Depends(require_session)):
     """Choose MongoDB semantic search, Google Shopping via SerpApi, or free online shops."""
+    # Time each search step (spelling, retrieval, reranker) for System health.
+    instrument_engines(search_service._search_engine, ranking_service._ranker)
     query = q.strip()
     invalid = search_validation(query, options.source)
     if invalid is not None:
@@ -257,6 +267,7 @@ def catalog_search(context, preferences, understanding):
 def finish_search(context, payload, preferences):
     if preferences is not None:
         payload = apply_preferences(payload, preferences, context.source)
+    record_search_outcome(context.source, payload, context.query)
     return remember_search(context, payload)
 
 
