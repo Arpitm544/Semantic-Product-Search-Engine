@@ -26,7 +26,9 @@ from api.search_history import router as history_router, remember_search, Search
 from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
 from api.product_prices import apply_preferences
-from api.query_understanding import apply as apply_query_filters, brand_index, filtering, parse_skip, understand
+from api.query_understanding import (
+    FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, understand,
+)
 from api.search_limits import check_search_rate
 from api.auth import require_session
 from api.dashboard import dashboard_data
@@ -148,14 +150,13 @@ def get_dashboard():
 
 class SearchOptions:
     def __init__(self, fuzzy: str = "1", source: str = "mongo", preferences: bool = False,
-                 skip: str = "", brand: str = "", color: str = ""):
+                 smart: FilterChoice = Depends(filter_choice)):
         self.fuzzy = fuzzy != "0"
         self.source = source
         self.preferences = preferences
         # Smart query filters: types the shopper switched off, and chips they chose.
-        self.skip = parse_skip(skip)
-        self.brand = brand[:100]
-        self.color = color[:30]
+        # Code that builds options directly (not through FastAPI) gets no choices.
+        self.smart = smart if isinstance(smart, FilterChoice) else FilterChoice()
 
 
 def search_validation(query, source):
@@ -182,7 +183,7 @@ def search_products(q: str = "", options: SearchOptions = Depends(SearchOptions)
     context = SearchContext(session['sub'], query, options.source, options.fuzzy, options.preferences)
     engine = search_service._search_engine
     understanding = understand(query, options.source, brand_index(engine.products if engine else None),
-                               options.skip, options.brand, options.color)
+                               options.smart)
     if options.source == "serpapi":
         return shopping_search(context, values, understanding)
     if options.source == "shops":

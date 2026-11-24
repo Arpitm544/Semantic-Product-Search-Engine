@@ -141,7 +141,8 @@ def test_price_applies_to_shop_results_and_brand_color_are_only_suggested(brands
 
 
 def test_chips_the_shopper_chooses_filter_strictly(brands):
-    understanding = qu.understand("black nike shoes under $100", "shops", brands, brand="nike", color="black")
+    understanding = qu.understand("black nike shoes under $100", "shops", brands,
+                                   qu.FilterChoice(brand="nike", color="black"))
     assert understanding["suggestions"] == []
     assert titles(qu.apply({"results": SHOP_RESULTS}, understanding)) == ["Black Nike Pegasus"]
 

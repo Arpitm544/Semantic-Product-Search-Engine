@@ -221,10 +221,12 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     // A new query starts with fresh smart filters.
-    await runSearch(input.trim(), true, usePreferences, NO_CHOICE);
+    await runSearch(input.trim(), true, usePreferences, { choice: NO_CHOICE });
   }
 
-  async function runSearch(query: string, fuzzy = true, filtersEnabled = usePreferences, choice = smart, searchSource = source) {
+  /** `smartOptions` carries the smart-filter chips and, when switching, the new source. */
+  async function runSearch(query: string, fuzzy = true, filtersEnabled = usePreferences, smartOptions: { choice?: SmartFilterChoice; source?: SearchSource } = {}) {
+    const { choice = smart, source: searchSource = source } = smartOptions;
     if (!query) return;
     pending.current?.abort();
     const controller = new AbortController();
@@ -342,10 +344,10 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
         {!loading && !error && searched && <>
           <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_var(--border-e7ebe5)] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:var(--text-344035)] [&>span]:text-[11px] [&>span]:[color:var(--text-8b958a)] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span>{shopping ? `${results.length} products shown` : `${results.length} products shown from ${total} ranked candidates`}</span></div>
           {queryFilters && <QueryFilterChips filters={queryFilters}
-            onRemovePrice={() => void runSearch(searched, lastFuzzy, usePreferences, { ...smart, skip: [...smart.skip, 'price'] })}
-            onRemove={(item: QueryFilterChip) => void runSearch(searched, lastFuzzy, usePreferences, { ...smart, [item.type]: '' })}
-            onNarrow={(item: QueryFilterChip) => void runSearch(searched, lastFuzzy, usePreferences, { ...smart, [item.type]: item.value })}
-            onSearchShops={() => { const query = searched; changeSource('shops'); void runSearch(query, lastFuzzy, usePreferences, smart, 'shops'); }} />}
+            onRemovePrice={() => void runSearch(searched, lastFuzzy, usePreferences, { choice: { ...smart, skip: [...smart.skip, 'price'] } })}
+            onRemove={(item: QueryFilterChip) => void runSearch(searched, lastFuzzy, usePreferences, { choice: { ...smart, [item.type]: '' } })}
+            onNarrow={(item: QueryFilterChip) => void runSearch(searched, lastFuzzy, usePreferences, { choice: { ...smart, [item.type]: item.value } })}
+            onSearchShops={() => { const query = searched; changeSource('shops'); void runSearch(query, lastFuzzy, usePreferences, { source: 'shops' }); }} />}
           {warning && <div className={"search-ranking-warning mt-[15px] mr-[0] mb-[15px] ml-[0] pt-[12px] pr-[14px] pb-[12px] pl-[14px] [border:1px_solid_var(--border-e5d9b5)] rounded-[8px] [background:var(--surface-fffaf0)] [color:var(--text-796338)] text-[12px] leading-[1.5]"} role="status">{warning}</div>}
           {correctedQuery && <div className={"search-spelling-note flex items-center justify-between gap-[12px] mt-[15px] mr-[0] mb-[15px] ml-[0] pt-[12px] pr-[14px] pb-[12px] pl-[14px] [border:1px_solid_var(--border-dce4d9)] rounded-[8px] [background:var(--surface-edf3e9)] [color:var(--text-455b48)] text-[12px] leading-[1.5] [&_button]:[border:0] [&_button]:[background:transparent] [&_button]:[color:var(--text-4f7857)] [&_button]:[font-style:normal] [&_button]:font-semibold [&_button]:text-[11px] [&_button]:leading-[normal] [&_button]:[font-family:'DM_Sans',sans-serif] [&_button]:underline [&_button]:cursor-pointer [&_button]:shrink-[0] [&_button:focus-visible]:[outline:2px_solid_var(--focus-ring)] [&_button:focus-visible]:[outline-offset:4px] max-[600.01px]:items-start max-[600.01px]:flex-col"}><span>Also searching for <strong>“{correctedQuery}”</strong>.</span><button type="button" onClick={() => runSearch(searched, false)}>Use original spelling</button></div>}
           {results.length ? <div className={"search-result-list grid"}>{results.map((product, index) => {

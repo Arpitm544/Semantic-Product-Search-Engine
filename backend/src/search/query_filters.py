@@ -77,28 +77,46 @@ def _currency(match, prefix):
     return None
 
 
-def parse_price(text):
-    """Return (price filter or None, text without the price phrase)."""
+def _without(text, start, end):
+    """Remove text[start:end] and tidy the spaces left behind."""
+    return re.sub(r"\s+", " ", (text[:start] + " " + text[end:]).strip())
+
+
+def _range_price(match):
+    # A bare "1-2" or "2 to 4" is often a size or count ("2 to 4 years").
+    # Ranges need a currency or the word "between" to count as prices.
+    currencies = {_currency(match, "a"), _currency(match, "b")} - {None}
+    if not currencies and not match.group(0).lower().startswith("between"):
+        return None
+    low, high = sorted((_amount(match.group("anum")), _amount(match.group("bnum"))))
+    return {"min": low, "max": high, "currency": currencies.pop() if len(currencies) == 1 else None}
+
+
+def _price_from_match(kind, match):
+    """Turn one pattern match into a price filter, or None when it is not a price."""
+    if kind == "range":
+        return _range_price(match)
+    amount = _amount(match.group("anum"))
+    return {"min": amount if kind == "min" else None,
+            "max": amount if kind == "max" else None,
+            "currency": _currency(match, "a")}
+
+
+def _price_matches(text):
+    """Candidate price phrases in priority order, skipping sizes and counts."""
     for kind, pattern in PRICE_PATTERNS:
         for match in pattern.finditer(text):
-            if _next_word(text, match.end()) in UNITS:
-                continue
-            if kind == "range":
-                # A bare "1-2" or "2 to 4" is often a size or count ("2 to 4 years").
-                # Ranges need a currency or the word "between" to count as prices.
-                currencies = {_currency(match, "a"), _currency(match, "b")} - {None}
-                if not currencies and not match.group(0).lower().startswith("between"):
-                    continue
-                low, high = sorted((_amount(match.group("anum")), _amount(match.group("bnum"))))
-                price = {"min": low, "max": high, "currency": currencies.pop() if len(currencies) == 1 else None}
-            else:
-                amount = _amount(match.group("anum"))
-                price = {"min": amount if kind == "min" else None,
-                         "max": amount if kind == "max" else None,
-                         "currency": _currency(match, "a")}
+            if _next_word(text, match.end()) not in UNITS:
+                yield kind, match
+
+
+def parse_price(text):
+    """Return (price filter or None, text without the price phrase)."""
+    for kind, match in _price_matches(text):
+        price = _price_from_match(kind, match)
+        if price:
             price["text"] = match.group(0).strip()
-            remaining = (text[:match.start()] + " " + text[match.end():]).strip()
-            return price, re.sub(r"\s+", " ", remaining)
+            return price, _without(text, match.start(), match.end())
     return None, text
 
 
@@ -157,6 +175,22 @@ def product_text(product):
     return f"{product.get('title', '')} {product.get('representation_text') or product.get('description', '')}"
 
 
+TRAILING_BRAND = re.compile(r"\b([a-z0-9]+(?:\s+[a-z0-9]+){0,2})\s+brand\b", re.I)
+COMPATIBILITY_WORDS = {"for", "fits", "with"}
+
+
+def _words(text):
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+
+def _phrases(words):
+    """Runs of three, two, then one word, skipping those after "for", "fits" or "with"."""
+    for size in (3, 2, 1):
+        for start in range(len(words) - size + 1):
+            if start == 0 or words[start - 1] not in COMPATIBILITY_WORDS:
+                yield " ".join(words[start:start + size])
+
+
 class BrandIndex:
     """Brand names the catalog knows, and how reliably each word means a brand."""
 
@@ -194,39 +228,56 @@ class BrandIndex:
 
     def find(self, text):
         """Return (brand filter or None, text with any cue word removed)."""
-        words = re.findall(r"[a-z0-9]+", text.lower())
-        # 1. Signalled brands: "by sony", "from the north face", "nike brand".
-        for match in BRAND_CUE.finditer(text):
-            following = re.findall(r"[a-z0-9]+", text[match.end():].lower())
-            for size in (3, 2, 1):
-                phrase = " ".join(following[:size])
-                if len(following) >= size and self.known(phrase):
-                    remaining = (text[:match.start()] + text[match.end():]).strip()
-                    return self._result(phrase), re.sub(r"\s+", " ", remaining)
-        trailing = re.search(r"\b([a-z0-9]+(?:\s+[a-z0-9]+){0,2})\s+brand\b", text, re.I)
-        if trailing:
-            candidate = trailing.group(1).lower().split()
-            for size in (3, 2, 1):
-                phrase = " ".join(candidate[-size:])
-                if len(candidate) >= size and self.known(phrase):
-                    remaining = (text[:trailing.end() - len("brand")] + text[trailing.end():]).strip()
-                    return self._result(phrase), re.sub(r"\s+", " ", remaining)
-        # 2. Unprompted brand words the catalog uses almost only as a brand.
-        # Accessory and compatibility searches ("breville replacement rack",
-        # "case for samsung") name a brand the product only fits, so skip them.
-        if set(words) & ACCESSORY_WORDS:
-            return None, text
-        for size in (3, 2, 1):
-            for start in range(len(words) - size + 1):
-                phrase = " ".join(words[start:start + size])
-                if start > 0 and words[start - 1] in {"for", "fits", "with"}:
-                    continue
-                # Only complete brand names count here, so "under" (the start of
-                # "under armour") or "the" never becomes a brand on its own.
-                if (len(phrase) >= 2 and self.full_counts[phrase] >= self.MIN_PRODUCTS
-                        and self.precision(phrase) >= self.MIN_PRECISION):
-                    return self._result(phrase), text
+        for finder in (self._after_cue, self._before_brand_word, self._unprompted):
+            found = finder(text)
+            if found:
+                return found
         return None, text
+
+    def _longest_known(self, words, from_end=False):
+        """The longest known brand among the first (or last) one to three words."""
+        for size in (3, 2, 1):
+            if len(words) < size:
+                continue
+            phrase = " ".join(words[-size:] if from_end else words[:size])
+            if self.known(phrase):
+                return phrase
+        return None
+
+    def _after_cue(self, text):
+        """Signalled brands: "by sony", "from the north face"."""
+        for match in BRAND_CUE.finditer(text):
+            phrase = self._longest_known(_words(text[match.end():]))
+            if phrase:
+                return self._result(phrase), _without(text, match.start(), match.end())
+        return None
+
+    def _before_brand_word(self, text):
+        """Signalled brands: "nike brand shoes"."""
+        trailing = TRAILING_BRAND.search(text)
+        phrase = self._longest_known(trailing.group(1).lower().split(), from_end=True) if trailing else None
+        if not phrase:
+            return None
+        return self._result(phrase), _without(text, trailing.end() - len("brand"), trailing.end())
+
+    def _unprompted(self, text):
+        """Brand words the catalog uses almost only as a brand.
+
+        Accessory and compatibility searches ("breville replacement rack",
+        "case for samsung") name a brand the product only fits, so skip them."""
+        words = _words(text)
+        if set(words) & ACCESSORY_WORDS:
+            return None
+        for phrase in _phrases(words):
+            if self._reliable(phrase):
+                return self._result(phrase), text
+        return None
+
+    def _reliable(self, phrase):
+        """Only complete brand names count, so "under" (the start of "under
+        armour") or "the" never becomes a brand on its own."""
+        complete = len(phrase) >= 2 and self.full_counts[phrase] >= self.MIN_PRODUCTS
+        return complete and self.precision(phrase) >= self.MIN_PRECISION
 
     def _result(self, phrase):
         return {"value": phrase, "label": self.display.get(phrase, phrase.title())}
@@ -246,6 +297,25 @@ def has_brand(product, brand):
 FILTER_TYPES = ("price", "brand", "color")
 
 
+def _price_step(text, _brands):
+    price, without_price = parse_price(text)
+    # Never leave nothing to search for: "under $50" alone keeps its text.
+    if price and re.search(r"[a-z]", without_price, re.I):
+        return price, without_price
+    return None, text
+
+
+def _brand_step(text, brands):
+    return brands.find(text) if brands is not None else (None, text)
+
+
+def _color_step(text, _brands):
+    return parse_color(text), text
+
+
+PARSE_STEPS = (("price", _price_step), ("brand", _brand_step), ("color", _color_step))
+
+
 def parse_query(query, brands=None, skip=()):
     """Split a query into search text and the filters it asks for.
 
@@ -254,19 +324,12 @@ def parse_query(query, brands=None, skip=()):
     """
     text = re.sub(r"\s+", " ", query or "").strip()
     filters = {}
-    if "price" not in skip:
-        price, without_price = parse_price(text)
-        # Never leave nothing to search for: "under $50" alone keeps its text.
-        if price and re.search(r"[a-z]", without_price, re.I):
-            filters["price"], text = price, without_price
-    if brands is not None and "brand" not in skip:
-        brand, text = brands.find(text)
-        if brand:
-            filters["brand"] = brand
-    if "color" not in skip:
-        color = parse_color(text)
-        if color:
-            filters["color"] = color
+    for kind, step in PARSE_STEPS:
+        if kind in skip:
+            continue
+        value, text = step(text, brands)
+        if value:
+            filters[kind] = value
     return {"text": text, "filters": filters}
 
 
