@@ -4,7 +4,7 @@ from unittest.mock import Mock
 import numpy as np
 
 from api.ranking_service import CandidateRanker
-from src.search.explanations import explanation, matched_terms
+from src.search.explanations import RankSignals, explanation, matched_terms
 from src.search.product_search import ProductSearch
 from src.search.ranking import RERANKER_WEIGHT, RETRIEVAL_WEIGHT, blend_ranks
 
@@ -40,8 +40,8 @@ def test_matched_terms_skip_filler_words_and_keep_query_order():
 def test_ranking_weights_are_shared_with_the_explanation():
     assert (RETRIEVAL_WEIGHT, RERANKER_WEIGHT) == (0.25, 0.75)
     assert blend_ranks({"x": 1}, {"x": 2}) == {"x": 0.25 / 61 + 0.75 / 62}
-    details = explanation(query="q", product={}, retrieval_rank=1, reranker_rank=2, reranker_score=1.23456,
-                          blended_score=0.0162, candidate_count=5)
+    details = explanation("q", {}, RankSignals(retrieval_rank=1, reranker_rank=2, reranker_score=1.23456,
+                                               blended_score=0.0162, candidate_count=5))
     assert details["weights"] == {"retrieval": 0.25, "reranker": 0.75}
     assert details["rerankerScore"] == 1.23 and details["semanticRank"] is None
 

@@ -4,7 +4,7 @@ import os
 from threading import Lock
 
 from src.config import PROJECT_ROOT
-from src.search.explanations import explanation
+from src.search.explanations import RankSignals, explanation
 from src.search.ranking import blend_ranks
 
 _ranker = None
@@ -62,11 +62,11 @@ class CandidateRanker:
             'score': scores[i],
             'matchSources': list(dict.fromkeys([*products[i].get('matchSources', []), 'semantic', 'reranker'])),
             # Here retrieval order is our encoder's order of the shop's candidates.
-            'explanation': explanation(
-                query=query, product=products[i], retrieval_rank=semantic_positions[i],
-                reranker_rank=reranker_positions[i], reranker_score=reranker_scores[i],
-                blended_score=scores[i], candidate_count=len(products), semantic_rank=semantic_positions[i],
-                semantic_similarity=semantic_scores[i], provider_rank=i + 1),
+            'explanation': explanation(query, products[i], RankSignals(
+                retrieval_rank=semantic_positions[i], reranker_rank=reranker_positions[i],
+                reranker_score=reranker_scores[i], blended_score=scores[i], candidate_count=len(products),
+                semantic_rank=semantic_positions[i], semantic_similarity=semantic_scores[i],
+                provider_rank=i + 1)),
         } for i in order]
 
 

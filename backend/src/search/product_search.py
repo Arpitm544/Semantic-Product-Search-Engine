@@ -12,7 +12,7 @@ from src.keyword_search.bm25 import fit_bm25
 from src.search.hybrid import HybridSearch
 from src.search.typos import FrequencySpelling
 from src.search.ranking import blend_ranks
-from src.search.explanations import explanation
+from src.search.explanations import RankSignals, explanation
 
 
 def brand_title(product):
@@ -96,13 +96,12 @@ class ProductSearch:
                 **product,
                 "score": scores[product_id],
                 "matchSources": sorted(match_sources[product_id]) + ["reranker"],
-                "explanation": explanation(
-                    query=corrected_query, product=product,
+                "explanation": explanation(corrected_query, product, RankSignals(
                     retrieval_rank=ranking["retrieval"][product_id],
                     reranker_rank=ranking["reranker"][product_id],
                     reranker_score=ranking["model_scores"][product_id],
                     blended_score=scores[product_id], candidate_count=len(ranked_ids),
-                    spelling_match="fuzzy" in match_sources[product_id], **signals[product_id]),
+                    spelling_match="fuzzy" in match_sources[product_id], **signals[product_id])),
             })
         return response
 
