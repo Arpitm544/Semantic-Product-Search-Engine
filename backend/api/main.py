@@ -26,6 +26,7 @@ from api.search_history import router as history_router, remember_search, Search
 from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
 from api.product_prices import apply_preferences
+from api.query_understanding import apply as apply_query_filters, brand_index, filtering, parse_skip, understand
 from api.search_limits import check_search_rate
 from api.auth import require_session
 from api.dashboard import dashboard_data
@@ -146,10 +147,15 @@ def get_dashboard():
 
 
 class SearchOptions:
-    def __init__(self, fuzzy: str = "1", source: str = "mongo", preferences: bool = False):
+    def __init__(self, fuzzy: str = "1", source: str = "mongo", preferences: bool = False,
+                 skip: str = "", brand: str = "", color: str = ""):
         self.fuzzy = fuzzy != "0"
         self.source = source
         self.preferences = preferences
+        # Smart query filters: types the shopper switched off, and chips they chose.
+        self.skip = parse_skip(skip)
+        self.brand = brand[:100]
+        self.color = color[:30]
 
 
 def search_validation(query, source):
@@ -174,16 +180,25 @@ def search_products(q: str = "", options: SearchOptions = Depends(SearchOptions)
     except PyMongoError:
         return JSONResponse(status_code=503, content={'error': 'Saved preferences are unavailable. Turn off saved preferences or try again.'})
     context = SearchContext(session['sub'], query, options.source, options.fuzzy, options.preferences)
+    engine = search_service._search_engine
+    understanding = understand(query, options.source, brand_index(engine.products if engine else None),
+                               options.skip, options.brand, options.color)
     if options.source == "serpapi":
-        return shopping_search(context, values)
+        return shopping_search(context, values, understanding)
     if options.source == "shops":
-        return shops_search(context, values)
-    return catalog_search(context, values)
+        return shops_search(context, values, understanding)
+    return catalog_search(context, values, understanding)
 
 
-def shopping_search(context, preferences):
+def search_text(context, understanding):
+    """Search without price phrases, which only add noise to retrieval."""
+    return understanding["searchText"] or context.query
+
+
+def shopping_search(context, preferences, understanding):
     try:
-        payload = rank_shopping_response(search_shopping(context.query))
+        payload = rank_shopping_response(search_shopping(search_text(context, understanding)))
+        payload = apply_query_filters(payload, understanding)
         return finish_search(context, payload, preferences)
     except ShoppingError as error:
         return JSONResponse(status_code=error.status, content={
@@ -191,9 +206,10 @@ def shopping_search(context, preferences):
         })
 
 
-def shops_search(context, preferences):
+def shops_search(context, preferences, understanding):
     try:
-        payload = rank_shops_response(search_shops(context.query))
+        payload = rank_shops_response(search_shops(search_text(context, understanding)))
+        payload = apply_query_filters(payload, understanding)
         return finish_search(context, payload, preferences)
     except ShoppingError as error:
         return JSONResponse(status_code=error.status, content={
@@ -213,7 +229,7 @@ def search_unavailable():
     return JSONResponse(status_code=503, content={"error": "The search service is temporarily unavailable. Please try again."})
 
 
-def catalog_search(context, preferences):
+def catalog_search(context, preferences, understanding):
     if search_initializing():
         return JSONResponse(status_code=503, content={"error": "Search is initializing. Wait for indexing to finish."})
     try:
@@ -222,7 +238,10 @@ def catalog_search(context, preferences):
         logging.getLogger(__name__).exception("Search initialization failed")
         return search_unavailable()
     try:
-        payload = with_product_links(engine.search(context.query, fuzzy=context.fuzzy))
+        # Rank every candidate when a chip narrows results, then keep the top 20.
+        limit = 500 if filtering(understanding) else 20
+        payload = engine.search(search_text(context, understanding), limit=limit, fuzzy=context.fuzzy)
+        payload = with_product_links(apply_query_filters(payload, understanding, limit=20))
         return finish_search(context, payload, preferences)
     except (ValueError, RuntimeError, OSError, PyMongoError):
         logging.getLogger(__name__).exception("Search request failed")

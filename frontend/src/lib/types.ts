@@ -51,3 +51,15 @@ export interface DashboardData {
   totalStock: number | null;
   sources?: { catalog?: string };
 }
+
+/** What the search understood from the query: see backend/api/query_understanding.py. */
+export type QueryFilterType = 'price' | 'brand' | 'color';
+export interface QueryFilterChip { type: 'brand' | 'color'; value: string; label: string }
+export interface QueryFilters {
+  searchText: string;
+  price: { label: string; text: string; applied: boolean } | null;
+  active: QueryFilterChip[];
+  suggestions: QueryFilterChip[];
+}
+/** The shopper's choices about smart filters, sent back with the next search. */
+export interface SmartFilterChoice { skip: QueryFilterType[]; brand: string; color: string }
