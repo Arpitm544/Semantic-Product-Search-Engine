@@ -36,7 +36,7 @@ export default function SearchFilters({
     const saved = await resource.mutate(() => resource.api<Preferences>('/api/preferences', {
       method: 'PUT',
       body: JSON.stringify(filters),
-    }), 'Filters applied.');
+    }), 'Default filters saved.');
     if (saved) onApplied(saved);
   }
 
@@ -73,7 +73,7 @@ export default function SearchFilters({
             <h3 className="mb-3 text-sm font-semibold">Availability</h3>
             <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1 accent-[var(--accent)]" checked={form.inStockOnly} onChange={event => setForm({ ...form, inStockOnly: event.target.checked })} />In stock only</label>
           </div>
-          <button type="submit" className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-[var(--accent-ink)] hover:opacity-90">Apply filters</button>
+          <button type="submit" className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-[var(--accent-ink)] hover:opacity-90">Save as default filters</button>
           <button type="button" className="w-full text-sm font-medium text-[var(--muted)] underline underline-offset-4" onClick={async () => { const reset = await resource.mutate(() => resource.api('/api/preferences', { method: 'DELETE' }), 'Filters cleared.'); if (reset) onCleared(); }}>Clear all filters</button>
           <p className="text-xs leading-relaxed text-[var(--muted)]">Catalog results support brand and category filters. Shopping results support price filters. Filters use the selected currency without conversion.</p>
         </fieldset>

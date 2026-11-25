@@ -3,15 +3,17 @@ import { useCallback } from 'react';
 
 export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 
+export const SESSION_RENEWAL_MESSAGE = 'Your session could not be verified. Sign in again to continue.';
+
 export function useAuthenticatedFetch() {
   const { getToken } = useAuth();
   return useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
     const token = await getToken();
-    if (!token) throw new Error('Your session has expired. Sign in again to continue.');
+    if (!token) throw new Error(SESSION_RENEWAL_MESSAGE);
     const headers = new Headers(init?.headers);
     headers.set('Authorization', `Bearer ${token}`);
     const response = await fetch(input, { ...init, headers, cache: 'no-store' });
-    if (response.status === 401) throw new Error('Your session has expired. Sign in again to continue.');
+    if (response.status === 401) throw new Error(SESSION_RENEWAL_MESSAGE);
     return response;
   }, [getToken]);
 }
