@@ -141,3 +141,37 @@ def test_jwks_connection_failure_is_service_unavailable():
             patch.object(auth, "jwks_client", return_value=client), pytest.raises(HTTPException) as error:
         auth.require_session(HTTPAuthorizationCredentials(scheme="Bearer", credentials="token"))
     assert error.value.status_code == 503
+
+
+def test_proxy_jwks_preserves_issuer_validation(signing_key, monkeypatch):
+    issuer = "https://test.clerk.accounts.dev"
+    proxy = "https://app.example.com/__clerk/.well-known/jwks.json"
+    monkeypatch.setenv("CLERK_ISSUER_URL", issuer)
+    monkeypatch.setenv("CLERK_JWKS_URL", proxy)
+    monkeypatch.setenv("FRONTEND_ORIGINS", "http://localhost:3001")
+    client = Mock()
+    client.get_signing_key_from_jwt.return_value = SimpleNamespace(key=signing_key.public_key())
+    lookup = Mock(return_value=client)
+    monkeypatch.setattr(auth, "jwks_client", lookup)
+
+    token = jwt.encode(claims(), signing_key, algorithm="RS256")
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+    assert auth.require_session(credentials)["sub"] == "user_test"
+    lookup.assert_called_once_with(proxy)
+
+    token = jwt.encode(claims(iss="https://app.example.com"), signing_key, algorithm="RS256")
+    with pytest.raises(HTTPException) as error:
+        auth.require_session(HTTPAuthorizationCredentials(scheme="Bearer", credentials=token))
+    assert error.value.status_code == 401
+
+
+def test_jwks_defaults_to_issuer_url(monkeypatch):
+    monkeypatch.delenv("CLERK_JWKS_URL", raising=False)
+    assert auth.jwks_url("https://test.clerk.accounts.dev") == "https://test.clerk.accounts.dev/.well-known/jwks.json"
+
+
+def test_insecure_jwks_url_fails_closed(monkeypatch):
+    monkeypatch.setenv("CLERK_JWKS_URL", "http://app.example.com/__clerk/.well-known/jwks.json")
+    with pytest.raises(HTTPException) as error:
+        auth.jwks_url("https://test.clerk.accounts.dev")
+    assert error.value.status_code == 503

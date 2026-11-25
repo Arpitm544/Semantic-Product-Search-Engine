@@ -40,8 +40,12 @@ Frontend environment (set before build):
 Backend environment:
 
 - `CLERK_ISSUER_URL`: exact production Frontend API origin shown by Clerk,
-  such as `https://clerk.example.com`. This determines the trusted JWKS endpoint;
-  it must belong to the same Clerk instance as the frontend keys.
+  such as `https://clerk.example.com`. Use the issuer of the session tokens
+  issued by the same Clerk instance as the frontend keys.
+- `CLERK_JWKS_URL`: optional trusted HTTPS signing-key endpoint for that same
+  instance. With the Vercel Clerk proxy, use the production app URL followed by
+  `/__clerk/.well-known/jwks.json`. With direct Clerk access, leave this unset
+  to fetch signing keys from the issuer.
 - `FRONTEND_ORIGINS`: comma-separated exact frontend origins, e.g.
   `https://example.com,https://www.example.com`. These control CORS and JWT `azp`
   verification. Do not use `*`.
