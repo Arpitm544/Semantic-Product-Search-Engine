@@ -14,6 +14,8 @@ from src.search.relevance import configured_reranker_path
 from api.ranking_service import get_candidate_ranker
 
 logger = logging.getLogger(__name__)
+# Decided by scripts/train_ltr.py results; see backend/ranking/ltr_report.json.
+DEFAULT_RANKER = "blend"
 
 _search_engine = None
 _search_signature = None
@@ -83,11 +85,33 @@ def build_search_engine():
     reranker = load_reranker(reranker_path)
 
     # ProductSearch combines spelling correction, retrieval, and ranking.
-    _search_engine = ProductSearch(products, semantic, reranker,
-                                   model_lock=get_candidate_ranker().lock, params=params)
+    engine = ProductSearch(products, semantic, reranker,
+                           model_lock=get_candidate_ranker().lock, params=params)
+    engine.learned_ranker = load_learned_ranker(ranker_choice())
+    _search_engine = engine
     _search_signature = signature
     _search_params = params
     return _search_engine
+
+
+def ranker_choice():
+    """SEARCH_RANKER=learned uses the LambdaMART model; anything else keeps the blend."""
+    return "learned" if os.environ.get("SEARCH_RANKER", DEFAULT_RANKER).strip().lower() == "learned" else "blend"
+
+
+def load_learned_ranker(choice):
+    """The learned ranker, or None (the 25/75 blend) when off or unavailable."""
+    if choice != "learned":
+        return None
+    try:
+        from src.ranking.learned import LearnedRanker
+        ranker = LearnedRanker.load()
+    except (ImportError, OSError, ValueError) as error:
+        # A missing model file or library must never stop search from starting.
+        logger.warning("Learned ranker unavailable (%s); using the blend.", type(error).__name__)
+        return None
+    print("Using the learned ranker.", flush=True)
+    return ranker
 
 
 def load_semantic_search(products, model_path, catalog_hash):

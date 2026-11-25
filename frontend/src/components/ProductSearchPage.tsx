@@ -6,6 +6,7 @@ import QueryFilterChips from '@/components/QueryFilterChips';
 import ResultExplanation from '@/components/ResultExplanation';
 import ProductArtwork from '@/components/ProductArtwork';
 import DashboardShell from '@/components/dashboard/DashboardShell';
+import { SuggestionList, useSearchSuggestions } from '@/components/SearchSuggestions';
 import { classes } from '@/lib/classes';
 
 import { useEffect, useRef, useState } from 'react';
@@ -190,6 +191,7 @@ export default function ProductSearchPage({
   // Smart query filters: what the search understood, and the shopper's chip choices.
   const [queryFilters, setQueryFilters] = useState<QueryFilters | null>(null);
   const [smart, setSmart] = useState<SmartFilterChoice>(NO_CHOICE);
+  const suggestions = useSearchSuggestions(input, isSignedIn === true);
   const pending = useRef<AbortController | null>(null);
   const preferences = useAccountResource<Preferences>('/api/preferences');
   const [usePreferences, setUsePreferences] = useState(initialPreferences);
@@ -260,8 +262,15 @@ export default function ProductSearchPage({
 
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    suggestions.setOpen(false);
     // A new query starts with fresh smart filters.
     await runSearch(input.trim(), true, usePreferences, { choice: NO_CHOICE });
+  }
+
+  function chooseSuggestion(text: string) {
+    setInput(text);
+    suggestions.setOpen(false);
+    void runSearch(text.trim(), true, usePreferences, { choice: NO_CHOICE });
   }
 
   /** `smartOptions` carries the smart-filter chips and, when switching, the new source. */
@@ -325,11 +334,16 @@ export default function ProductSearchPage({
             <span>{label}</span>
           </label>)}
         </fieldset>
+        <div className="relative">
         <form className={"real-search-form light:[&.real-search-form_button]:[background:var(--day-action)] light:[&.real-search-form_button]:[color:var(--day-on-action)] light:[&.real-search-form_button:disabled]:[background:#aeb9ac] h-[62px] [background:var(--surface-fff)] [border:1px_solid_var(--border-dce4d9)] rounded-[11px] flex items-center pt-[6px] pr-[7px] pb-[6px] pl-[17px] [box-shadow:0_10px_35px_var(--shadow-384a3610)] [&_input]:h-[100%] [&_input]:min-w-[0] [&_input]:[flex:1] [&_input]:[border:0] [&_input]:[background:transparent] [&_input]:[color:var(--text-374237)] [&_input]:[font-style:normal] [&_input]:[font-weight:normal] [&_input]:text-[13px] [&_input]:leading-[normal] [&_input]:[font-family:'DM_Sans',sans-serif] [&_input:focus-visible]:outline-none [&_input::placeholder]:[color:var(--text-a1aaa0)] [&_button]:h-[46px] [&_button]:pt-[0] [&_button]:pr-[18px] [&_button]:pb-[0] [&_button]:pl-[18px] [&_button]:[border:0] [&_button]:rounded-[7px] [&_button]:[background:var(--surface-4f7857)] [&_button]:[color:white] [&_button]:[font-style:normal] [&_button]:font-semibold [&_button]:text-[12px] [&_button]:leading-[normal] [&_button]:[font-family:'DM_Sans',sans-serif] [&_button]:cursor-pointer [&_button:disabled]:[background:var(--surface-aeb9ac)] [&_button:disabled]:cursor-not-allowed [&_button_span]:text-[17px] [&_button_span]:ml-[10px] max-[600.01px]:h-[56px] max-[600.01px]:pl-[12px] max-[600.01px]:[&_button]:h-[42px] max-[600.01px]:[&_button]:pt-[0] max-[600.01px]:[&_button]:pr-[12px] max-[600.01px]:[&_button]:pb-[0] max-[600.01px]:[&_button]:pl-[12px] max-[600.01px]:[&_button]:text-[11px] dark:[&.real-search-form]:[border-color:#608368] dark:shadow-[0_0_0_4px_#a9c49708,0_16px_40px_#050d0926] dark:[&.real-search-form_button]:[background:#c9ddb5] dark:[&.real-search-form_button]:[color:#17251b] dark:[&.real-search-form_button:hover:not(:disabled)]:[background:#deebd0] dark:[&.real-search-form_button:disabled]:[background:#324337] dark:[&.real-search-form_button:disabled]:[color:#a3b3a5]"} onSubmit={submitSearch}>
           <span className={"search-glass text-[28px] [color:var(--text-879587)] leading-[1] mr-[11px] [transform:rotate(-20deg)]"} aria-hidden="true">⌕</span>
-          <input autoFocus maxLength={512} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Try ‘wireless headphones’ or ‘mascara’" aria-label="Search products" />
+          <input autoFocus maxLength={512} value={input} onChange={(event) => { setInput(event.target.value); suggestions.setOpen(true); }}
+            onKeyDown={event => suggestions.onKeyDown(event, chooseSuggestion)} onBlur={() => suggestions.setOpen(false)} onFocus={() => suggestions.setOpen(true)}
+            autoComplete="off" {...suggestions.comboboxProps} placeholder="Try ‘wireless headphones’ or ‘mascara’" aria-label="Search products" />
           <button type="submit" disabled={!input.trim() || loading}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
         </form>
+        <SuggestionList open={suggestions.open} items={suggestions.items} active={suggestions.active} typed={input} onChoose={chooseSuggestion} onHover={suggestions.setActive} />
+        </div>
         <span className={"search-data-note block mt-[11px] text-[10px] [color:var(--text-a1a99f)]"}>{SOURCE_NOTES[source]}</span>
       </section>
 

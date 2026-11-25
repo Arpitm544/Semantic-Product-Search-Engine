@@ -190,11 +190,9 @@ class Metrics:
                 self.errors += 1
                 entry["errors"] += 1
 
-    def record_search(self, source, result_count, query, stages, top_probability=None):
+    def record_search(self, source, query, stages, reason):
         """One finished search. Texts of searches that found nothing good are
         kept without any user ID."""
-        # A blank search has nothing to find, so it is never counted as a miss.
-        reason = miss_reason(result_count, top_probability) if query.strip() else None
         with self.lock:
             self.searches[source] += 1
             self.search_timings.append(stages)
@@ -303,4 +301,6 @@ def record_search_outcome(source, payload, query):
     stages = search_stages(record.stages, total)
     record.details.update(source=source, results=len(results), stagesMs=stages,
                           topRelevanceProbability=top_probability)
-    metrics.record_search(source, len(results), query, stages, top_probability)
+    # A blank search has nothing to find, so it is never counted as a miss.
+    reason = miss_reason(len(results), top_probability) if query.strip() else None
+    metrics.record_search(source, query, stages, reason)
