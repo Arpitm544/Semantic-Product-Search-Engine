@@ -105,11 +105,11 @@ still fails.
 
 | Stage | NDCG@10 | MRR@10 | Recall@10 | Hit@5 | p50 latency |
 |---|---|---|---|---|---|
-| Keyword (BM25) | 0.388 | 0.492 | 0.345 | 0.634 | 2 ms |
-| + Spelling correction | 0.433 (+12%) | 0.546 | 0.380 | 0.693 | 13 ms |
-| Semantic only | 0.440 (+13%) | 0.547 | 0.377 | 0.683 | 7 ms |
-| Hybrid retrieval | 0.524 (+35%) | 0.633 | 0.465 | 0.794 | 26 ms |
-| Hybrid + reranker (served) | 0.600 (+54%) | 0.699 | 0.532 | 0.847 | 903 ms |
+| Keyword (BM25) | 0.388 | 0.492 | 0.345 | 0.634 | 10 ms |
+| + Spelling correction | 0.433 (+12%) | 0.546 | 0.380 | 0.693 | 44 ms |
+| Semantic only | 0.440 (+13%) | 0.547 | 0.377 | 0.683 | 18 ms |
+| Hybrid retrieval | 0.524 (+35%) | 0.633 | 0.465 | 0.794 | 55 ms |
+| Hybrid + reranker (served) | 0.600 (+54%) | 0.699 | 0.532 | 0.847 | 1,485 ms |
 
 992 test queries (200 clean, 792 with one synthetic typo) over 42,617 products; latency measured on 2 CPU threads.
 
@@ -126,6 +126,14 @@ cd backend
 
 The script writes `backend/quality/quality_report.json` (committed, served by
 `GET /api/quality`) and caches product embeddings under `backend/indexes/quality/`.
+The dashboard shows pointwise 95% percentile intervals from 5,000 bootstrap resamples
+for ranking scores, paired score changes, and latency summaries. A query family keeps
+the clean query and its typo variants together during resampling. Paired, two-sided
+randomization tests use 10,000 stage-label swaps at the family level. The dashboard
+marks a comparison significant when the Holm-adjusted p-value is below 0.01, adjusting
+across the reported comparisons, ranking metrics, and search groups.
+See [Smucker et al. on paired retrieval comparisons](https://doi.org/10.1145/1321440.1321528)
+and the [Holm adjustment documentation](https://search.r-project.org/R/refmans/stats/html/p.adjust.html).
 
 See [Colab training and evaluation](docs/colab-training.md) for reproducible
 validation and test comparisons. Amazon ESCI source attribution and license

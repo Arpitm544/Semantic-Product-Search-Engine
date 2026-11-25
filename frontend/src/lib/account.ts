@@ -13,11 +13,20 @@ export function useAccountApi() {
   const request = useAuthenticatedFetch();
   return useCallback(async <T,>(path: string, options?: RequestInit): Promise<T> => {
     const response = await request(`${API_BASE}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...options?.headers } });
-    const body = await response.json();
-    if (!response.ok) {
-      throw new Error(accountResponseMessage(body) || 'Your request could not be completed. Please try again.');
+    const text = await response.text();
+    let body: unknown = null;
+    if (text) {
+      try { body = JSON.parse(text); } catch { body = null; }
     }
-    return body;
+    if (!response.ok) {
+      const parsed = body && typeof body === 'object' ? body as { detail?: string | { msg?: string }[]; error?: string } : {};
+      throw new Error(accountResponseMessage(parsed) || 'Your request could not be completed. Please try again.');
+    }
+    if (!text) return undefined as T;
+    if (body === null) {
+      throw new Error('The server returned an unreadable response. Please try again.');
+    }
+    return body as T;
   }, [request]);
 }
 function accountResponseMessage(body: { detail?: string | { msg?: string }[]; error?: string }) {

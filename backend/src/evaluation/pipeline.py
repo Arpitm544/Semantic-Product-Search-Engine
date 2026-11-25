@@ -6,7 +6,7 @@ requests. The only substitution is semantic retrieval: production asks the
 Atlas vector index, while evaluation runs an exact in-memory search over the
 same embeddings so it needs no database or network.
 
-Stages, each building on the previous one:
+Evaluated stages and baselines:
   keyword   BM25 over the catalog text
   spelling  BM25 over the query and its spelling-corrected variations
   semantic  fine-tuned MiniLM embeddings only
@@ -18,6 +18,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 import time
 
+from src.evaluation.inference import infer
 from src.evaluation.metrics import mean_metrics, percentile, query_metrics
 from src.keyword_search.bm25 import search_bm25
 from src.search.product_search import ProductSearch
@@ -239,18 +240,20 @@ def evaluate(engine, keyword_engine, queries, progress=None):
 
 def build_report(per_query, latencies, by_id, metadata):
     """Assemble the JSON document served by /api/quality."""
+    stages = summarize(per_query, latencies)
     return {
-        "version": 1,
+        "version": 2,
         "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         **metadata,
         "queryCount": len(per_query),
-        "stages": summarize(per_query, latencies),
+        "stages": stages,
+        "statistics": infer(per_query, latencies, stages),
         "examples": pick_examples(per_query, by_id),
     }
 
 
-def build_engines(products, semantic, reranker):
+def build_engines(products, semantic, reranker, params=None):
     """The served pipeline, plus the same pipeline without embeddings."""
-    engine = ProductSearch(products, semantic, reranker)
-    keyword_engine = ProductSearch(products, None, reranker)
+    engine = ProductSearch(products, semantic, reranker, params=params)
+    keyword_engine = ProductSearch(products, None, reranker, params=params)
     return engine, keyword_engine

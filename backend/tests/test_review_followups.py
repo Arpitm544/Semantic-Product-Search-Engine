@@ -72,6 +72,13 @@ class TestReviewFollowups(unittest.TestCase):
             with patch.object(dashboard, 'load_products', return_value=[{'stock': x} for x in stocks]):
                 self.assertEqual(dashboard.dashboard_data()['totalStock'], expected)
 
+    def test_dashboard_ignores_boolean_and_non_finite_ratings(self):
+        rows = [{'rating': 4.0}, {'rating': True}, {'rating': float('nan')}, {'rating': float('inf')}]
+        with patch.object(dashboard, 'load_products', return_value=rows):
+            summary = dashboard.dashboard_data()
+        self.assertEqual(summary['ratedProductCount'], 1)
+        self.assertEqual(summary['averageRating'], 4.0)
+
     def test_spelling_cache_does_not_retain_rebuilt_catalogs(self):
         for cls, words in [(CatalogSpelling, ['keyboard']), (FrequencySpelling, Counter(keyboard=8))]:
             spelling = cls(words)

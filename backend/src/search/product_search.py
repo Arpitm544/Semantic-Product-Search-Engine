@@ -12,8 +12,9 @@ from threading import Lock
 from src.keyword_search.bm25 import fit_bm25
 from src.search.hybrid import HybridSearch
 from src.search.typos import FrequencySpelling
-from src.search.ranking import blend_ranks
+from src.search.ranking import PipelineParams, blend_ranks
 from src.search.explanations import RankSignals, explanation
+from src.search.relevance import CalibratedReranker, product_pair_text, relevance_probability
 from src.ranking.features import candidate_features
 
 
@@ -30,13 +31,14 @@ def brand_title(product):
 class ProductSearch:
     """Keep the prepared search tools together so requests can reuse them."""
 
-    def __init__(self, products, semantic, reranker, model_lock=None):
+    def __init__(self, products, semantic, reranker, model_lock=None, params=None):
         self.products = products
         self.by_id = {product["id"]: product for product in products}
         self.semantic = semantic
         self.reranker = reranker
         self.lock = model_lock if model_lock is not None else Lock()
-        # Optional LambdaMART model (src/ranking/learned.py); None keeps the 25/75 blend.
+        self.params = params if params is not None else PipelineParams()
+        # Optional LambdaMART model (src/ranking/learned.py); None keeps the configured blend.
         self.learned_ranker = None
         self.prepare_keyword_search(products, semantic)
 
@@ -52,7 +54,7 @@ class ProductSearch:
 
         keyword_index = fit_bm25(keyword_products)
         keyword_index["products"] = products
-        self.hybrid = HybridSearch(products, semantic, lexical=keyword_index)
+        self.hybrid = HybridSearch(products, semantic, lexical=keyword_index, params=self.params)
         self.spelling = FrequencySpelling(word_counts)
         self.hybrid.spelling = self.spelling
 
@@ -102,6 +104,7 @@ class ProductSearch:
             ranked_ids, scores, rows = learned
         response["searchMode"] += "-learned" if learned is not None else ""
         response["candidateCount"] = len(ranked_ids)
+        weights = {"retrieval": self.params.retrieval_weight, "reranker": self.params.reranker_weight}
         for product_id in ranked_ids[:limit]:
             product = self.by_id[product_id]
             details = explanation(corrected_query, product, RankSignals(
@@ -109,13 +112,15 @@ class ProductSearch:
                 reranker_rank=ranking["reranker"][product_id],
                 reranker_score=ranking["model_scores"][product_id],
                 blended_score=scores[product_id], candidate_count=len(ranked_ids),
-                spelling_match="fuzzy" in match_sources[product_id], **signals[product_id]))
+                spelling_match="fuzzy" in match_sources[product_id], **signals[product_id]),
+                weights=weights)
             details["ranker"] = "learned" if learned is not None else "blend"
             if learned is not None:
                 details["learnedFactors"] = self.learned_ranker.top_factors(rows[product_id])
             response["results"].append({
                 **product,
                 "score": scores[product_id],
+                "relevanceProbability": relevance_probability(self.reranker, ranking["model_scores"][product_id]),
                 "matchSources": sorted(match_sources[product_id]) + ["reranker"],
                 "explanation": details,
             })
@@ -140,17 +145,32 @@ class ProductSearch:
         candidate_ids, match_sources, _ = self.find_candidates_detailed(query_variations, original_query)
         return candidate_ids, match_sources
 
+    def _variation_weight(self, variation, original_query, corrected_query):
+        if variation == original_query:
+            return self.params.original_variation_weight
+        if corrected_query and variation == corrected_query:
+            return self.params.corrected_variation_weight
+        return self.params.alt_variation_weight
+
     def find_candidates_detailed(self, query_variations, original_query):
         """find_candidates(), plus each product's best keyword and semantic rank."""
         scores = defaultdict(float)
         match_sources = defaultdict(set)
         signals = defaultdict(lambda: {"keyword_rank": None, "semantic_rank": None, "semantic_similarity": None})
+        corrected_query = None
+        if len(query_variations) > 1:
+            corrected, _ = self.spelling.correct(original_query)
+            if corrected != original_query:
+                corrected_query = corrected
         for query in query_variations:
-            matches = self.hybrid.search(query, 50, fuzzy=False)
+            weight = self._variation_weight(query, original_query, corrected_query)
+            if weight <= 0:
+                continue
+            matches = self.hybrid.search(query, self.params.variation_limit, fuzzy=False)
             for position, product in enumerate(matches["results"], start=1):
                 product_id = product["id"]
                 # Earlier matches earn more points. Repeated matches add up.
-                scores[product_id] += 1 / (60 + position)
+                scores[product_id] += weight / (self.params.variation_rrf_k + position)
                 match_sources[product_id].update(product["matchSources"])
                 if query != original_query:
                     match_sources[product_id].add("fuzzy")
@@ -166,6 +186,8 @@ class ProductSearch:
 
     def rank_candidates_detailed(self, query, candidate_ids):
         """rank_candidates(), plus each product's retrieval rank, reranker rank and score."""
+        if self.params.rerank_k is not None:
+            candidate_ids = candidate_ids[:self.params.rerank_k]
         retrieval_positions = {
             product_id: position
             for position, product_id in enumerate(candidate_ids, start=1)
@@ -175,7 +197,8 @@ class ProductSearch:
         query_product_pairs = []
         for product_id in candidate_ids:
             product = self.by_id[product_id]
-            text = product.get("representation_text") or product.get("title", "")
+            text = (product_pair_text(product) if isinstance(self.reranker, CalibratedReranker)
+                    else product.get("representation_text") or product.get("title", ""))
             query_product_pairs.append((query, text))
         with self.lock:
             model_scores = self.reranker.predict(
@@ -191,7 +214,13 @@ class ProductSearch:
         for position, index in enumerate(reranked_indexes, start=1):
             reranker_positions[candidate_ids[index]] = position
 
-        combined_scores = blend_ranks(retrieval_positions, reranker_positions)
+        combined_scores = blend_ranks(
+            retrieval_positions,
+            reranker_positions,
+            rrf_k=self.params.blend_rrf_k,
+            retrieval_weight=self.params.retrieval_weight,
+            reranker_weight=self.params.reranker_weight,
+        )
 
         ranked_ids = sorted(
             candidate_ids,

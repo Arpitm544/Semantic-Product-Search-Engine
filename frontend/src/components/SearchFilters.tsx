@@ -6,8 +6,17 @@ import { useAccountResource, type Preferences } from '@/lib/account';
 
 const inputClass = 'mt-2 w-full min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface-fff)] px-3 py-2.5 text-sm text-[var(--ink)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--sage)]';
 
-export default function SearchFilters({ onApplied, onCleared }: { onApplied: (filters: Preferences) => void; onCleared: () => void }) {
-  const resource = useAccountResource<Preferences>('/api/preferences');
+export type PreferencesResource = ReturnType<typeof useAccountResource<Preferences>>;
+
+export default function SearchFilters({
+  resource,
+  onApplied,
+  onCleared,
+}: {
+  resource: PreferencesResource;
+  onApplied: (filters: Preferences) => void;
+  onCleared: () => void;
+}) {
   const [form, setForm] = useState<Preferences | null>(null);
   const [categories, setCategories] = useState('');
   const [brands, setBrands] = useState('');
@@ -28,7 +37,7 @@ export default function SearchFilters({ onApplied, onCleared }: { onApplied: (fi
       method: 'PUT',
       body: JSON.stringify(filters),
     }), 'Filters applied.');
-    if (saved) onApplied(filters);
+    if (saved) onApplied(saved);
   }
 
   return <details id="filters" open className="group scroll-mt-24 rounded-2xl border border-[var(--line)] bg-[var(--surface-fff)] lg:sticky lg:top-24 lg:self-start">

@@ -12,12 +12,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import PROJECT_ROOT
 from src.data.catalog import database, version
 from src.semantic.identity import vector_generation, model_digest
+from src.search.relevance import BASE_RERANKER_PATH, CALIBRATION_FILE, ESCI_RERANKER_PATH, configured_reranker_path
 
 
 def export(destination):
     catalog = version()
     encoder = (PROJECT_ROOT / os.getenv('SEMANTIC_MODEL_PATH', 'models/colab-export/esci-minilm-20k')).resolve()
-    reranker = (PROJECT_ROOT / os.getenv('RERANKER_MODEL_PATH', 'models/ms-marco-MiniLM-L6-v2')).resolve()
+    reranker = (PROJECT_ROOT / configured_reranker_path()).resolve()
+    reranker_target = ESCI_RERANKER_PATH if (reranker / CALIBRATION_FILE).is_file() else BASE_RERANKER_PATH
     generation = vector_generation(str(encoder), catalog['sha256'])
     manifest = database()['vector_manifests'].find_one({'_id': generation})
     if not manifest or manifest.get('status') != 'ready' or manifest.get('catalog_sha256') != catalog['sha256']:
@@ -26,7 +28,7 @@ def export(destination):
                'model_sha256': model_digest(encoder)}
     with tarfile.open(destination, 'w:gz') as archive:
         for folder, target in [(encoder, 'models/colab-export/esci-minilm-20k'),
-                               (reranker, 'models/ms-marco-MiniLM-L6-v2')]:
+                               (reranker, reranker_target)]:
             for path in sorted(folder.rglob('*')):
                 if (path.is_file() and not any(p.startswith('.') for p in path.relative_to(folder).parts)
                         and path.name not in {'atlas_generation.json', 'README.md', 'progress.json', 'training_report.json'}):

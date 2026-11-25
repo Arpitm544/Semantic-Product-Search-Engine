@@ -134,8 +134,10 @@ def reserve_active_slot(user, row, resume=False):
                 if not result.matched_count:
                     owned('price_alerts', row['_id'], user)
             else:
-                alerts.update_one({'_id': row['_id'], 'user_id': user},
+                result = alerts.update_one({'_id': row['_id'], 'user_id': user},
                     {'$setOnInsert': {**row, 'active_slot': slot}}, upsert=True)
+                if result is not None and result.upserted_id is None:
+                    raise HTTPException(409, 'An alert already exists for this product. Manage it below.')
             return
         except DuplicateKeyError:
             continue

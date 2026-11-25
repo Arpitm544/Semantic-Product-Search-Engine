@@ -81,3 +81,29 @@ def test_all_alert_slots_full_is_rejected(mockdb):
     with pytest.raises(HTTPException) as error:
         price_alerts.reserve_active_slot('alice',{'_id':ID,'user_id':'alice','enabled':True})
     assert error.value.status_code==409 and db['price_alerts'].update_one.call_count==50
+
+
+def test_rate_limit_retries_initial_upsert_race():
+    collection = MagicMock()
+    collection.find_one_and_update.side_effect = [DuplicateKeyError('first insert won'), {'count': 2}]
+    with patch.object(search_limits, 'collection', return_value=collection):
+        search_limits.check_search_rate('alice', 'serpapi')
+    assert collection.find_one_and_update.call_count == 2
+    assert collection.find_one_and_update.call_args_list[0].kwargs['upsert'] is True
+    assert collection.find_one_and_update.call_args_list[1].kwargs['upsert'] is False
+
+
+def test_daily_slot_retries_initial_upsert_race():
+    collection = MagicMock()
+    collection.find_one_and_update.side_effect = [DuplicateKeyError('first insert won'), {'count': 2}]
+    with patch.object(search_limits, 'collection', return_value=collection):
+        assert search_limits.take_daily_slot('scope', 5) is True
+    assert collection.find_one_and_update.call_count == 2
+
+
+def test_concurrent_create_alert_rejects_existing_document(mockdb):
+    db, _ = mockdb
+    db['price_alerts'].update_one.return_value = MagicMock(upserted_id=None)
+    with pytest.raises(HTTPException) as error:
+        price_alerts.reserve_active_slot('alice', {'_id': ID, 'user_id': 'alice', 'enabled': True})
+    assert error.value.status_code == 409

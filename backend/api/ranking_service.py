@@ -6,6 +6,7 @@ from threading import Lock
 from src.config import PROJECT_ROOT
 from src.search.explanations import RankSignals, explanation
 from src.search.ranking import blend_ranks
+from src.search.relevance import configured_reranker_path, load_reranker, product_pair_text, relevance_probability
 
 _ranker = None
 _signature = None
@@ -25,11 +26,7 @@ class CandidateRanker:
 
         if not products:
             return []
-        texts = [
-            f"[Title] {product['title'][:512]}"
-            + (f" | [Description] {product['description'][:2000]}" if product.get('description') else '')
-            for product in products
-        ]
+        texts = [product_pair_text(product) for product in products]
         # Both search sources share this lock because they reuse the same models.
         with self.lock:
             vectors = np.asarray(self.encoder.encode(
@@ -59,6 +56,7 @@ class CandidateRanker:
             'providerRank': i + 1,
             'semanticScore': float(semantic_scores[i]),
             'rerankerScore': float(reranker_scores[i]),
+            'relevanceProbability': relevance_probability(self.reranker, reranker_scores[i]),
             'score': scores[i],
             'matchSources': list(dict.fromkeys([*products[i].get('matchSources', []), 'semantic', 'reranker'])),
             # Here retrieval order is our encoder's order of the shop's candidates.
@@ -73,19 +71,21 @@ class CandidateRanker:
 def get_candidate_ranker():
     """Load the configured local weights once, independently of MongoDB readiness."""
     global _ranker, _signature
-    signature = tuple(str((PROJECT_ROOT / os.environ.get(name, default)).resolve()) for name, default in (
-        ('SEMANTIC_MODEL_PATH', 'models/colab-export/esci-minilm-20k'),
-        ('RERANKER_MODEL_PATH', 'models/ms-marco-MiniLM-L6-v2'),
-    ))
+    signature = (
+        str((PROJECT_ROOT / os.getenv('SEMANTIC_MODEL_PATH', 'models/colab-export/esci-minilm-20k')).resolve()),
+        str((PROJECT_ROOT / configured_reranker_path()).resolve()),
+    )
     with _load_lock:
         if _ranker is not None and _signature == signature:
             return _ranker
         import torch
-        from sentence_transformers import CrossEncoder, SentenceTransformer
+        from sentence_transformers import SentenceTransformer
 
         torch.set_num_threads(2)
         encoder = SentenceTransformer(signature[0], local_files_only=True, device='cpu')
-        reranker = CrossEncoder(signature[1], local_files_only=True, device='cpu', max_length=256)
+        reranker = load_reranker(signature[1])
         _ranker = CandidateRanker(encoder, reranker)
         _signature = signature
+        from api.observability import instrument_engines
+        instrument_engines(None, _ranker)
         return _ranker

@@ -44,7 +44,7 @@ class RankSignals:
     provider_rank: Optional[int] = None
 
 
-def explanation(query, product, signals):
+def explanation(query, product, signals, weights=None):
     """One result's explanation; absent signals are None so the page can skip them.
 
     The page shows each result's own position, because filters applied after
@@ -61,5 +61,5 @@ def explanation(query, product, signals):
         "rerankerRank": signals.reranker_rank,
         "rerankerScore": rounded(signals.reranker_score, 2),
         "blendedScore": rounded(signals.blended_score, 5),
-        "weights": WEIGHTS,
+        "weights": weights if weights is not None else WEIGHTS,
     }

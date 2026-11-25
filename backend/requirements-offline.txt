@@ -1,6 +1,7 @@
-# Optional offline FAISS evaluation tools; not needed by the Atlas application.
+# Optional offline tools for evaluation, tuning, and training.
 -r requirements.txt
 faiss-cpu>=1.7.4,<2
+optuna>=4,<6
 # Error analysis figures (scripts/error_analysis.py); not needed to serve search.
 umap-learn>=0.5.9
 matplotlib>=3.8

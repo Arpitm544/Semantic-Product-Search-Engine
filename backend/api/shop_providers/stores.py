@@ -219,14 +219,20 @@ class StoreProvider:
         with self._lock:
             if self._snapshot and monotonic() - self._snapshot[0] < SNAPSHOT_SECONDS:
                 return self._snapshot[1]
-            products, page, cap = [], 1, max_products()
+            products, seen_ids, page, cap = [], set(), 1, max_products()
             while len(products) < cap:
                 payload = self._get('/products.json', limit=str(SHOPIFY_PAGE_SIZE), page=str(page))
                 rows = payload.get('products')
                 if not isinstance(rows, list):
                     raise ProviderError(f'{self.LABEL} returned an invalid response.', 'invalid_response')
-                products.extend(p for p in (shopify_product(self.config, row) for row in rows) if p)
-                if len(rows) < SHOPIFY_PAGE_SIZE:
+                added = 0
+                for row in rows:
+                    product = shopify_product(self.config, row)
+                    if product and product['id'] not in seen_ids:
+                        seen_ids.add(product['id'])
+                        products.append(product)
+                        added += 1
+                if len(rows) < SHOPIFY_PAGE_SIZE or added == 0:
                     break
                 page += 1
             documents = [{'product': p, 'representation_text': ' '.join(filter(None, [
