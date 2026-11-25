@@ -2,6 +2,10 @@
 -r requirements.txt
 faiss-cpu>=1.7.4,<2
 optuna>=4,<6
+# Error analysis figures (scripts/error_analysis.py); not needed to serve search.
+umap-learn>=0.5.9
+matplotlib>=3.8
+
 # Learning to rank: training only (scripts/train_ltr.py). Serving reads the
 # exported JSON model and does not need LightGBM.
 lightgbm==4.6.0
