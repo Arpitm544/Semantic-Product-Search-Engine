@@ -6,6 +6,7 @@ Read ProductSearch.search() first to follow the full process.
 
 from collections import Counter, defaultdict
 import re
+import logging
 from threading import Lock
 
 from src.keyword_search.bm25 import fit_bm25
@@ -13,6 +14,10 @@ from src.search.hybrid import HybridSearch
 from src.search.typos import FrequencySpelling
 from src.search.ranking import blend_ranks
 from src.search.explanations import RankSignals, explanation
+from src.ranking.features import candidate_features
+
+
+logger = logging.getLogger(__name__)
 
 
 def brand_title(product):
@@ -31,6 +36,8 @@ class ProductSearch:
         self.semantic = semantic
         self.reranker = reranker
         self.lock = model_lock if model_lock is not None else Lock()
+        # Optional LambdaMART model (src/ranking/learned.py); None keeps the 25/75 blend.
+        self.learned_ranker = None
         self.prepare_keyword_search(products, semantic)
 
     def prepare_keyword_search(self, products, semantic):
@@ -89,21 +96,44 @@ class ProductSearch:
         # 3. Put the best matches first, then build the response.
         ranking = self.rank_candidates_detailed(corrected_query, candidate_ids)
         ranked_ids, scores = ranking["ids"], ranking["scores"]
+        context = {"query": query, "corrected": corrected_query, "variations": query_variations}
+        learned = self.learned_order(context, ranking, signals, match_sources)
+        if learned is not None:
+            ranked_ids, scores, rows = learned
+        response["searchMode"] += "-learned" if learned is not None else ""
         response["candidateCount"] = len(ranked_ids)
         for product_id in ranked_ids[:limit]:
             product = self.by_id[product_id]
+            details = explanation(corrected_query, product, RankSignals(
+                retrieval_rank=ranking["retrieval"][product_id],
+                reranker_rank=ranking["reranker"][product_id],
+                reranker_score=ranking["model_scores"][product_id],
+                blended_score=scores[product_id], candidate_count=len(ranked_ids),
+                spelling_match="fuzzy" in match_sources[product_id], **signals[product_id]))
+            details["ranker"] = "learned" if learned is not None else "blend"
+            if learned is not None:
+                details["learnedFactors"] = self.learned_ranker.top_factors(rows[product_id])
             response["results"].append({
                 **product,
                 "score": scores[product_id],
                 "matchSources": sorted(match_sources[product_id]) + ["reranker"],
-                "explanation": explanation(corrected_query, product, RankSignals(
-                    retrieval_rank=ranking["retrieval"][product_id],
-                    reranker_rank=ranking["reranker"][product_id],
-                    reranker_score=ranking["model_scores"][product_id],
-                    blended_score=scores[product_id], candidate_count=len(ranked_ids),
-                    spelling_match="fuzzy" in match_sources[product_id], **signals[product_id])),
+                "explanation": details,
             })
         return response
+
+    def learned_order(self, context, ranking, signals, match_sources):
+        """Reorder candidates with the learned ranker, or None to keep the blend.
+
+        Any model failure falls back to the blend so search keeps working."""
+        if self.learned_ranker is None:
+            return None
+        try:
+            ids, matrix = candidate_features(context, ranking, signals, match_sources, self.by_id)
+            ordered, scores = self.learned_ranker.order(ids, matrix)
+        except Exception:
+            logger.exception("Learned ranker failed; using the blend")
+            return None
+        return ordered, scores, {product_id: matrix[index] for index, product_id in enumerate(ids)}
 
     def find_candidates(self, query_variations, original_query):
         """Give points to products found across the query variations."""

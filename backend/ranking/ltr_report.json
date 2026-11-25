@@ -1,0 +1,419 @@
+{
+  "generatedAt": "2026-11-25T11:38:45+00:00",
+  "protocol": {
+    "training": "ESCI validation split: 200 query families x (1 clean + 4 typo variants)",
+    "selection": "5-fold cross-validation grouped by query family",
+    "test": "ESCI test split, untouched until the final evaluation",
+    "significance": "10,000 family bootstrap resamples; 10,000-round paired randomization test",
+    "labels": "Exact 3, Substitute 2, Complement 1, Irrelevant 0; unjudged candidates 0"
+  },
+  "features": [
+    {
+      "name": "blend_rank",
+      "label": "Position under the current 25/75 blend"
+    },
+    {
+      "name": "retrieval_rank",
+      "label": "Position after keyword + meaning retrieval"
+    },
+    {
+      "name": "reranker_rank",
+      "label": "Position by the careful check (cross-encoder)"
+    },
+    {
+      "name": "reranker_score",
+      "label": "Careful-check score"
+    },
+    {
+      "name": "reranker_gap",
+      "label": "Careful-check score minus the best in this search"
+    },
+    {
+      "name": "reranker_z",
+      "label": "Careful-check score compared with the other candidates"
+    },
+    {
+      "name": "keyword_rank",
+      "label": "Keyword (BM25) rank"
+    },
+    {
+      "name": "has_keyword",
+      "label": "Found by keyword search"
+    },
+    {
+      "name": "semantic_rank",
+      "label": "Meaning-search rank"
+    },
+    {
+      "name": "has_semantic",
+      "label": "Found by meaning search"
+    },
+    {
+      "name": "semantic_similarity",
+      "label": "Meaning similarity (cosine)"
+    },
+    {
+      "name": "similarity_gap",
+      "label": "Similarity minus the best in this search"
+    },
+    {
+      "name": "spelling_match",
+      "label": "Matched a spelling correction"
+    },
+    {
+      "name": "query_corrected",
+      "label": "The search had a typo"
+    },
+    {
+      "name": "query_variations",
+      "label": "Spelling variations searched"
+    },
+    {
+      "name": "query_words",
+      "label": "Words in the search"
+    },
+    {
+      "name": "title_overlap",
+      "label": "Share of search words in the title"
+    },
+    {
+      "name": "text_overlap",
+      "label": "Share of search words anywhere in the product text"
+    },
+    {
+      "name": "brand_in_query",
+      "label": "Product brand named in the search"
+    },
+    {
+      "name": "title_words",
+      "label": "Words in the title"
+    },
+    {
+      "name": "candidate_count",
+      "label": "Candidates for this search"
+    }
+  ],
+  "candidates": {
+    "trainingRows": 69365,
+    "testRows": 68639
+  },
+  "crossValidation": {
+    "baselineNdcg10": 0.5725030791342961,
+    "grid": [
+      {
+        "numLeaves": 7,
+        "minChildSamples": 10,
+        "cvNdcg10": 0.6084412612700123,
+        "trees": 81
+      },
+      {
+        "numLeaves": 7,
+        "minChildSamples": 40,
+        "cvNdcg10": 0.6085291842278052,
+        "trees": 62
+      },
+      {
+        "numLeaves": 15,
+        "minChildSamples": 10,
+        "cvNdcg10": 0.6058673347069775,
+        "trees": 41
+      },
+      {
+        "numLeaves": 15,
+        "minChildSamples": 40,
+        "cvNdcg10": 0.6054076387928101,
+        "trees": 43
+      },
+      {
+        "numLeaves": 31,
+        "minChildSamples": 10,
+        "cvNdcg10": 0.6017243630065227,
+        "trees": 18
+      },
+      {
+        "numLeaves": 31,
+        "minChildSamples": 40,
+        "cvNdcg10": 0.6044689518592131,
+        "trees": 20
+      }
+    ],
+    "chosen": {
+      "numLeaves": 7,
+      "minChildSamples": 40,
+      "cvNdcg10": 0.6085291842278052,
+      "trees": 62
+    }
+  },
+  "params": {
+    "objective": "lambdarank",
+    "learning_rate": 0.05,
+    "n_estimators": 62,
+    "colsample_bytree": 0.8,
+    "reg_lambda": 1.0,
+    "label_gain": [
+      0,
+      1,
+      3,
+      7
+    ],
+    "lambdarank_truncation_level": 20,
+    "random_state": 13,
+    "num_leaves": 7,
+    "min_child_samples": 40
+  },
+  "test": {
+    "blend": {
+      "all": {
+        "queries": 992,
+        "ndcg@10": 0.5999212175429306,
+        "mrr@10": 0.6986019105222735,
+        "recall@10": 0.5322008846564875,
+        "hit@5": 0.8467741935483871
+      },
+      "clean": {
+        "queries": 200,
+        "ndcg@10": 0.6222392241977727,
+        "mrr@10": 0.7124305555555556,
+        "recall@10": 0.5518286885868054,
+        "hit@5": 0.865
+      },
+      "typo": {
+        "queries": 792,
+        "ndcg@10": 0.5942853572765562,
+        "mrr@10": 0.6951098284431618,
+        "recall@10": 0.5272443685124679,
+        "hit@5": 0.8421717171717171
+      }
+    },
+    "learned": {
+      "all": {
+        "queries": 992,
+        "ndcg@10": 0.6041759776402302,
+        "mrr@10": 0.7019541250640041,
+        "recall@10": 0.5308895633210573,
+        "hit@5": 0.8397177419354839
+      },
+      "clean": {
+        "queries": 200,
+        "ndcg@10": 0.6276518768021148,
+        "mrr@10": 0.725311507936508,
+        "recall@10": 0.5493432714454672,
+        "hit@5": 0.855
+      },
+      "typo": {
+        "queries": 792,
+        "ndcg@10": 0.598247720276118,
+        "mrr@10": 0.6960557960557961,
+        "recall@10": 0.5262295360169134,
+        "hit@5": 0.8358585858585859
+      }
+    },
+    "learnedWithoutReranker": {
+      "all": {
+        "queries": 992,
+        "ndcg@10": 0.578396759797311,
+        "mrr@10": 0.6916738671274961,
+        "recall@10": 0.5147080733714764,
+        "hit@5": 0.8256048387096774
+      },
+      "clean": {
+        "queries": 200,
+        "ndcg@10": 0.6008147195837573,
+        "mrr@10": 0.7178710317460317,
+        "recall@10": 0.53461206595281,
+        "hit@5": 0.835
+      },
+      "typo": {
+        "queries": 792,
+        "ndcg@10": 0.5727356588411378,
+        "mrr@10": 0.6850584215167548,
+        "recall@10": 0.5096818126186143,
+        "hit@5": 0.8232323232323232
+      }
+    },
+    "learnedVsBlend": {
+      "ndcg@10": {
+        "difference": 0.00379650622494057,
+        "interval95": [
+          -0.007258409881318481,
+          0.014898009503126032
+        ],
+        "pValue": 0.5114488551144886
+      },
+      "mrr@10": {
+        "difference": 0.0033253968253968264,
+        "interval95": [
+          -0.027898730158730164,
+          0.03368196428571429
+        ],
+        "pValue": 0.8229177082291771
+      },
+      "hit@5": {
+        "difference": -0.006999999999999999,
+        "interval95": [
+          -0.027000000000000003,
+          0.012
+        ],
+        "pValue": 0.533946605339466
+      },
+      "families": 200
+    },
+    "withoutRerankerVsBlend": {
+      "ndcg@10": {
+        "difference": -0.02155925958467077,
+        "interval95": [
+          -0.038530446734657366,
+          -0.004914221666338221
+        ],
+        "pValue": 0.014098590140985901
+      },
+      "mrr@10": {
+        "difference": -0.006872619047619049,
+        "interval95": [
+          -0.04195136904761905,
+          0.02869964285714286
+        ],
+        "pValue": 0.7011298870112989
+      },
+      "hit@5": {
+        "difference": -0.021000000000000005,
+        "interval95": [
+          -0.052000000000000005,
+          0.008999999999999998
+        ],
+        "pValue": 0.15558444155584442
+      },
+      "families": 200
+    }
+  },
+  "shap": [
+    {
+      "feature": "reranker_z",
+      "label": "Careful-check score compared with the other candidates",
+      "meanAbsolute": 0.4509458572884359,
+      "direction": 0.9428869441509801
+    },
+    {
+      "feature": "similarity_gap",
+      "label": "Similarity minus the best in this search",
+      "meanAbsolute": 0.3155678911463478,
+      "direction": 0.834569188118553
+    },
+    {
+      "feature": "reranker_gap",
+      "label": "Careful-check score minus the best in this search",
+      "meanAbsolute": 0.2668807059853868,
+      "direction": 0.9380805298734343
+    },
+    {
+      "feature": "blend_rank",
+      "label": "Position under the current 25/75 blend",
+      "meanAbsolute": 0.1861624617892423,
+      "direction": -0.69300260396633
+    },
+    {
+      "feature": "semantic_rank",
+      "label": "Meaning-search rank",
+      "meanAbsolute": 0.12569997984969053,
+      "direction": -0.511103370806219
+    },
+    {
+      "feature": "semantic_similarity",
+      "label": "Meaning similarity (cosine)",
+      "meanAbsolute": 0.0711320964100537,
+      "direction": 0.865954303253476
+    },
+    {
+      "feature": "reranker_rank",
+      "label": "Position by the careful check (cross-encoder)",
+      "meanAbsolute": 0.022624833148458784,
+      "direction": -0.6979198216880507
+    },
+    {
+      "feature": "reranker_score",
+      "label": "Careful-check score",
+      "meanAbsolute": 0.0190612960440833,
+      "direction": 0.8765268202628995
+    },
+    {
+      "feature": "title_words",
+      "label": "Words in the title",
+      "meanAbsolute": 0.0188427650601704,
+      "direction": -0.5740034507270602
+    },
+    {
+      "feature": "title_overlap",
+      "label": "Share of search words in the title",
+      "meanAbsolute": 0.01807535550206274,
+      "direction": 0.7936760599881695
+    },
+    {
+      "feature": "text_overlap",
+      "label": "Share of search words anywhere in the product text",
+      "meanAbsolute": 0.00894969803065173,
+      "direction": 0.6941413957101411
+    },
+    {
+      "feature": "keyword_rank",
+      "label": "Keyword (BM25) rank",
+      "meanAbsolute": 0.003955696407505082,
+      "direction": -0.5962490135787656
+    },
+    {
+      "feature": "query_words",
+      "label": "Words in the search",
+      "meanAbsolute": 0.0015915198701288494,
+      "direction": 0.23292556249496216
+    },
+    {
+      "feature": "candidate_count",
+      "label": "Candidates for this search",
+      "meanAbsolute": 0.0005820626506207884,
+      "direction": -0.12087161064743167
+    },
+    {
+      "feature": "has_keyword",
+      "label": "Found by keyword search",
+      "meanAbsolute": 0.0,
+      "direction": 0.0
+    },
+    {
+      "feature": "has_semantic",
+      "label": "Found by meaning search",
+      "meanAbsolute": 0.0,
+      "direction": 0.0
+    },
+    {
+      "feature": "retrieval_rank",
+      "label": "Position after keyword + meaning retrieval",
+      "meanAbsolute": 0.0,
+      "direction": 0.0
+    },
+    {
+      "feature": "spelling_match",
+      "label": "Matched a spelling correction",
+      "meanAbsolute": 0.0,
+      "direction": 0.0
+    },
+    {
+      "feature": "query_corrected",
+      "label": "The search had a typo",
+      "meanAbsolute": 0.0,
+      "direction": 0.0
+    },
+    {
+      "feature": "query_variations",
+      "label": "Spelling variations searched",
+      "meanAbsolute": 0.0,
+      "direction": 0.0
+    },
+    {
+      "feature": "brand_in_query",
+      "label": "Product brand named in the search",
+      "meanAbsolute": 0.0,
+      "direction": 0.0
+    }
+  ],
+  "scoringMsPerQuery": 0.05039833005866967,
+  "servedScoreMaxDifference": 0.0
+}
