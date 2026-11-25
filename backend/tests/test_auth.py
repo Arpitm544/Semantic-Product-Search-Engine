@@ -104,7 +104,7 @@ def test_missing_configuration_fails_closed():
 
 
 @pytest.mark.parametrize("issuer", [
-    "http://test.clerk.accounts.dev", "https://", "https://example.com/path",
+    "http://test.clerk.accounts.dev", "https://", "https://example.com/path;params", "https://[invalid",
     "https://example.com?query=1", "https://example.com#fragment",
     "https://user@example.com", "https://user:password@example.com",
 ])
@@ -175,3 +175,26 @@ def test_insecure_jwks_url_fails_closed(monkeypatch):
     with pytest.raises(HTTPException) as error:
         auth.jwks_url("https://test.clerk.accounts.dev")
     assert error.value.status_code == 503
+
+
+def test_proxied_session_requires_exact_issuer_path(signing_key, monkeypatch):
+    issuer = "https://app.example.com/__clerk"
+    monkeypatch.setenv("CLERK_ISSUER_URL", issuer)
+    monkeypatch.delenv("CLERK_JWKS_URL", raising=False)
+    monkeypatch.setenv("FRONTEND_ORIGINS", "https://app.example.com")
+    client = Mock()
+    client.get_signing_key_from_jwt.return_value = SimpleNamespace(key=signing_key.public_key())
+    lookup = Mock(return_value=client)
+    monkeypatch.setattr(auth, "jwks_client", lookup)
+
+    token = jwt.encode(claims(iss=issuer, azp="https://app.example.com"), signing_key, algorithm="RS256")
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+    assert auth.require_session(credentials)["sub"] == "user_test"
+    lookup.assert_called_once_with(issuer + "/.well-known/jwks.json")
+
+    for wrong_issuer in ("https://app.example.com", issuer + "/"):
+        wrong_token = jwt.encode(claims(iss=wrong_issuer, azp="https://app.example.com"),
+                                 signing_key, algorithm="RS256")
+        with pytest.raises(HTTPException) as error:
+            auth.require_session(HTTPAuthorizationCredentials(scheme="Bearer", credentials=wrong_token))
+        assert error.value.status_code == 401
