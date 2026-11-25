@@ -1,3 +1,6 @@
 # Optional offline FAISS evaluation tools; not needed by the Atlas application.
 -r requirements.txt
 faiss-cpu>=1.7.4,<2
+# Learning to rank: training only (scripts/train_ltr.py). Serving reads the
+# exported JSON model and does not need LightGBM.
+lightgbm==4.6.0
