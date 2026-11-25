@@ -1,7 +1,7 @@
 'use client';
 import { productSourceLabel } from '@/lib/types';
 import { useAuth } from '@clerk/nextjs';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { accountError, useAccountApi, type SavedItem, type Page } from '@/lib/account';
 import { accountButton, accountPanel } from './AccountShell';
 
@@ -20,19 +20,34 @@ function usePickerProducts() {
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
+  const version = useRef(0);
   useEffect(() => {
-    let active = true;
-    setItems([]); setError(''); setBusy(true);
-    if (!isLoaded || !userId) return () => { active = false; };
-    api<Page<SavedItem>>('/api/saved-products').then(result => { if (active) { setItems(result.items); setMore(result.hasMore); } })
-      .catch(reason => { if (active) setError(reason.message); }).finally(() => { if (active) setBusy(false); });
-    return () => { active = false; };
+    const current = ++version.current;
+    setItems([]); setError('');
+    if (!isLoaded || !userId) {
+      setBusy(!isLoaded);
+      return () => { version.current++; };
+    }
+    setBusy(true);
+    api<Page<SavedItem>>('/api/saved-products').then(result => { if (current === version.current) { setItems(result.items); setMore(result.hasMore); } })
+      .catch(reason => { if (current === version.current) setError(accountError(reason, 'Could not load products.')); })
+      .finally(() => { if (current === version.current) setBusy(false); });
+    return () => { version.current++; };
   }, [api, isLoaded, userId]);
   async function loadMore(reset = false) {
+    if (busy || !isLoaded || !userId) return;
+    const current = ++version.current;
     setBusy(true); setError('');
-    try { const result = await api<Page<SavedItem>>(`/api/saved-products?offset=${reset ? 0 : items.length}`); setItems(old => reset ? result.items : [...old, ...result.items.filter(item => !old.some(existing => existing.id === item.id))]); setMore(result.hasMore); }
-    catch (reason) { setError(accountError(reason, 'Could not load products.')); }
-    finally { setBusy(false); }
+    try {
+      const result = await api<Page<SavedItem>>(`/api/saved-products?offset=${reset ? 0 : items.length}`);
+      if (current !== version.current) return;
+      setItems(old => reset ? result.items : [...old, ...result.items.filter(item => !old.some(existing => existing.id === item.id))]);
+      setMore(result.hasMore);
+    } catch (reason) {
+      if (current === version.current) setError(accountError(reason, 'Could not load products.'));
+    } finally {
+      if (current === version.current) setBusy(false);
+    }
   }
   return { items, more, busy, error, loadMore };
 }

@@ -2,8 +2,14 @@
 
 export type MetricKey = 'ndcg@10' | 'mrr@10' | 'recall@10' | 'hit@5';
 export type Segment = 'all' | 'clean' | 'typo';
+export type ConfidenceInterval = [lower: number, upper: number];
+type LatencyKey = 'p50' | 'p95' | 'mean';
 
-export type StageMetrics = { queries: number } & Record<MetricKey, number>;
+export type StageMetrics = {
+  queries: number;
+  families?: number;
+  confidenceIntervals?: Record<MetricKey, ConfidenceInterval> | null;
+} & Record<MetricKey, number>;
 
 export interface QualityStage {
   id: 'keyword' | 'spelling' | 'semantic' | 'hybrid' | 'reranked';
@@ -11,7 +17,20 @@ export interface QualityStage {
   description: string;
   metrics: Record<Segment, StageMetrics>;
   byTypoKind: Record<string, StageMetrics>;
-  latencyMs: { p50: number; p95: number; mean: number };
+  latencyMs: Record<LatencyKey, number>;
+  latencyConfidenceIntervals?: Record<LatencyKey, ConfidenceInterval> | null;
+}
+
+interface StageComparison {
+  baseline: QualityStage['id'];
+  candidate: QualityStage['id'];
+  metrics: Record<MetricKey, {
+    delta: number;
+    confidenceInterval: ConfidenceInterval;
+    pValue: number;
+    adjustedPValue: number;
+    significant: boolean;
+  }>;
 }
 
 export interface ExampleResult { title: string; grade: 'Exact' | 'Substitute' | 'Complement' | 'Irrelevant' | 'Unjudged' }
@@ -39,6 +58,14 @@ export interface QualityReport {
   commit?: string | null;
   partial?: boolean;
   stages: QualityStage[];
+  statistics?: {
+    confidenceLevel: number;
+    alpha: number;
+    bootstrapSamples: number;
+    randomizationSamples: number;
+    seed: number;
+    comparisons: Record<Segment, StageComparison[]>;
+  };
   examples: { wins: QualityExample[]; misses: QualityExample[] };
 }
 

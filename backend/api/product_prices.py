@@ -99,6 +99,14 @@ def active_filters(preferences):
     return [name for name in FILTERS if active[name]]
 
 
+def has_supported_preferences(preferences, source=None):
+    """True when at least one active preference applies to `source`."""
+    if not preferences:
+        return False
+    supported = SOURCE_FILTERS.get(source, set(FILTERS)) if source else set(FILTERS)
+    return any(name in supported for name in active_filters(preferences))
+
+
 def matches_preferences(product, preferences, filters=tuple(FILTERS)):
     return all(FILTERS[name](product, preferences) for name in filters)
 
@@ -126,6 +134,11 @@ def apply_preferences(payload, preferences, source=None):
         notices.append('Saved preferences filter the returned candidates. Products with unavailable details for an active filter are excluded.')
     if skipped:
         notices.append(skipped_notice(skipped, source))
-    return {**payload, 'results': results, 'preferencesApplied': True,
-            'appliedPreferences': applied, 'skippedPreferences': skipped,
-            'warning': ' '.join(filter(None, notices))}
+    updated = {**payload, 'results': results, 'preferencesApplied': True,
+               'appliedPreferences': applied, 'skippedPreferences': skipped,
+               'warning': ' '.join(filter(None, notices))}
+    if 'total' in payload:
+        updated['total'] = len(results)
+    if applied and 'candidateCount' in payload:
+        updated['candidateCount'] = len(results)
+    return updated

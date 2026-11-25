@@ -24,7 +24,12 @@ def dashboard_data():
         )
 
     categories = sorted({item.get("category") for item in products if item.get("category")})
-    rated_products = [item for item in products if isinstance(item.get("rating"), (int, float))]
+    rated_products = [
+        item for item in products
+        if isinstance(item.get("rating"), (int, float))
+        and not isinstance(item.get("rating"), bool)
+        and isfinite(item["rating"])
+    ]
     average_rating = (
         sum(item["rating"] for item in rated_products) / len(rated_products)
         if rated_products else None

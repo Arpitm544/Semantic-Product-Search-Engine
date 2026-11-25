@@ -16,6 +16,19 @@ def collection():
     return value
 
 
+def _increment_window(key, limit, expires_at):
+    query = {'_id': key, 'count': {'$lt': limit}}
+    update = {'$inc': {'count': 1}, '$setOnInsert': {'expires_at': expires_at}}
+    try:
+        return collection().find_one_and_update(
+            query, update, upsert=True, return_document=ReturnDocument.AFTER)
+    except DuplicateKeyError:
+        # Two requests can race to create the first counter document of a window;
+        # retry once against the newly inserted document before treating it as full.
+        return collection().find_one_and_update(
+            query, {'$inc': {'count': 1}}, upsert=False, return_document=ReturnDocument.AFTER)
+
+
 def take_daily_slot(scope, limit):
     """Atomically use one of `limit` slots for `scope` in the current UTC day.
 
@@ -27,9 +40,7 @@ def take_daily_slot(scope, limit):
     day = int(timestamp.timestamp()) // 86400
     key = sha256(f'daily:{scope}:{day}'.encode()).hexdigest()
     try:
-        result = collection().find_one_and_update({'_id': key, 'count': {'$lt': limit}},
-            {'$inc': {'count': 1}, '$setOnInsert': {'expires_at': timestamp + timedelta(days=2)}},
-            upsert=True, return_document=ReturnDocument.AFTER)
+        result = _increment_window(key, limit, timestamp + timedelta(days=2))
     except DuplicateKeyError:
         return False
     return result is not None
@@ -51,9 +62,7 @@ def check_search_rate(user, source):
     window = int(timestamp.timestamp()) // 60
     key = sha256(f'{user}:{source}:{window}'.encode()).hexdigest()
     try:
-        result = collection().find_one_and_update({'_id': key, 'count': {'$lt': limit}},
-            {'$inc': {'count': 1}, '$setOnInsert': {'expires_at': timestamp + timedelta(minutes=2)}},
-            upsert=True, return_document=ReturnDocument.AFTER)
+        result = _increment_window(key, limit, timestamp + timedelta(minutes=2))
         if result is None:
             raise DuplicateKeyError('Rate limit reached')
     except DuplicateKeyError:

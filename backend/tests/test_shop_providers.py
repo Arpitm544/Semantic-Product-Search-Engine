@@ -294,7 +294,8 @@ class ScoringRanker:
 
     def rank(self, query, products):
         self.seen = list(products)
-        scored = [{**p, 'rerankerScore': 8.0 if 'earbuds' in p['title'] else -11.0, 'semanticScore': 0.0}
+        scored = [{**p, 'rerankerScore': 1.0 if 'earbuds' in p['title'] else 0.5, 'semanticScore': 0.0,
+                   'relevanceProbability': 0.20 if 'earbuds' in p['title'] else 0.199}
                   for p in products]
         return sorted(scored, key=lambda p: -p['rerankerScore'])
 
@@ -331,6 +332,11 @@ def test_relevant_results_have_no_close_match_notice():
             patch.object(shops_service, 'get_candidate_ranker', return_value=ScoringRanker()):
         result = shops_service.rank_shops_response(shops_service.search_shops('earbuds'))
     assert [r['title'] for r in result['results']] == ['wireless earbuds'] and 'warning' not in result
+
+
+def test_uncalibrated_shop_scores_do_not_trigger_close_match_filter():
+    results = [{'rerankerScore': -11.0}, {'rerankerScore': 8.0}]
+    assert shops_service.relevant(results) == (results, None)
 
 
 def test_results_are_capped_at_the_limit_after_ranking():

@@ -1,15 +1,23 @@
 """Build the search engine once and reuse it while the catalog stays the same."""
 
+import logging
 import os
 from threading import Event, Lock
+
+from pymongo.errors import PyMongoError
 
 from src.config import PROJECT_ROOT
 from src.data.catalog import load_products, version, CatalogUpdatingError
 from src.search.product_search import ProductSearch
+from src.search.ranking import configured_pipeline_params
+from src.search.relevance import configured_reranker_path
 from api.ranking_service import get_candidate_ranker
+
+logger = logging.getLogger(__name__)
 
 _search_engine = None
 _search_signature = None
+_search_params = None
 _search_lock = Lock()
 _search_ready = Event()
 _search_error = None
@@ -30,9 +38,18 @@ def get_search_engine():
             # serving the last complete engine; the next request retries.
             _search_ready.set()
             return _search_engine
+        except PyMongoError as error:
+            if _search_engine is not None:
+                logger.warning("Catalog refresh failed (%s); continuing with cached index.", type(error).__name__)
+                _search_ready.set()
+                _search_error = None
+                return _search_engine
+            _search_ready.clear()
+            _search_error = str(error)
+            raise
         except Exception as error:
             _search_ready.clear()
-            _search_error = None if isinstance(error, CatalogUpdatingError) else str(error)
+            _search_error = str(error)
             raise
         _search_error = None
         _search_ready.set()
@@ -41,17 +58,20 @@ def get_search_engine():
 
 def build_search_engine():
     """Load products and models when needed, then return a ready search engine."""
-    global _search_engine, _search_signature
+    global _search_engine, _search_signature, _search_params
 
     catalog_version = version()
     model_path = os.environ.get("SEMANTIC_MODEL_PATH", "models/colab-export/esci-minilm-20k")
-    reranker_path = os.environ.get("RERANKER_MODEL_PATH", "models/ms-marco-MiniLM-L6-v2")
+    reranker_path = configured_reranker_path()
+    params = configured_pipeline_params()
 
     # This identifies the catalog and model settings used by the engine.
     signature = (catalog_version["sha256"], catalog_version["updated_at"],
                  model_path, reranker_path,
                  os.getenv("ATLAS_VECTOR_INDEX", "product_vectors"))
-    if _search_engine is not None and signature == _search_signature:
+    if _search_engine is not None and signature == _search_signature and (
+        _search_params is None or _search_params == params
+    ):
         return _search_engine
 
     _search_ready.clear()
@@ -63,8 +83,10 @@ def build_search_engine():
     reranker = load_reranker(reranker_path)
 
     # ProductSearch combines spelling correction, retrieval, and ranking.
-    _search_engine = ProductSearch(products, semantic, reranker, model_lock=get_candidate_ranker().lock)
+    _search_engine = ProductSearch(products, semantic, reranker,
+                                   model_lock=get_candidate_ranker().lock, params=params)
     _search_signature = signature
+    _search_params = params
     return _search_engine
 
 

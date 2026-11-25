@@ -155,7 +155,8 @@ def search_shopping(query, limit=20):
     location = os.environ.get("SERPAPI_LOCATION", "").strip()
     if location:
         params["location"] = location
-    cache_key = (hashlib.sha256(api_key.encode()).hexdigest(), query, params["gl"], params["hl"], location, limit)
+    cache_limit = max(limit, 100)
+    cache_key = (hashlib.sha256(api_key.encode()).hexdigest(), query, params["gl"], params["hl"], location)
 
     # Share concurrent requests for the same query without blocking other queries.
     # Failures are not cached and requests are not automatically retried.
@@ -163,18 +164,19 @@ def search_shopping(query, limit=20):
         cached = _cache.get(cache_key)
         if cached and monotonic() - cached[0] < CACHE_SECONDS:
             _cache.move_to_end(cache_key)
-            return {**response, "results": cached[1], "total": len(cached[1]), "cached": True}
+            shown = cached[1][:limit]
+            return {**response, "results": shown, "total": len(shown), "cached": True}
         waiting = _inflight.get(cache_key)
         if waiting is None:
             _inflight[cache_key] = Future()
     if waiting is not None:
         try:
-            products = waiting.result(timeout=30)
+            products = waiting.result(timeout=30)[:limit]
         except FutureTimeout:
             raise ShoppingError("Google Shopping took too long to respond. Please try again.", "serpapi_timeout", 504) from None
         return {**response, "results": products, "total": len(products), "cached": True}
     try:
-        products = normalize_products(fetch_products(params), limit)
+        products = normalize_products(fetch_products(params), cache_limit)
     except Exception as error:
         with _cache_lock:
             _inflight.pop(cache_key).set_exception(error)
@@ -185,7 +187,8 @@ def search_shopping(query, limit=20):
         while len(_cache) > CACHE_SIZE:
             _cache.popitem(last=False)
         _inflight.pop(cache_key).set_result(products)
-    return {**response, "results": products, "total": len(products)}
+    shown = products[:limit]
+    return {**response, "results": shown, "total": len(shown)}
 
 
 def rank_shopping_response(response):

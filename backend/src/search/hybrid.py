@@ -3,13 +3,14 @@
 from collections import defaultdict
 
 from src.keyword_search.bm25 import fit_bm25, search_bm25, tokenize
+from src.search.ranking import PipelineParams
 from src.search.typos import CatalogSpelling
 
 
 class HybridSearch:
     """Combine word matching with meaning-based matching in one search."""
 
-    def __init__(self, products, semantic=None, semantic_model=None, lexical=None):
+    def __init__(self, products, semantic=None, semantic_model=None, lexical=None, params=None):
         if len({product["id"] for product in products}) != len(products):
             raise ValueError("Catalog product IDs must be unique.")
         self.products = products
@@ -17,6 +18,7 @@ class HybridSearch:
         self.spelling = CatalogSpelling(self.lexical["idf"])
         self.semantic = semantic
         self.semantic_model = semantic_model
+        self.params = params if params is not None else PipelineParams()
 
     def search(self, query, limit=20, fuzzy=True):
         """Prepare the query, collect ranked matches, and combine them."""
@@ -50,17 +52,19 @@ class HybridSearch:
 
     def collect_rankings(self, query, corrected_query, corrections, limit):
         """Keep the results of each search method with its scoring weight."""
-        rankings = [("keyword", 1.0, search_bm25(self.lexical, query, max(50, limit)))]
+        bm25_k = max(self.params.bm25_k, limit)
+        rankings = [("keyword", self.params.keyword_weight, search_bm25(self.lexical, query, bm25_k))]
         if corrections:
             rankings.append((
-                "fuzzy", 0.85, search_bm25(self.lexical, corrected_query, max(50, limit)),
+                "fuzzy", self.params.fuzzy_weight, search_bm25(self.lexical, corrected_query, bm25_k),
             ))
         if self.semantic is not None:
-            candidate_k = min(len(self.products), max(50, limit))
-            rankings.append(("semantic", 1.0, self.semantic.search(query, candidate_k)))
+            candidate_k = min(len(self.products), max(self.params.semantic_k, limit))
+            rankings.append(("semantic", self.params.semantic_weight, self.semantic.search(query, candidate_k)))
             if corrections:
                 rankings.append((
-                    "semantic-corrected", 0.5, self.semantic.search(corrected_query, candidate_k),
+                    "semantic-corrected", self.params.semantic_corrected_weight,
+                    self.semantic.search(corrected_query, candidate_k),
                 ))
 
         return rankings
@@ -73,11 +77,12 @@ class HybridSearch:
         source_ranks = defaultdict(dict)   # best rank each method gave the product
         similarity = {}                     # best semantic cosine similarity
         products_by_id = {}
+        rrf_k = self.params.hybrid_rrf_k
         for source, weight, ranked in rankings:
             for rank, (product, method_score) in enumerate(ranked, start=1):
                 product_id = product["id"]
                 products_by_id[product_id] = product
-                scores[product_id] += weight / (60 + rank)
+                scores[product_id] += weight / (rrf_k + rank)
                 sources[product_id].append(source)
                 source_ranks[product_id].setdefault(source, rank)
                 if source.startswith("semantic"):

@@ -25,6 +25,8 @@ from src.evaluation.pipeline import (
     ExactSemanticSearch, build_engines, build_report, encode_products, evaluate,
 )
 from src.semantic.dataset import catalog_fingerprint, load_catalog, read_jsonl
+from src.search.ranking import PipelineParams, configured_pipeline_params
+from src.search.relevance import configured_reranker_path, load_reranker
 
 REPORT_PATH = PROJECT_ROOT / "quality" / "quality_report.json"
 
@@ -36,6 +38,8 @@ def parse_arguments():
     parser.add_argument("--limit", type=int, default=None, help="Evaluate only the first N queries.")
     parser.add_argument("--threads", type=int, default=2,
                         help="Torch CPU threads; the production server uses 2.")
+    parser.add_argument("--params", type=Path, default=None,
+                        help="Optional JSON file of tuned PipelineParams.")
     parser.add_argument("--output", type=Path, default=REPORT_PATH)
     return parser.parse_args()
 
@@ -83,7 +87,7 @@ def git_commit():
 def main():
     args = parse_arguments()
     import torch
-    from sentence_transformers import CrossEncoder, SentenceTransformer
+    from sentence_transformers import SentenceTransformer
 
     torch.set_num_threads(args.threads)
     products = load_catalog(args.data_dir / "products.json")
@@ -96,14 +100,15 @@ def main():
         sys.exit("The evaluation split is empty.")
 
     encoder_path = model_path("SEMANTIC_MODEL_PATH", "models/colab-export/esci-minilm-20k")
-    reranker_path = model_path("RERANKER_MODEL_PATH", "models/ms-marco-MiniLM-L6-v2")
+    reranker_path = (PROJECT_ROOT / configured_reranker_path()).resolve()
     # Same loading options as api/ranking_service.py, so latency matches serving.
     encoder = SentenceTransformer(str(encoder_path), local_files_only=True, device="cpu")
-    reranker = CrossEncoder(str(reranker_path), local_files_only=True, device="cpu", max_length=256)
+    reranker = load_reranker(reranker_path)
 
+    params = PipelineParams.load(args.params) if args.params else configured_pipeline_params()
     vectors = load_product_vectors(encoder, products, catalog_hash, encoder_path)
     semantic = ExactSemanticSearch(products, encoder, vectors, model_name=encoder_path.name)
-    engine, keyword_engine = build_engines(products, semantic, reranker)
+    engine, keyword_engine = build_engines(products, semantic, reranker, params=params)
 
     def progress(done, total):
         if done == total or done % 50 == 0:

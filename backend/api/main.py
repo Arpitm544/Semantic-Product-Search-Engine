@@ -26,7 +26,7 @@ from api.search_history import router as history_router, remember_search, Search
 from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
 from api.quality import router as quality_router
-from api.product_prices import apply_preferences
+from api.product_prices import apply_preferences, has_supported_preferences
 from api.query_understanding import (
     FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, understand,
 )
@@ -40,7 +40,11 @@ from api import search_service
 from api.search_service import get_search_engine, _search_ready
 from src.data.catalog import CatalogUpdatingError, with_product_links
 from api.shopping_service import ShoppingError, search_shopping, rank_shopping_response
-from api.shops_service import search_shops, rank_shops_response
+from api.shops_service import MAX_CANDIDATES as MAX_SHOPS_CANDIDATES, search_shops, rank_shops_response
+
+DISPLAY_LIMIT = 20
+SHOPPING_FILTER_LIMIT = 100
+CATALOG_FILTER_LIMIT = 500
 
 PORT = int(os.environ.get("PORT", "8000"))
 FRONTEND_ORIGINS = [
@@ -208,9 +212,27 @@ def search_text(context, understanding):
     return understanding["searchText"] or context.query
 
 
+def needs_candidate_pool(understanding, preferences, source):
+    """Keep more ranked candidates when smart filters or saved preferences will narrow them."""
+    return filtering(understanding) or has_supported_preferences(preferences, source)
+
+
+def limit_results(payload, limit):
+    """Cap displayed results after ranking and all post-ranking filters have run."""
+    results = payload.get("results", [])
+    if not limit or len(results) <= limit:
+        return payload
+    limited = results[:limit]
+    updated = {**payload, "results": limited}
+    if "total" in payload:
+        updated["total"] = len(limited)
+    return updated
+
+
 def shopping_search(context, preferences, understanding):
     try:
-        payload = rank_shopping_response(search_shopping(search_text(context, understanding)))
+        limit = SHOPPING_FILTER_LIMIT if needs_candidate_pool(understanding, preferences, "serpapi") else DISPLAY_LIMIT
+        payload = rank_shopping_response(search_shopping(search_text(context, understanding), limit=limit))
         payload = apply_query_filters(payload, understanding)
         return finish_search(context, payload, preferences)
     except ShoppingError as error:
@@ -221,7 +243,8 @@ def shopping_search(context, preferences, understanding):
 
 def shops_search(context, preferences, understanding):
     try:
-        payload = rank_shops_response(search_shops(search_text(context, understanding)))
+        limit = MAX_SHOPS_CANDIDATES if needs_candidate_pool(understanding, preferences, "shops") else DISPLAY_LIMIT
+        payload = rank_shops_response(search_shops(search_text(context, understanding), limit=limit))
         payload = apply_query_filters(payload, understanding)
         return finish_search(context, payload, preferences)
     except ShoppingError as error:
@@ -250,20 +273,22 @@ def catalog_search(context, preferences, understanding):
     except Exception:
         logging.getLogger(__name__).exception("Search initialization failed")
         return search_unavailable()
+    instrument_engines(engine, ranking_service._ranker)
     try:
-        # Rank every candidate when a chip narrows results, then keep the top 20.
-        limit = 500 if filtering(understanding) else 20
+        # Rank every candidate when a chip or saved filter narrows results, then keep the top 20.
+        limit = CATALOG_FILTER_LIMIT if needs_candidate_pool(understanding, preferences, "mongo") else DISPLAY_LIMIT
         payload = engine.search(search_text(context, understanding), limit=limit, fuzzy=context.fuzzy)
-        payload = with_product_links(apply_query_filters(payload, understanding, limit=20))
-        return finish_search(context, payload, preferences)
+        payload = apply_query_filters(payload, understanding)
+        return with_product_links(finish_search(context, payload, preferences))
     except (ValueError, RuntimeError, OSError, PyMongoError):
         logging.getLogger(__name__).exception("Search request failed")
         return search_unavailable()
 
 
-def finish_search(context, payload, preferences):
+def finish_search(context, payload, preferences, limit=DISPLAY_LIMIT):
     if preferences is not None:
         payload = apply_preferences(payload, preferences, context.source)
+    payload = limit_results(payload, limit)
     record_search_outcome(context.source, payload, context.query)
     return remember_search(context, payload)
 

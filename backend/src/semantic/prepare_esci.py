@@ -142,7 +142,7 @@ def select_splits(train_groups, test_groups, validation_count, test_count, seed)
     return training_families, validation_pool, validation_families, test_pool[:test_count]
 
 
-def read_needed_products(parquet_path, needed_ids):
+def read_needed_products(parquet_path, needed_ids, *, strict=True):
     """Read only the selected US products from the large source file."""
     import pyarrow as pa
     import pyarrow.compute as pc
@@ -184,7 +184,7 @@ def read_needed_products(parquet_path, needed_ids):
                 "representation_text": " | ".join(parts),
             }
     missing = needed_ids - products.keys()
-    if missing:
+    if missing and strict:
         raise ValueError(f"{len(missing)} selected products lack metadata: {sorted(missing)[:5]}")
     return [products[pid] for pid in sorted(products)]
 
@@ -194,6 +194,19 @@ def write_jsonl(path, rows):
     with path.open("w", encoding="utf-8") as output:
         for row in rows:
             output.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def read_us_esci_examples(raw_dir):
+    import pandas as pd
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    path = raw_dir / "shopping_queries_dataset_examples.parquet"
+    small_version = True if pa.types.is_boolean(pq.read_schema(path).field("small_version").type) else 1
+    return pd.read_parquet(
+        path, columns=["query", "query_id", "product_id", "esci_label", "split"],
+        filters=[("product_locale", "=", "us"), ("small_version", "=", small_version)],
+    )
 
 
 def parse_arguments():
@@ -231,13 +244,7 @@ def prepare_dataset(args, parser):
         parser.error("Pair and query counts must be positive.")
     if (args.output_dir / "manifest.json").exists():
         parser.error("Prepared data already exists; choose another output directory for a new experiment.")
-    import pandas as pd
-
-    examples = pd.read_parquet(
-        args.raw_dir / "shopping_queries_dataset_examples.parquet",
-        columns=["query", "query_id", "product_id", "esci_label", "split"],
-        filters=[("product_locale", "=", "us"), ("small_version", "=", True)],
-    )
+    examples = read_us_esci_examples(args.raw_dir)
     print(f"Loaded {len(examples):,} official English ranking judgments.", flush=True)
     train_groups = group_judgments(examples[examples["split"] == "train"])
     test_groups = group_judgments(examples[examples["split"] == "test"])

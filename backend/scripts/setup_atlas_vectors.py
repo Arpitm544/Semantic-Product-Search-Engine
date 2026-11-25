@@ -15,7 +15,21 @@ from src.semantic.identity import vector_generation
 from scripts.import_catalog import catalog_import_lock
 
 
-def setup(timeout=900):
+def prune_old_generations(db, active_generation):
+    """Drop stale product_vectors_* collections and manifests after a new generation is ready."""
+    prefix = collection_name('')
+    active_col = collection_name(active_generation)
+    dropped = []
+    for name in db.list_collection_names():
+        if name.startswith(prefix) and name != active_col:
+            db.drop_collection(name)
+            dropped.append(name)
+    db['vector_manifests'].delete_many({'_id': {'$ne': active_generation}})
+    if dropped:
+        print(f'Pruned {len(dropped)} old vector collection(s): {", ".join(sorted(dropped))}')
+
+
+def setup(timeout=900, keep_old=False):
     from sentence_transformers import SentenceTransformer
     import numpy as np
 
@@ -69,6 +83,8 @@ def setup(timeout=900):
             '_id': generation, 'status': 'ready', 'product_count': len(products),
             'dimensions': dimensions, 'catalog_sha256': manifest['sha256'],
         }, upsert=True)
+        if not keep_old:
+            prune_old_generations(db, generation)
         print(f'Atlas vector index ready: {db.name}.{collection.name} / {index_name()}')
         print('Atlas indexing is eventually consistent; newly uploaded vectors may take time to appear.')
 
@@ -76,4 +92,6 @@ def setup(timeout=900):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--timeout', type=int, default=900, help='Index readiness timeout in seconds')
-    setup(parser.parse_args().timeout)
+    parser.add_argument('--keep-old', action='store_true', help='Keep previous product_vectors_* generations')
+    args = parser.parse_args()
+    setup(args.timeout, keep_old=args.keep_old)

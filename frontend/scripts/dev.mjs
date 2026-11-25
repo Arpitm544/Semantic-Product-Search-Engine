@@ -47,7 +47,7 @@ export function backendIsRunning(port) {
 
 async function main() {
   nextEnv.loadEnvConfig(frontendDir);
-  const port = Number(process.env.PORT || 8000);
+  const port = Number(process.env.BACKEND_PORT || 8000);
   const reuseBackend = await backendIsRunning(port);
   let backend;
   if (reuseBackend) {

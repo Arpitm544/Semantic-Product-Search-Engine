@@ -68,6 +68,25 @@ python -m src.semantic.evaluate_typos --lexical-only
 Use --split test for the held-out test split. Model comparisons and metrics are
 described in [search evaluation](typo-search.md).
 
+## Hyperparameter tuning
+
+Tune RRF constants, per-stage candidate counts, spelling variation weights, and
+blend weights with Optuna on the validation split and evaluate once on the
+untouched test split:
+
+~~~sh
+python scripts/tune_pipeline.py --trials 120
+~~~
+
+Evaluate `quality_report.json` with a specific parameter file (by default
+`evaluate_quality.py` and live serving automatically load
+`reports/tuning/best_params_balanced.json` when present, or set
+`PIPELINE_PARAMS_PATH`):
+
+~~~sh
+python scripts/evaluate_quality.py --params reports/tuning/best_params_balanced.json
+~~~
+
 ## Tests
 
 From the repository root, with development dependencies installed:

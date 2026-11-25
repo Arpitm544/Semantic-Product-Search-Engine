@@ -87,13 +87,13 @@ def test_zero_result_texts_are_grouped_and_hidden_unless_allowed():
 
 
 def test_searches_with_only_weak_matches_count_as_no_close_match():
-    floor = obs.RELEVANCE_FLOOR
+    floor = obs.RELEVANCE_THRESHOLD
     assert obs.miss_reason(0, None) == "no-results"
-    assert obs.miss_reason(20, floor - 6) == "no-close-match"   # results exist, none is relevant
-    assert obs.miss_reason(20, floor + 9) is None
-    assert obs.miss_reason(20, None) is None                    # no reranker score: unknown, not a miss
-    obs.metrics.record_search("mongo", 20, "qwxzv blorptastic", {"total": 5.0}, top_score=-11.3)
-    obs.metrics.record_search("mongo", 20, "wireless headphones", {"total": 5.0}, top_score=4.8)
+    assert obs.miss_reason(20, floor - 0.001) == "no-close-match"
+    assert obs.miss_reason(20, floor) is None
+    assert obs.miss_reason(20, None) is None
+    obs.metrics.record_search("mongo", 20, "qwxzv blorptastic", {"total": 5.0}, top_probability=0.19)
+    obs.metrics.record_search("mongo", 20, "wireless headphones", {"total": 5.0}, top_probability=0.20)
     snapshot = obs.metrics.snapshot(include_queries=True)
     assert snapshot["search"]["noCloseMatch"] == 1 and snapshot["search"]["missRate"] == 0.5
     assert snapshot["zeroResultSearches"] == [{**snapshot["zeroResultSearches"][0], "query": "qwxzv blorptastic",
@@ -162,6 +162,19 @@ def test_search_outcomes_record_counts_and_log_details():
     assert obs.metrics.snapshot(True)["search"]["total"] == 1
 
 
+@pytest.mark.parametrize("probabilities, misses", [([0.1, 0.19], 1), ([0.1, 0.20], 0), ([None], 0)])
+def test_search_outcome_uses_returned_probabilities(probabilities, misses):
+    record = obs.RequestRecord("search-request")
+    record.details["topScore"] = 8.0
+    token = obs.current_request.set(record)
+    try:
+        results = [{"relevanceProbability": value} for value in probabilities]
+        obs.record_search_outcome("shops", {"results": results}, "headphones")
+    finally:
+        obs.current_request.reset(token)
+    assert obs.metrics.snapshot(True)["search"]["noCloseMatch"] == misses
+
+
 # ---------------------------------------------------------------- endpoint
 
 def test_health_endpoint_hides_search_text_from_non_admins(authenticated_api, monkeypatch):
@@ -195,3 +208,24 @@ def test_a_real_search_request_is_measured(authenticated_api):
     assert summary["search"]["total"] == 1 and summary["search"]["zeroResults"] == 1
     assert summary["zeroResultSearches"][0]["query"] == "unfindable thing"
     assert summary["search"]["stages"]["total"]["count"] == 1
+
+
+def test_first_lazy_engine_load_is_instrumented(authenticated_api):
+    from api import main
+    engine = Mock()
+    engine.products = []
+    engine.spelling.correct = lambda q: (q, [])
+    engine.spelling.alternatives = lambda q: [q]
+    engine.hybrid.search = lambda *a, **k: []
+    engine.semantic.search = lambda *a, **k: []
+    def run_search(*args, **kwargs):
+        engine.spelling.alternatives("x")
+        return {"results": [], "candidateCount": 0}
+    engine.search.side_effect = run_search
+    with patch.object(main.search_service, "_search_engine", None), \
+            patch.object(main, "search_initializing", return_value=False), \
+            patch.object(main, "get_search_engine", return_value=engine), \
+            patch.object(main, "with_product_links", side_effect=lambda payload: payload):
+        TestClient(main.app).get("/api/search", params={"q": "headphones"})
+    summary = obs.metrics.snapshot(True)
+    assert summary["search"]["stages"]["spelling"]["count"] == 1

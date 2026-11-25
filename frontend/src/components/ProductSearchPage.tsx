@@ -160,8 +160,20 @@ function ProductImage({ product, index }: { product: SearchProduct; index: numbe
   );
 }
 
-export default function ProductSearchPage({ initialQuery = '', initialSource = 'mongo', initialFuzzy = true, initialPreferences = false }: {
-  initialQuery?: string; initialSource?: SearchSource; initialFuzzy?: boolean; initialPreferences?: boolean;
+export default function ProductSearchPage({
+  initialQuery = '',
+  initialSource = 'mongo',
+  initialFuzzy = true,
+  initialPreferences = false,
+  hasExplicitSource = false,
+  hasExplicitPreferences = false,
+}: {
+  initialQuery?: string;
+  initialSource?: SearchSource;
+  initialFuzzy?: boolean;
+  initialPreferences?: boolean;
+  hasExplicitSource?: boolean;
+  hasExplicitPreferences?: boolean;
 }) {
   const authenticatedFetch = useAuthenticatedFetch();
   const { isLoaded, isSignedIn } = useAuth();
@@ -183,29 +195,55 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
   const [usePreferences, setUsePreferences] = useState(initialPreferences);
   const [appliedFilters, setAppliedFilters] = useState<Preferences | null>(null);
   const defaultsApplied = useRef(false);
+  const sourceOverridden = useRef(false);
+  const initialSearchRan = useRef(false);
+
   useEffect(() => {
     if (!preferences.data) return;
-    if (initialQuery) return;
-    if (!defaultsApplied.current) {
-      defaultsApplied.current = true;
+    if (defaultsApplied.current) return;
+    defaultsApplied.current = true;
+    if (!hasExplicitSource && !sourceOverridden.current) {
       setSource(preferences.data.defaultSource);
+    }
+    if (!hasExplicitPreferences) {
       setUsePreferences(preferences.data.applyByDefault);
     }
-  }, [preferences.data, initialQuery]);
+  }, [preferences.data, hasExplicitSource, hasExplicitPreferences]);
   // Google Shopping and online shops both return external offers with a merchant.
   const shopping = source !== 'mongo';
 
   useEffect(() => () => pending.current?.abort(), []);
 
   useEffect(() => {
-    // A history link mounts this page with the original query and source.
-    // Source-picker changes should not replay the initial search again.
-    if (!isLoaded) return;
-    if (!isSignedIn) return;
-    if (initialQuery) void runSearch(initialQuery, initialFuzzy);
-  }, [initialQuery, initialFuzzy, authenticatedFetch, isLoaded, isSignedIn]);
+    // Wait for saved defaults when the URL omitted `source` or `preferences` (e.g. dashboard links).
+    // Once run, source-picker switches or auth refreshes must not replay the initial search.
+    if (!initialQuery || initialSearchRan.current) return;
+    if (!isLoaded || !isSignedIn) return;
+    const waitingForDefaults = (!hasExplicitSource || !hasExplicitPreferences) && preferences.busy;
+    if (waitingForDefaults) return;
+    initialSearchRan.current = true;
+    const targetSource = !hasExplicitSource && !sourceOverridden.current && preferences.data
+      ? preferences.data.defaultSource
+      : source;
+    const targetPreferences = !hasExplicitPreferences && preferences.data
+      ? preferences.data.applyByDefault
+      : initialPreferences;
+    void runSearch(initialQuery, initialFuzzy, targetPreferences, { source: targetSource });
+  }, [
+    initialQuery,
+    initialFuzzy,
+    initialPreferences,
+    hasExplicitSource,
+    hasExplicitPreferences,
+    isLoaded,
+    isSignedIn,
+    preferences.busy,
+    preferences.data,
+    source,
+  ]);
 
   function changeSource(value: keyof typeof SOURCES) {
+    sourceOverridden.current = true;
     pending.current?.abort();
     pending.current = null;
     setSource(value);
@@ -290,23 +328,27 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
         <form className={"real-search-form light:[&.real-search-form_button]:[background:var(--day-action)] light:[&.real-search-form_button]:[color:var(--day-on-action)] light:[&.real-search-form_button:disabled]:[background:#aeb9ac] h-[62px] [background:var(--surface-fff)] [border:1px_solid_var(--border-dce4d9)] rounded-[11px] flex items-center pt-[6px] pr-[7px] pb-[6px] pl-[17px] [box-shadow:0_10px_35px_var(--shadow-384a3610)] [&_input]:h-[100%] [&_input]:min-w-[0] [&_input]:[flex:1] [&_input]:[border:0] [&_input]:[background:transparent] [&_input]:[color:var(--text-374237)] [&_input]:[font-style:normal] [&_input]:[font-weight:normal] [&_input]:text-[13px] [&_input]:leading-[normal] [&_input]:[font-family:'DM_Sans',sans-serif] [&_input:focus-visible]:outline-none [&_input::placeholder]:[color:var(--text-a1aaa0)] [&_button]:h-[46px] [&_button]:pt-[0] [&_button]:pr-[18px] [&_button]:pb-[0] [&_button]:pl-[18px] [&_button]:[border:0] [&_button]:rounded-[7px] [&_button]:[background:var(--surface-4f7857)] [&_button]:[color:white] [&_button]:[font-style:normal] [&_button]:font-semibold [&_button]:text-[12px] [&_button]:leading-[normal] [&_button]:[font-family:'DM_Sans',sans-serif] [&_button]:cursor-pointer [&_button:disabled]:[background:var(--surface-aeb9ac)] [&_button:disabled]:cursor-not-allowed [&_button_span]:text-[17px] [&_button_span]:ml-[10px] max-[600.01px]:h-[56px] max-[600.01px]:pl-[12px] max-[600.01px]:[&_button]:h-[42px] max-[600.01px]:[&_button]:pt-[0] max-[600.01px]:[&_button]:pr-[12px] max-[600.01px]:[&_button]:pb-[0] max-[600.01px]:[&_button]:pl-[12px] max-[600.01px]:[&_button]:text-[11px] dark:[&.real-search-form]:[border-color:#608368] dark:shadow-[0_0_0_4px_#a9c49708,0_16px_40px_#050d0926] dark:[&.real-search-form_button]:[background:#c9ddb5] dark:[&.real-search-form_button]:[color:#17251b] dark:[&.real-search-form_button:hover:not(:disabled)]:[background:#deebd0] dark:[&.real-search-form_button:disabled]:[background:#324337] dark:[&.real-search-form_button:disabled]:[color:#a3b3a5]"} onSubmit={submitSearch}>
           <span className={"search-glass text-[28px] [color:var(--text-879587)] leading-[1] mr-[11px] [transform:rotate(-20deg)]"} aria-hidden="true">⌕</span>
           <input autoFocus maxLength={512} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Try ‘wireless headphones’ or ‘mascara’" aria-label="Search products" />
-          <button type="submit" disabled={!input.trim() || loading || preferences.busy}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
+          <button type="submit" disabled={!input.trim() || loading}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
         </form>
         <span className={"search-data-note block mt-[11px] text-[10px] [color:var(--text-a1a99f)]"}>{SOURCE_NOTES[source]}</span>
       </section>
 
       <div className="grid items-start gap-6 lg:grid-cols-[248px_minmax(0,1fr)]">
-        <SearchFilters onApplied={filters => {
-          setAppliedFilters(filters);
-          setUsePreferences(true);
-          void preferences.reload();
-          if (input.trim()) void runSearch(input.trim(), true, true);
-        }} onCleared={() => {
-          setAppliedFilters(null);
-          setUsePreferences(false);
-          void preferences.reload();
-          if (input.trim()) void runSearch(input.trim(), true, false);
-        }} />
+        <SearchFilters
+          resource={preferences}
+          onApplied={filters => {
+            setAppliedFilters(filters);
+            setUsePreferences(true);
+            const target = searched || input.trim();
+            if (target) void runSearch(target, searched ? lastFuzzy : true, true);
+          }}
+          onCleared={() => {
+            setAppliedFilters(null);
+            setUsePreferences(false);
+            const target = searched || input.trim();
+            if (target) void runSearch(target, searched ? lastFuzzy : true, false);
+          }}
+        />
       <div className="min-w-0">
         {usePreferences && (appliedFilters || preferences.data) && <div aria-label="Active filters" className="flex flex-wrap items-center gap-2 px-6 pb-3">
           <span className="text-xs font-semibold text-[var(--muted)]">Active filters</span>
@@ -316,7 +358,7 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
             ...((appliedFilters || preferences.data)!.categories.map(value => [value, 'categories'])),
             ...((appliedFilters || preferences.data)!.brands.map(value => [value, 'brands'])),
             ...((appliedFilters || preferences.data)!.inStockOnly ? [['In stock', 'inStockOnly']] : []),
-          ] as [string, keyof Preferences][]).map(([label, key]) => <button key={`${key}:${label}`} type="button" className="rounded-full border border-[var(--line)] bg-[var(--surface-fff)] px-3 py-1.5 text-xs hover:bg-[var(--sage)]" aria-label={`Remove ${label} filter`} onClick={async () => {
+          ] as [string, keyof Preferences][]).map(([label, key]) => <button key={`${key}:${label}`} type="button" disabled={preferences.busy} className="rounded-full border border-[var(--line)] bg-[var(--surface-fff)] px-3 py-1.5 text-xs hover:bg-[var(--sage)] disabled:opacity-50" aria-label={`Remove ${label} filter`} onClick={async () => {
             const current = appliedFilters || preferences.data!;
             const next = { ...current };
             if (key === 'categories') next.categories = current.categories.filter(value => value !== label);
@@ -324,12 +366,15 @@ export default function ProductSearchPage({ initialQuery = '', initialSource = '
             else if (key === 'minBudget') next.minBudget = null;
             else if (key === 'maxBudget') next.maxBudget = null;
             else if (key === 'inStockOnly') next.inStockOnly = false;
-            try {
-              await preferences.api('/api/preferences', { method: 'PUT', body: JSON.stringify(next) });
-              setAppliedFilters(next);
-              void preferences.reload();
-              if (input.trim()) void runSearch(input.trim(), true, true);
-            } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not remove filter.'); }
+            const saved = await preferences.mutate(
+              () => preferences.api<Preferences>('/api/preferences', { method: 'PUT', body: JSON.stringify(next) }),
+              'Filter removed.',
+            );
+            if (saved) {
+              setAppliedFilters(saved);
+              const target = searched || input.trim();
+              if (target) void runSearch(target, searched ? lastFuzzy : true, true);
+            }
           }}>{label} <span aria-hidden="true">×</span></button>)}
         </div>}
       <section className={"search-results-section max-w-[990px] min-h-[170px] mt-[0] mr-[auto] mb-[0] ml-[auto] pt-[0] pr-[24px] pb-[50px] pl-[24px] max-[600.01px]:pl-[17px] max-[600.01px]:pr-[17px]"} aria-live="polite" aria-busy={loading}>

@@ -199,3 +199,11 @@ def test_filler_words_do_not_match_unrelated_store_products():
     with robots(), patch.object(base.requests, 'get', return_value=response(payload={'products': [sunscreen, earbuds]})):
         titles = [p['title'] for p in provider.search('earbuds with noise cancellation', 10)]
     assert titles == ['Wireless Earbuds']
+
+
+def test_shopify_pagination_stops_when_page_adds_no_new_products():
+    repeated = [{**SHOPIFY_ROW, 'id': i + 1, 'handle': f'item-{i}'} for i in range(stores.SHOPIFY_PAGE_SIZE)]
+    provider = StoreProvider(SHOPIFY)
+    with robots(), patch.object(base.requests, 'get', return_value=response(payload={'products': repeated})) as get:
+        provider.search('cotton', 5)
+    assert get.call_count == 2
