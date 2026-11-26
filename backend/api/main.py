@@ -27,7 +27,7 @@ from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
 from api.quality import router as quality_router
 from api.suggestions import router as suggestions_router, warm_up as warm_up_suggestions
-from api.product_prices import apply_preferences, has_supported_preferences
+from api.product_prices import apply_preferences, has_supported_preferences, price_info
 from api.query_understanding import (
     FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, understand,
 )
@@ -326,6 +326,14 @@ def finish_search(context, payload, preferences, limit=DISPLAY_LIMIT):
     if preferences is not None:
         payload = apply_preferences(payload, preferences, context.source)
     payload = limit_results(payload, limit)
+    if context.source != "mongo":
+        payload = {
+            **payload,
+            "results": [
+                {**product, "confirmedPrice": price} if (price := price_info(product)) else product
+                for product in payload.get("results", [])
+            ],
+        }
     record_search_outcome(context.source, payload, context.query)
     return remember_search(context, payload)
 

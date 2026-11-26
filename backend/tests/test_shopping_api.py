@@ -147,6 +147,20 @@ class TestShoppingSearch(unittest.TestCase):
         self.assertEqual(response.json()['source'], 'serpapi')
         engine.assert_not_called()
 
+    def test_guided_budget_exposes_only_prices_in_a_known_currency(self):
+        payload = {'shopping_results': [
+            {'product_id': '1', 'title': 'Phone 1', 'price': '₹2,499', 'extracted_price': 2499},
+            {'product_id': '2', 'title': 'Phone 2', 'price': '$55', 'extracted_price': 55},
+            {'product_id': '3', 'title': 'Phone 3', 'price': '€22', 'extracted_price': None},
+        ]}
+        with self.provider(payload), patch.object(api, 'rank_shopping_response', side_effect=lambda result: result):
+            response = TestClient(api.app).get('/api/search?q=phone&source=serpapi')
+        self.assertEqual(response.status_code, 200)
+        results = response.json()['results']
+        self.assertEqual(results[0]['confirmedPrice'], {'amount': 2499, 'currency': 'INR'})
+        self.assertNotIn('confirmedPrice', results[1])
+        self.assertNotIn('confirmedPrice', results[2])
+
     def test_route_rejects_invalid_requests_before_provider_call(self):
         with patch.object(api, 'search_shopping') as search:
             client = TestClient(api.app)
