@@ -2,20 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type MouseEvent, type Ref } from 'react';
 import { card, ghostButton, heading } from '@/components/dashboard/ui';
-
-export const methods = [
-  { id: 'keyword', label: 'Keyword', description: 'BM25 word matching' },
-  { id: 'semantic', label: 'Semantic', description: 'Vector similarity' },
-  { id: 'hybrid', label: 'Hybrid', description: 'Weighted rank fusion' },
-] as const;
-
-type Method = typeof methods[number]['id'];
-type RankedProduct = { id: string; title: string };
-export type LabReport = {
-  query: string;
-  limit: number;
-  rankings: Record<Method, RankedProduct[]>;
-};
+import { methods, type LabReport, type Method, type RankedProduct } from '@/lib/searchLab';
 
 const relevanceLabels = ['Exact match', 'Substitute', 'Complement', 'Irrelevant'] as const;
 type RelevanceLabel = typeof relevanceLabels[number];
