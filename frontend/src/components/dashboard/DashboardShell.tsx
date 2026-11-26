@@ -12,6 +12,7 @@ export default function DashboardShell({ children, unreadAlerts, title = 'Overvi
     { title: 'Discover', items: [
       { href: '/dashboard', label: 'Dashboard', icon: 'grid' },
       { href: '/search', label: 'Product search', icon: 'search' },
+      { href: '/search-lab', label: 'Search Lab', icon: 'columns' },
       { href: '/quality', label: 'Search quality', icon: 'chart' },
       { href: '/system', label: 'System health', icon: 'pulse' },
     ] },

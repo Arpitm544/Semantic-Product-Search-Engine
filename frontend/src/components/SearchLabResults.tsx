@@ -1,0 +1,165 @@
+'use client';
+
+import { useEffect, useId, useRef, useState } from 'react';
+import { card, ghostButton, heading } from '@/components/dashboard/ui';
+
+export const methods = [
+  { id: 'keyword', label: 'Keyword', description: 'BM25 word matching' },
+  { id: 'semantic', label: 'Semantic', description: 'Vector similarity' },
+  { id: 'hybrid', label: 'Hybrid', description: 'Weighted rank fusion' },
+] as const;
+
+type Method = typeof methods[number]['id'];
+type RankedProduct = { id: string; title: string };
+export type LabReport = {
+  query: string;
+  limit: number;
+  rankings: Record<Method, RankedProduct[]>;
+};
+
+const relevanceLabels = ['Exact match', 'Substitute', 'Complement', 'Irrelevant'] as const;
+type RelevanceLabel = typeof relevanceLabels[number];
+
+function judgmentKey(userId: string, query: string, productId: string) {
+  return `semantic-search-lab-judgment-v1:${JSON.stringify([userId, query, productId])}`;
+}
+
+function loadJudgments(userId: string, report: LabReport) {
+  const judgments = new Map<string, RelevanceLabel>();
+  const ids = new Set(Object.values(report.rankings).flatMap(products => products.map(product => product.id)));
+  try {
+    for (const id of ids) {
+      const saved = localStorage.getItem(judgmentKey(userId, report.query, id));
+      const label = relevanceLabels.find(value => value === saved);
+      if (label) judgments.set(id, label);
+    }
+  } catch {
+    // Feedback still works in memory when browser storage is unavailable.
+  }
+  return judgments;
+}
+
+function byRank(products: RankedProduct[]) {
+  return new Map(products.map((product, index) => [product.id, index + 1]));
+}
+
+function movement(rank: number, baseline: number | undefined, method: string, limit: number) {
+  if (baseline === undefined) return `Outside ${method} top ${limit}`;
+  const difference = baseline - rank;
+  if (difference === 0) return `Same as ${method}`;
+  return `${difference > 0 ? 'Up' : 'Down'} ${Math.abs(difference)} vs ${method}`;
+}
+
+export default function SearchLabResults({ report, userId }: { report: LabReport; userId: string }) {
+  const [selected, setSelected] = useState<RankedProduct | null>(null);
+  const [judgments, setJudgments] = useState(() => loadJudgments(userId, report));
+  const [storageUnavailable, setStorageUnavailable] = useState(false);
+  const judgmentGroup = useId();
+  const feedbackPanel = useRef<HTMLDivElement>(null);
+  const focusFeedback = useRef(false);
+  const { query, limit, rankings } = report;
+  const positions = {
+    keyword: byRank(rankings.keyword),
+    semantic: byRank(rankings.semantic),
+    hybrid: byRank(rankings.hybrid),
+  };
+
+  useEffect(() => {
+    if (selected && focusFeedback.current) {
+      feedbackPanel.current?.focus({ preventScroll: true });
+      focusFeedback.current = false;
+    }
+  }, [selected]);
+
+  function setJudgment(productId: string, label: RelevanceLabel | null) {
+    const key = judgmentKey(userId, query, productId);
+    try {
+      if (label) localStorage.setItem(key, label);
+      else localStorage.removeItem(key);
+      setStorageUnavailable(false);
+    } catch {
+      setStorageUnavailable(true);
+    }
+    setJudgments(current => {
+      const next = new Map(current);
+      if (label) next.set(productId, label);
+      else next.delete(productId);
+      return next;
+    });
+  }
+
+  return <section aria-labelledby="lab-results-title" className="min-w-0">
+    <h2 id="lab-results-title" className={`${heading} m-0 break-words text-xl`}>Rankings for “{query}”</h2>
+    <p className="mb-4 mt-1 text-sm text-[var(--muted)]">Up to {limit} results per method. Select a product to trace its ranks and mark its relevance.</p>
+
+    <div className="sticky top-28 z-[1] lg:top-16">
+      {selected && <div ref={feedbackPanel} tabIndex={-1} role="region" aria-label="Selected product" className="mb-4 rounded-xl border border-[var(--line)] bg-[var(--sage)] p-4 focus-visible:outline-2">
+        <div aria-live="polite" aria-atomic="true">
+          <p className="m-0 line-clamp-2 break-words text-sm font-semibold sm:line-clamp-none">{selected.title}</p>
+          <dl className="mb-0 mt-2 flex flex-wrap gap-x-5 gap-y-1">
+            {methods.map(({ id, label }) => {
+              const rank = positions[id].get(selected.id);
+              return <div key={id} className="flex gap-1.5 text-xs">
+                <dt className="font-semibold">{label}</dt>
+                <dd className="m-0">{rank === undefined ? `Outside top ${limit}` : `#${rank}`}</dd>
+              </div>;
+            })}
+          </dl>
+        </div>
+        <fieldset className="m-0 mt-3 min-w-0 border-0 p-0">
+          <legend className="mb-1.5 p-0 text-xs font-semibold">Relevance to this query</legend>
+          <div className="flex flex-wrap items-center gap-2">
+            {relevanceLabels.map(label => <label key={label} className={`${ghostButton} cursor-pointer has-[:checked]:border-[var(--accent)] has-[:checked]:bg-[var(--surface-fff)]`}>
+              <input type="radio" name={judgmentGroup} checked={judgments.get(selected.id) === label}
+                onChange={() => setJudgment(selected.id, label)} className="m-0 accent-[var(--accent)]" />
+              {label}
+            </label>)}
+            {judgments.has(selected.id) && <button type="button" onClick={() => {
+              setJudgment(selected.id, null);
+              feedbackPanel.current?.focus({ preventScroll: true });
+            }} className="cursor-pointer border-0 bg-transparent px-1 py-1.5 text-xs underline underline-offset-4">Clear judgment</button>}
+          </div>
+        </fieldset>
+        <p role="status" className={storageUnavailable ? 'mb-0 mt-2 text-xs' : 'sr-only'}>
+          {storageUnavailable ? 'Browser storage is unavailable. This judgment is temporary.' : judgments.get(selected.id) ?? 'No judgment selected.'}
+        </p>
+      </div>}
+    </div>
+
+    <p className="mb-2 mt-0 text-xs text-[var(--muted)] md:hidden">Swipe or scroll to see all three rankings.</p>
+    <div className="overflow-x-auto rounded-2xl focus-visible:outline-2" tabIndex={0} role="region" aria-label="Side-by-side search rankings">
+      <div className="grid min-w-[660px] grid-cols-3 items-start gap-3 pb-2">
+        {methods.map(({ id, label, description }) => <section key={id} aria-label={`${label} ranking`} className={`${card} min-w-0 overflow-hidden`}>
+          <div className={`border-b border-[var(--line)] p-4 ${id === 'hybrid' ? 'bg-[var(--sage)]' : ''}`}>
+            <h3 className={`${heading} m-0 text-base`}>{label}</h3>
+            <p className="mb-0 mt-1 text-xs text-[var(--muted)]">{description}</p>
+          </div>
+          {rankings[id].length > 0 ? <ol role="list" className="m-0 list-none divide-y divide-[var(--line)] p-0">
+            {rankings[id].map((product, index) => {
+              const rank = index + 1;
+              const highlighted = selected?.id === product.id;
+              const judgment = judgments.get(product.id);
+              return <li key={product.id}>
+                <button type="button" aria-pressed={highlighted} onClick={event => {
+                  focusFeedback.current = !highlighted && event.detail === 0;
+                  setSelected(highlighted ? null : product);
+                }}
+                  className={`flex w-full cursor-pointer items-start gap-2 border-0 p-3 text-left text-[var(--ink)] hover:bg-[var(--sage)] focus-visible:outline-2 focus-visible:-outline-offset-2 ${highlighted ? 'bg-[var(--sage)]' : 'bg-transparent'}`}>
+                  <span className="min-w-6 shrink-0 text-xs font-semibold tabular-nums text-[var(--accent)]">#{rank}</span>
+                  <span className="min-w-0 break-words text-xs leading-relaxed">
+                    <span className="block font-semibold">{product.title}</span>
+                    {judgment && <span className="mt-1 inline-flex rounded-full border border-[var(--line)] bg-[var(--surface-fff)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent)]">{judgment}</span>}
+                    {id === 'hybrid' && <span className="mt-1.5 block space-y-0.5 text-[11px] text-[var(--muted)]">
+                      <span className="block">{movement(rank, positions.keyword.get(product.id), 'keyword', limit)}</span>
+                      <span className="block">{movement(rank, positions.semantic.get(product.id), 'semantic', limit)}</span>
+                    </span>}
+                  </span>
+                </button>
+              </li>;
+            })}
+          </ol> : <p className="p-4 text-sm text-[var(--muted)]">No results for this method.</p>}
+        </section>)}
+      </div>
+    </div>
+  </section>;
+}
