@@ -10,6 +10,8 @@ const paths = {
   sliders: <><path d="M4 7h4m4 0h8M4 17h8m4 0h4" /><circle cx="10" cy="7" r="2" /><circle cx="14" cy="17" r="2" /></>,
   check: <path d="m5 12 4 4L19 6" />,
   menu: <><path d="M4 8h16M4 16h16" /></>,
+  pause: <path d="M9 5v14M15 5v14" />,
+  play: <path d="m9 5 10 7-10 7V5Z" />,
   leaf: <><path d="M20 3C7 2 3 8 5 15c2 7 16 4 15-12Z" /><path d="M4 21 15 10" /></>,
   sparkle: <><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z" /></>,
 };

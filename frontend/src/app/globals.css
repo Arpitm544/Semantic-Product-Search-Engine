@@ -43,6 +43,43 @@
 @keyframes arrive { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes auth-arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
+@keyframes footer-strip-scroll {
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .footer-strip-track {
+    display: flex;
+    width: max-content;
+    min-width: 200%;
+    animation: footer-strip-scroll 34s linear infinite;
+  }
+
+  .footer-strip-cycle {
+    flex: 1 0 auto;
+    justify-content: space-around;
+  }
+
+  .footer-strip-track[data-paused="true"] {
+    animation-play-state: paused;
+  }
+}
+
+/* The opaque landing content scrolls away to uncover the footer underneath. */
+@media (min-width: 781px) and (min-height: 720px) and (prefers-reduced-motion: no-preference) {
+  .site-footer {
+    position: sticky;
+    bottom: 0;
+    min-height: 100svh;
+  }
+
+  /* Keep the browser's normal scroll-to-focus behavior for footer links. */
+  .site-footer:has(:focus-visible) {
+    position: relative;
+    bottom: auto;
+  }
+}
+
 :root { --surface-topbar: #faf8f2ed; --focus-ring: #4f7857; }
 :root[data-theme="dark"] { --surface-topbar: #1c241f; --focus-ring: #a6c5b0; }
 

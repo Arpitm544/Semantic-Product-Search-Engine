@@ -68,53 +68,6 @@ function disposeObject(root: THREE.Object3D) {
   textures.forEach((texture) => { const data: unknown = texture.source?.data; if (typeof ImageBitmap !== 'undefined' && data instanceof ImageBitmap) data.close(); texture.dispose(); });
 }
 
-function makeMeaningSpace(T: typeof THREE) {
-  const field = new T.Group();
-  const clusters = [
-    { center: [1.2, .6, .3], color: '#658a9a', count: 45 },
-    { center: [-1.1, -.65, -.5], color: '#9582ae', count: 35 },
-    { center: [.9, -1.05, -.4], color: '#73946b', count: 35 },
-  ];
-  const positions: number[] = [], colors: number[] = [];
-  let seed = 39;
-  const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-  clusters.forEach(({ center, color, count }) => {
-    const c = new T.Color(color);
-    for (let index = 0; index < count; index++) {
-      positions.push(center[0] + (random() - .5) * 1.4, center[1] + (random() - .5) * 1.1, center[2] + (random() - .5) * 1.2);
-      colors.push(c.r, c.g, c.b);
-    }
-  });
-  const geometry = new T.BufferGeometry();
-  geometry.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
-  const dots = new T.Points(geometry, new T.PointsMaterial({ size: .105, vertexColors: true, transparent: true, opacity: .95, toneMapped: false }));
-  field.add(dots);
-  const query = new T.Mesh(new T.SphereGeometry(.09, 20, 16), new T.MeshBasicMaterial({ color: '#bd985a', transparent: true }));
-  query.position.set(.05, .75, .9); field.add(query);
-  const connectionPositions: number[] = [];
-  [[1.2, .6, .3], [1.45, .83, .45], [.92, .3, .6]].forEach((point) => connectionPositions.push(...query.position.toArray(), ...point));
-  const connections = new T.LineSegments(new T.BufferGeometry().setAttribute('position', new T.Float32BufferAttribute(connectionPositions, 3)), new T.LineBasicMaterial({ color: '#a18956', transparent: true, opacity: .85, toneMapped: false }));
-  field.add(connections);
-  [1.1, 1.7, 2.25].forEach((radius) => {
-    const ring = new T.Mesh(new T.TorusGeometry(radius, .003, 3, 128), new T.MeshBasicMaterial({ color: '#a7b6b5', transparent: true, opacity: .28 }));
-    ring.rotation.set(.3, -.25, .1); field.add(ring);
-  });
-  return field;
-}
-
-function updateFieldOpacity(T: typeof THREE, field: THREE.Group, opacity: number) {
-  field.traverse((object) => {
-    if (!(object instanceof T.Mesh || object instanceof T.Points || object instanceof T.Line)) return;
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    for (const material of materials) {
-      if (material.userData.originalOpacity === undefined) material.userData.originalOpacity = material.opacity;
-      material.opacity = material.userData.originalOpacity * opacity;
-      material.transparent = true;
-    }
-  });
-}
-
 export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef, onFailure }: { progressRef: MutableRefObject<number>; appearanceRef: MutableRefObject<string>; rotationRef: MutableRefObject<number>; onFailure: () => void }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
@@ -203,8 +156,6 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
         const headphones = await loadHeadphones(T, GLTFLoader);
         if (disposed) { disposeObject(headphones); return; }
         scene.add(headphones);
-        const field = makeMeaningSpace(T);
-        scene.add(field);
         const resize = () => {
           const width = host.clientWidth, height = host.clientHeight;
           if (!width || !height) return;
@@ -219,17 +170,10 @@ export default function HeadphoneScene({ progressRef, appearanceRef, rotationRef
           frame = 0;
           if (disposed || !visible || document.hidden) return;
           smoothed = Math.abs(smoothed - progressRef.current) < .0001 ? progressRef.current : lerp(smoothed, progressRef.current, .09);
-          const cloud = T.MathUtils.smoothstep(smoothed, .43, .56) * (1 - T.MathUtils.smoothstep(smoothed, .72, .81));
-          headphones.visible = cloud < .98;
-          const scale = lerp(1 + T.MathUtils.smoothstep(smoothed, .12, .38) * .12, .34, cloud);
-          headphones.scale.setScalar(scale);
-          headphones.position.set(lerp(0, 1.6, cloud), -.05, lerp(0, -.8, cloud));
-          headphones.rotation.set(.12 + cloud * .12, -.95 + smoothed * Math.PI * 2 + manualRotation + rotationRef.current, -.06 + Math.sin(smoothed * Math.PI) * .12);
+          headphones.scale.setScalar(1 + T.MathUtils.smoothstep(smoothed, .12, .38) * .12);
+          headphones.position.set(0, -.05, 0);
+          headphones.rotation.set(.12, -.95 + smoothed * Math.PI * 2 + manualRotation + rotationRef.current, -.06 + Math.sin(smoothed * Math.PI) * .12);
           headphones.userData.finish.value = appearanceRef.current === 'sage' ? 0 : 1;
-          field.visible = cloud > .01;
-          field.rotation.y = -.2 + smoothed * .45;
-          field.scale.setScalar(lerp(.4, 1.04, cloud));
-          updateFieldOpacity(T, field, cloud);
           try {
             renderer.render(scene, camera);
           } catch {
