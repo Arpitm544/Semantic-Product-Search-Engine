@@ -1,0 +1,10 @@
+[Unit]
+Description=Check main for a CI-tested Product Search backend release
+
+[Timer]
+OnCalendar=*-*-* *:0/3:00
+Persistent=true
+Unit=product-search-deploy.service
+
+[Install]
+WantedBy=timers.target

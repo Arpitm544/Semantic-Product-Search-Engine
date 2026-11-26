@@ -1,0 +1,12 @@
+[Unit]
+Description=Deploy the CI-tested Product Search backend from main
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/libexec/product-search-deploy.py
+StateDirectory=product-search-deploy
+StateDirectoryMode=0700
+UMask=0077
+TimeoutStartSec=8min

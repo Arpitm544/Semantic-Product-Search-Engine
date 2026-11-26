@@ -113,3 +113,32 @@ or remove enough alerts before creating or resuming another.
 Internal failure details stay in server logs. Public health and search responses
 return safe retryable messages. Vector caches with mismatched row counts,
 nonfinite/unnormalized values, or a wrong model dimension are rebuilt.
+
+## Vultr automatic backend releases
+
+The Vultr timer checks `main` every three minutes. It uses the public GitHub API
+to require a successful push run of `python-app.yml` for the exact commit, then
+switches the existing checkout and restarts `product-search-api.service`.
+The local `/api/health` endpoint must report ready within 120 seconds after
+the restart. The updater restores the previous revision on failure, checks its
+health, and holds the failed revision until `main` advances. Its recovery state
+also survives an interrupted deployment.
+
+The updater retains the existing environment, models and Python runtime.
+A requirements change needs a manual release with a compatible runtime to set
+a new rollback baseline. The timer keeps the checkout pinned to a tested
+commit and runs Git as `productsearch`.
+
+Install the deployment files from a CI-tested checkout as root:
+
+```sh
+install -D -m 0755 backend/scripts/deploy_vultr.py /usr/local/libexec/product-search-deploy.py
+install -m 0644 deploy/vultr/product-search-deploy.service deploy/vultr/product-search-deploy.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now product-search-deploy.timer
+systemctl start product-search-deploy.service
+```
+
+Use `journalctl -u product-search-deploy.service` to review releases and
+rollbacks, and `systemctl list-timers product-search-deploy.timer` to check
+the next run.
