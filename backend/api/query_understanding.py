@@ -164,14 +164,23 @@ def apply(payload, understanding, limit=None):
     A plain query with nothing to understand leaves the payload unchanged."""
     results = payload.get("results", [])
     if not understood(understanding):
-        return {**payload, "results": _limited(results, limit)} if limit else payload
+        if not limit:
+            return payload
+        limited = _limited(results, limit)
+        updated = {**payload, "results": limited}
+        if "total" in payload:
+            updated["total"] = len(limited)
+        return updated
     narrowing = filtering(understanding)
     if narrowing:
         results = [product for product in results if matches(product, understanding)]
-    updated = {**payload, "results": _limited(results, limit), "queryFilters": understanding}
+    limited = _limited(results, limit)
+    updated = {**payload, "results": limited, "queryFilters": understanding}
     warning = _notes(payload, understanding["price"])
     if warning:
         updated["warning"] = warning
+    if "total" in payload:
+        updated["total"] = len(limited)
     if narrowing and "candidateCount" in payload:
         updated["candidateCount"] = len(results)
     return updated

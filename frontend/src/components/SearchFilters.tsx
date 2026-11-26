@@ -7,8 +7,17 @@ import { SOURCE_LABELS, type SearchSource } from '@/lib/types';
 
 const inputClass = 'mt-2 w-full min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface-fff)] px-3 py-2.5 text-sm text-[var(--ink)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--sage)]';
 
-export default function SearchFilters({ onApplied, onCleared }: { onApplied: (filters: Preferences) => void; onCleared: () => void }) {
-  const resource = useAccountResource<Preferences>('/api/preferences');
+export type PreferencesResource = ReturnType<typeof useAccountResource<Preferences>>;
+
+export default function SearchFilters({
+  resource,
+  onApplied,
+  onCleared,
+}: {
+  resource: PreferencesResource;
+  onApplied: (filters: Preferences) => void;
+  onCleared: () => void;
+}) {
   const [form, setForm] = useState<Preferences | null>(null);
   const [categories, setCategories] = useState('');
   const [brands, setBrands] = useState('');

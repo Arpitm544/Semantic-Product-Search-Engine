@@ -201,6 +201,14 @@ def test_filler_words_do_not_match_unrelated_store_products():
     assert titles == ['Wireless Earbuds']
 
 
+def test_shopify_pagination_stops_when_page_adds_no_new_products():
+    repeated = [{**SHOPIFY_ROW, 'id': i + 1, 'handle': f'item-{i}'} for i in range(stores.SHOPIFY_PAGE_SIZE)]
+    provider = StoreProvider(SHOPIFY)
+    with robots(), patch.object(base.requests, 'get', return_value=response(payload={'products': repeated})) as get:
+        provider.search('cotton', 5)
+    assert get.call_count == 2
+
+
 
 def test_shopify_price_uses_an_available_variant():
     from api.shop_providers.stores import StoreConfig, shopify_product

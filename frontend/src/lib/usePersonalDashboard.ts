@@ -27,7 +27,7 @@ function appendHistory(old: PersonalData | null, result: { hasMore: boolean; ite
 
 export function usePersonalDashboard() {
   const request = useAuthenticatedFetch();
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const [data, setData] = useState<PersonalData | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(true);
@@ -36,6 +36,8 @@ export function usePersonalDashboard() {
   const [notice, setNotice] = useState('');
   const version = useRef(0);
   const userId = user?.id;
+  const ownerRef = useRef(userId);
+  ownerRef.current = userId;
   const blocked = Boolean(mutation) || busy;
   const load = useCallback(async () => {
     const current = ++version.current;
@@ -49,23 +51,26 @@ export function usePersonalDashboard() {
     } finally { applyIfCurrent(version, current, () => setBusy(false)); }
   }, [request]);
   useEffect(() => {
-    setData(null); setNotice(''); setConfirmClear(false);
-    if (userId) void load();
+    setData(null); setError(''); setNotice(''); setConfirmClear(false);
+    if (isLoaded && userId) void load();
+    else setBusy(!isLoaded);
     return () => { version.current++; };
-  }, [load, userId]);
+  }, [load, isLoaded, userId]);
 
   async function mutate(id?: string) {
     if (blocked) return;
+    const actingUser = userId;
     const change = historyDeletion(id);
     setMutation(change.mutation); setError(''); setNotice('');
     try {
       const response = await request(`${API_BASE}/api/search-history${change.path}`, { method: 'DELETE' });
       requireResponseOk(response, 'Could not delete search history. Please try again.');
+      if (ownerRef.current !== actingUser) return;
       setConfirmClear(false);
       setNotice(change.notice);
       await load();
-    } catch (reason) { setError(accountError(reason)); }
-    finally { setMutation(null); }
+    } catch (reason) { if (ownerRef.current === actingUser) setError(accountError(reason)); }
+    finally { if (ownerRef.current === actingUser) setMutation(null); }
   }
   async function loadMore() {
     if (!data) return;

@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DashboardData } from '@/lib/types';
 import { API_BASE, useAuthenticatedFetch } from '@/lib/api';
@@ -61,10 +62,15 @@ export default function CatalogPanel({ catalog }: { catalog: ReturnType<typeof u
 
   return <section id="catalog" className={card} aria-labelledby="catalog-title">
     <PanelHeader id="catalog-title" title="Explore the catalog" description={summary}
-      action={<label className="flex h-9 w-full items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 text-[var(--muted)] sm:w-60">
-        <Icon name="search" size={15} />
-        <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Filter products" aria-label="Filter catalog preview" disabled={!data} className="w-full bg-transparent text-[13px] text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" />
-      </label>} />
+      action={<div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 sm:w-auto">
+        <label className="flex h-9 w-full items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 text-[var(--muted)] focus-within:ring-2 focus-within:ring-[var(--accent)] sm:w-44">
+          <Icon name="search" size={15} />
+          <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Filter preview" aria-label="Filter preview" aria-describedby="catalog-preview-scope" disabled={!data} className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" />
+        </label>
+        <Link href={{ pathname: '/search', query: { source: 'mongo', q: query.trim() || undefined } }} className="inline-flex min-h-9 items-center gap-1 text-[13px] font-semibold text-[var(--accent)] hover:underline">
+          Search the full catalog <Icon name="arrow" size={14} />
+        </Link>
+      </div>} />
 
     {!!categories.length && <div className="flex gap-2 overflow-x-auto border-b border-[var(--line)] px-5 py-3 [scrollbar-width:thin]" role="group" aria-label="Filter by category">
       {['', ...categories].map(name => <button key={name || 'all'} type="button" aria-pressed={category === name} onClick={() => setCategory(name)}
@@ -85,9 +91,8 @@ export default function CatalogPanel({ catalog }: { catalog: ReturnType<typeof u
     </li>)}</ul>}
     {data && !products.length && <p className="px-5 py-8 text-center text-[13px] text-[var(--muted)]">No products in this preview match{query ? ` “${query}”` : ''}{category ? ` in ${category}` : ''}.</p>}
 
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] px-5 py-3 text-[12px] text-[var(--muted)]">
-      <span>{data ? `Preview of the first ${format(data.displayedProductCount ?? data.products.length)} records${data.sources?.catalog ? ` from ${data.sources.catalog}` : ''}` : 'Product catalog'}</span>
-      <a href="/search" className="inline-flex items-center gap-1 font-semibold text-[var(--accent)] hover:underline">Search the full catalog <Icon name="arrow" size={14} /></a>
-    </div>
+    <p id="catalog-preview-scope" className="border-t border-[var(--line)] px-5 py-3 text-[12px] text-[var(--muted)]">
+      {data ? `Preview of the first ${format(data.displayedProductCount ?? data.products.length)} records${data.sources?.catalog ? ` from ${data.sources.catalog}` : ''}` : 'Product catalog'}
+    </p>
   </section>;
 }

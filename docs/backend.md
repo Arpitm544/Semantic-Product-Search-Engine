@@ -91,7 +91,9 @@ Catalog changes should be published through this importer so the vector cache
 is rebuilt. Direct database edits do not automatically update the search index.
 An external application should use the same version-manifest protocol.
 
-Optional model overrides: `SEMANTIC_MODEL_PATH` and `RERANKER_MODEL_PATH`.
+Use `SEMANTIC_MODEL_PATH` and `RERANKER_MODEL_PATH` to override the inference
+models. The backend picks up `models/colab-export/esci-reranker` when installed
+with its calibration file. See [reranker training and calibration](colab-training.md#fine-tune-and-calibrate-the-reranker).
 Training checkpoints and original models can remain as backups. No retraining
 is performed by the backend.
 

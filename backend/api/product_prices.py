@@ -134,6 +134,11 @@ def apply_preferences(payload, preferences, source=None):
         notices.append('Saved preferences filter the returned candidates. Products with unavailable details for an active filter are excluded.')
     if skipped:
         notices.append(skipped_notice(skipped, source))
-    return {**payload, 'results': results, 'preferencesApplied': True,
-            'appliedPreferences': applied, 'skippedPreferences': skipped,
-            'warning': ' '.join(filter(None, notices))}
+    updated = {**payload, 'results': results, 'preferencesApplied': True,
+               'appliedPreferences': applied, 'skippedPreferences': skipped,
+               'warning': ' '.join(filter(None, notices))}
+    if 'total' in payload:
+        updated['total'] = len(results)
+    if applied and 'candidateCount' in payload:
+        updated['candidateCount'] = len(results)
+    return updated

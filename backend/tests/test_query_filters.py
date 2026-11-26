@@ -212,6 +212,67 @@ def test_the_price_chip_is_sent_as_a_query_parameter():
     assert qu.filter_choice(price="yes").price is False
 
 
+def test_shops_and_shopping_keep_candidates_until_after_filters(authenticated_api):
+    from api import main, shops_service
+    from api.account_features import Preferences
+
+    expensive = [
+        {"id": f"shop:{i}", "title": f"Shoe {i}", "price": 200, "currency": "USD", "rerankerScore": 5.0}
+        for i in range(25)
+    ]
+    affordable = [
+        {"id": f"shop:cheap-{i}", "title": f"Budget Shoe {i}", "price": 75, "currency": "USD", "rerankerScore": 2.0}
+        for i in range(3)
+    ]
+    all_candidates = expensive + affordable
+
+    class FakeRanker:
+        def rank(self, query, products):
+            return list(products)
+
+    with patch.object(main, "search_shops", side_effect=lambda q, limit=20: {
+        "query": q, "source": "shops", "results": list(all_candidates), "total": min(len(all_candidates), limit),
+        "limit": limit, "candidateCount": len(all_candidates), "providers": [],
+    }), patch.object(shops_service, "get_candidate_ranker", return_value=FakeRanker()):
+        client = TestClient(main.app)
+        body = client.get("/api/search", params={"q": "shoes under $100", "source": "shops", "price": "1"}).json()
+        assert [item["id"] for item in body["results"]] == [item["id"] for item in affordable]
+        assert body["total"] == 3
+
+    with patch.object(main, "search_shopping", return_value={
+        "query": "shoes", "source": "serpapi", "results": list(all_candidates), "total": len(all_candidates),
+    }) as search_mock, patch.object(main, "rank_shopping_response", side_effect=lambda payload: payload), \
+            patch.object(main, "load_preferences", return_value=Preferences(currency="USD", maxBudget=100).model_dump()):
+        client = TestClient(main.app)
+        body = client.get("/api/search", params={"q": "shoes", "source": "serpapi", "preferences": "1"}).json()
+        assert search_mock.call_args.kwargs["limit"] == 100
+        assert [item["id"] for item in body["results"]] == [item["id"] for item in affordable]
+        assert body["total"] == 3
+
+
+def test_catalog_preference_search_uses_full_pool_before_slicing(authenticated_api):
+    from api import main
+    from api.account_features import Preferences
+
+    other = [{"id": f"m:{i}", "title": f"Shoe {i}", "brand": "Other"} for i in range(25)]
+    nike = [{"id": f"n:{i}", "title": f"Nike Shoe {i}", "brand": "Nike"} for i in range(25)]
+    engine = Mock()
+    engine.products = catalog()
+    engine.search.return_value = {"results": other + nike, "candidateCount": 50}
+    prefs = Preferences(brands=["Nike"]).model_dump()
+    with patch.object(main.search_service, "_search_engine", engine), \
+            patch.object(main, "search_initializing", return_value=False), \
+            patch.object(main, "get_search_engine", return_value=engine), \
+            patch.object(main, "load_preferences", return_value=prefs), \
+            patch.object(main, "with_product_links", side_effect=lambda payload: payload):
+        client = TestClient(main.app)
+        body = client.get("/api/search", params={"q": "running shoes", "preferences": "1"}).json()
+        assert engine.search.call_args.kwargs["limit"] == 500
+        assert len(body["results"]) == 20
+        assert all(item["brand"] == "Nike" for item in body["results"])
+        assert body["candidateCount"] == 25
+
+
 
 @pytest.mark.parametrize("params", [{"brand": "Sony"}, {"preferences": "1"}])
 def test_catalog_filters_allow_matches_beyond_the_normal_retrieval_depth(authenticated_api, params):
@@ -219,6 +280,7 @@ def test_catalog_filters_allow_matches_beyond_the_normal_retrieval_depth(authent
     from api import main
     from api.account_features import Preferences
     from src.search.product_search import ProductSearch
+    from src.search.ranking import PipelineParams
 
     items = [{"id": f"p{i:03}", "title": "Wireless headphones",
               "brand": "Other" if i < 60 else "Sony"} for i in range(65)]
@@ -226,7 +288,7 @@ def test_catalog_filters_allow_matches_beyond_the_normal_retrieval_depth(authent
     meaning.search.side_effect = lambda query, top_k: [(item, 0.9) for item in items[:top_k]]
     reranker = Mock()
     reranker.predict.side_effect = lambda pairs, **kwargs: [0.0] * len(pairs)
-    engine = ProductSearch(items, meaning, reranker)
+    engine = ProductSearch(items, meaning, reranker, params=PipelineParams(rerank_k=3))
     prefs = Preferences(brands=["Sony"]).model_dump()
     with patch.object(main.search_service, "_search_engine", engine), \
             patch.object(main, "get_search_engine", return_value=engine), \
@@ -236,7 +298,7 @@ def test_catalog_filters_allow_matches_beyond_the_normal_retrieval_depth(authent
     assert response.status_code == 200
     found = response.json()["results"]
     assert found and all(item["brand"] == "Sony" for item in found)
-    assert len(found) == 5
+    assert len(found) == 3
     assert len(reranker.predict.call_args.args[0]) == len(found)
 
 

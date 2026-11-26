@@ -5,7 +5,7 @@ Everything is kept in memory with fixed limits, so memory never grows:
 - request and search timings keep only the latest WINDOW entries;
 - searches that found nothing good keep only the latest ZERO_KEEP texts
   (no user IDs). "Nothing good" means no results, or no result the careful
-  check (cross-encoder) scores above the same floor the shop search uses.
+  check (cross-encoder) estimates to be at least 20% likely to be relevant.
 Numbers start again from zero when the server restarts.
 
 Request logs are written as JSON to standard output and omit search text and
@@ -25,7 +25,7 @@ from threading import Lock
 from time import perf_counter, time
 from uuid import uuid4
 
-from api.shops_service import RELEVANCE_FLOOR
+from src.search.relevance import RELEVANCE_THRESHOLD
 from src.evaluation.metrics import percentile
 
 WINDOW = 1000          # latest searches whose step timings are kept
@@ -115,11 +115,17 @@ def timed(stage, function, observe=None):
     return wrapper
 
 
+_instrument_lock = Lock()
+
+
 def instrument(target, stage, method, observe=None):
     """Time `target.method` in place; safe to call again."""
-    function = getattr(target, method, None) if target is not None else None
-    if callable(function) and getattr(function, "_observed", False) is not True:
-        setattr(target, method, timed(stage, function, observe))
+    if target is None:
+        return
+    with _instrument_lock:
+        function = getattr(target, method, None)
+        if callable(function) and getattr(function, "_observed", False) is not True:
+            setattr(target, method, timed(stage, function, observe))
 
 
 def instrument_engines(engine, ranker):
@@ -217,7 +223,7 @@ class Metrics:
                     "total": searches, "bySource": dict(self.searches),
                     "zeroResults": zero, "noCloseMatch": weak,
                     "missRate": (zero + weak) / searches if searches else 0.0,
-                    "closeMatchFloor": RELEVANCE_FLOOR,
+                    "closeMatchFloor": RELEVANCE_THRESHOLD,
                     "stages": {stage: _summary(t[stage] for t in self.search_timings if stage in t) for stage in STAGES},
                 },
                 "zeroResultSearches": self._zero_summary() if include_queries else None,
@@ -236,11 +242,11 @@ class Metrics:
                 for key in ordered]
 
 
-def miss_reason(result_count, top_score):
+def miss_reason(result_count, top_probability):
     """Why a search found nothing good, or None when it did."""
     if result_count == 0:
         return "no-results"
-    if top_score is not None and top_score < RELEVANCE_FLOOR:
+    if top_probability is not None and top_probability < RELEVANCE_THRESHOLD:
         return "no-close-match"
     return None
 
@@ -288,10 +294,13 @@ def record_search_outcome(source, payload, query):
     record = current_request.get()
     if record is None:
         return
-    results = len(payload.get("results", [])) if isinstance(payload, dict) else 0
+    results = payload.get("results", []) if isinstance(payload, dict) else []
+    probabilities = [item.get("relevanceProbability") for item in results]
+    top_probability = max(probabilities) if probabilities and None not in probabilities else None
     total = (perf_counter() - record.started) * 1000
     stages = search_stages(record.stages, total)
-    record.details.update(source=source, results=results, stagesMs=stages)
+    record.details.update(source=source, results=len(results), stagesMs=stages,
+                          topRelevanceProbability=top_probability)
     # A blank search has nothing to find, so it is never counted as a miss.
-    reason = miss_reason(results, record.details.get("topScore")) if query.strip() else None
+    reason = miss_reason(len(results), top_probability) if query.strip() else None
     metrics.record_search(source, query, stages, reason)

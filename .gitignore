@@ -26,6 +26,7 @@ backend/data/dataset/raw/*
 !backend/data/dataset/raw/source.json
 backend/models/
 backend/colab/*.zip
+backend/colab/reranker/
 backend/colab/bundle_build_manifest.json
 
 # Share configuration examples; keep credentials and generated caches private

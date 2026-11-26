@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.evaluation import metrics
+from src.evaluation.inference import COMPARISONS, infer, paired_p_values
 from src.evaluation.pipeline import (
     STAGES, ExactSemanticSearch, StageRunner, build_engines, build_report, evaluate,
 )
@@ -120,6 +121,7 @@ def test_report_summarizes_stages_buckets_and_examples(engines):
     report = build_report(per_query, latencies, engine.by_id, {"split": "test"})
 
     assert report["queryCount"] == 3 and report["split"] == "test"
+    assert report["version"] == 2
     assert [stage["id"] for stage in report["stages"]] == [stage_id for stage_id, _, _ in STAGES]
     for stage in report["stages"]:
         assert stage["metrics"]["all"]["queries"] == 3
@@ -128,11 +130,51 @@ def test_report_summarizes_stages_buckets_and_examples(engines):
         assert set(stage["byTypoKind"]) == {"deletion"}
         assert 0 <= stage["metrics"]["all"]["ndcg@10"] <= 1
         assert stage["latencyMs"]["p95"] >= stage["latencyMs"]["p50"] >= 0
+        assert stage["metrics"]["all"]["families"] == 2
+        assert stage["metrics"]["typo"]["confidenceIntervals"] is None
+        assert set(stage["metrics"]["all"]["confidenceIntervals"]) == set(metrics.METRIC_NAMES)
+        assert set(stage["latencyConfidenceIntervals"]) == {"p50", "p95", "mean"}
+        for low, high in stage["metrics"]["all"]["confidenceIntervals"].values():
+            assert 0 <= low <= high <= 1
+    assert not report["statistics"]["comparisons"]["typo"]
+    assert [(test["baseline"], test["candidate"]) for test in report["statistics"]["comparisons"]["all"]] == list(COMPARISONS)
     families = [example["query"] for example in report["examples"]["wins"]]
     assert len(families) == 2  # one example per query family
     assert all(item["grade"] in {"Exact", "Substitute", "Complement", "Irrelevant", "Unjudged"}
                for example in report["examples"]["wins"] for item in example["rerankedTop"])
     json.dumps(report)  # must be serializable for the API
+
+
+def test_paired_randomization_counts_ties_and_swaps_whole_families():
+    # The second metric has one nonzero family. A swap can change its sign but never its magnitude.
+    differences = np.column_stack((np.ones(16), [100.0] + [0.0] * 15, np.zeros(16)))
+    changed, one_family, unchanged = paired_p_values(differences, np.random.default_rng(42))
+    assert 0 < changed < 0.01
+    assert one_family == unchanged == 1
+
+
+def test_inference_uses_query_weighted_effects_and_adjusts_for_multiple_tests():
+    stage_ids = [stage_id for stage_id, _, _ in STAGES]
+    rows = []
+    for family in range(20):
+        for _ in range(2 if family == 0 else 1):
+            rows.append({"kind": "clean", "bucket": "clean", "family": family, "stages": {
+                stage_id: dict.fromkeys(metrics.METRIC_NAMES, (1.0 if family == 0 else 0.5) if stage_id == "reranked" else 0.0)
+                for stage_id in stage_ids
+            }})
+    stages = [{"id": stage_id, "metrics": {key: {} for key in ("all", "clean", "typo")}} for stage_id in stage_ids]
+    latencies = {stage_id: [10.0] * len(rows) for stage_id in stage_ids}
+    statistics = infer(rows, latencies, stages)
+    reranking = next(test for test in statistics["comparisons"]["all"] if test["baseline"] == "hybrid")
+    ndcg = reranking["metrics"]["ndcg@10"]
+    assert ndcg["delta"] == pytest.approx(11.5 / 21)
+    low, high = ndcg["confidenceInterval"]
+    assert low <= ndcg["delta"] <= high
+    assert 0 < ndcg["pValue"] < ndcg["adjustedPValue"] < statistics["alpha"]
+    assert ndcg["significant"] is True
+    unchanged = statistics["comparisons"]["all"][0]["metrics"]["ndcg@10"]
+    assert unchanged["adjustedPValue"] == 1 and unchanged["significant"] is False
+    assert stages[0]["latencyConfidenceIntervals"] == {key: [10.0, 10.0] for key in ("p50", "p95", "mean")}
 
 
 # ---------------------------------------------------------------- API

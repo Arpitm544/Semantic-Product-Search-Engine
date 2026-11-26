@@ -32,6 +32,19 @@ function foundBy(explanation: Explanation) {
   return lines;
 }
 
+/** With the learned ranker, a model weighed every signal; name the ones that mattered most here. */
+function LearnedReason({ factors }: { factors: NonNullable<Explanation['learnedFactors']> }) {
+  return <>
+    A ranking model trained on Amazon shopping judgments weighed all of these signals together.
+    {factors.length > 0 && <span className="mt-1.5 flex flex-wrap gap-1.5">
+      {factors.map(factor => <span key={factor.feature} className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[11px]">
+        <span aria-hidden="true">{factor.effect > 0 ? '▲' : '▼'}</span> {factor.label}
+        <span className="sr-only">{factor.effect > 0 ? ' raised it' : ' lowered it'}</span>
+      </span>)}
+    </span>}
+  </>;
+}
+
 /** "Why this result?": the numbers the search used, in the shopper's words. */
 export default function ResultExplanation({ explanation, position }: { explanation: Explanation; position: number }) {
   const { weights } = explanation;
@@ -50,11 +63,13 @@ export default function ResultExplanation({ explanation, position }: { explanati
         A second model read your search together with this product and ranked it <strong>#{explanation.rerankerRank}</strong> of {explanation.candidateCount} candidates.
       </Row>
       <Row label={`Why #${position}`}>
-        Candidates are ordered {pct(weights.retrieval)} by how they were found (#{explanation.retrievalRank}) and {pct(weights.reranker)} by the careful check (#{explanation.rerankerRank}).
-        <span className="mt-1.5 flex h-1.5 overflow-hidden rounded-full" aria-hidden="true">
-          <span className="bg-[var(--accent)] opacity-40" style={{ width: pct(weights.retrieval) }} />
-          <span className="bg-[var(--accent)]" style={{ width: pct(weights.reranker) }} />
-        </span>
+        {explanation.ranker === 'learned' ? <LearnedReason factors={explanation.learnedFactors ?? []} /> : <>
+          Candidates are ordered {pct(weights.retrieval)} by how they were found (#{explanation.retrievalRank}) and {pct(weights.reranker)} by the careful check (#{explanation.rerankerRank}).
+          <span className="mt-1.5 flex h-1.5 overflow-hidden rounded-full" aria-hidden="true">
+            <span className="bg-[var(--accent)] opacity-40" style={{ width: pct(weights.retrieval) }} />
+            <span className="bg-[var(--accent)]" style={{ width: pct(weights.reranker) }} />
+          </span>
+        </>}
       </Row>
     </dl>
   </details>;

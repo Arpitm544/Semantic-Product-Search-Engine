@@ -14,16 +14,13 @@ from api.ranking_service import get_candidate_ranker
 from api.shop_providers import enabled_providers
 from api.shop_providers.base import ProviderError
 from api.shopping_service import ShoppingError
+from src.search.relevance import RELEVANCE_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
 PER_PROVIDER = 10
 # Candidates gathered across all shops before ranking; the top `limit` are kept.
 MAX_CANDIDATES = 100
-# The cross-encoder scores clear matches far above zero and unrelated products
-# far below it (about +8 versus -11 in practice). Results under this floor are
-# dropped once at least one result clears it, so a search never ends up empty.
-RELEVANCE_FLOOR = -5.0
 DEADLINE_SECONDS = 15
 CACHE_SECONDS = 300
 CACHE_SIZE = 256
@@ -118,9 +115,11 @@ def search_shops(query, limit=20):
 
 
 def relevant(results):
-    """Drop clearly unrelated results. Returns (results, close_match_found);
-    when nothing clears the floor, every result is kept so the search isn't empty."""
-    kept = [item for item in results if item.get('rerankerScore', 0) >= RELEVANCE_FLOOR]
+    """Keep low-probability alternatives when there are no close matches."""
+    probabilities = [item.get('relevanceProbability') for item in results]
+    if not results or any(probability is None for probability in probabilities):
+        return results, None
+    kept = [item for item, probability in zip(results, probabilities) if probability >= RELEVANCE_THRESHOLD]
     return (kept, True) if kept else (results, False)
 
 
@@ -142,7 +141,7 @@ def rank_shops_response(response):
                 'warning': ' '.join(filter(None, [response.get('warning'), notice]))}
     results, close_match = relevant(ranked)
     results = results[:limit]
-    if not close_match:
+    if close_match is False:
         notice = 'No close matches in the online shops; showing the nearest products.'
         response['warning'] = ' '.join(filter(None, [response.get('warning'), notice]))
         response['warningCode'] = 'shops_no_close_match'

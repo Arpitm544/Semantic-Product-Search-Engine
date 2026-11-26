@@ -41,6 +41,7 @@ export interface SearchProduct {
   tags?: string[];
   provider?: string;
   matchSources?: string[];
+  relevanceProbability?: number | null;
   explanation?: ResultExplanation;
 }
 
@@ -58,6 +59,10 @@ export interface ResultExplanation {
   rerankerScore: number | null;
   blendedScore: number;
   weights: { retrieval: number; reranker: number };
+  /** 'learned' when the LambdaMART model ordered the results (SEARCH_RANKER=learned). */
+  ranker?: 'learned' | 'blend';
+  /** The features that moved this product's learned score most; effect > 0 raised it. */
+  learnedFactors?: { feature: string; label: string; effect: number }[];
 }
 
 export interface DashboardData {

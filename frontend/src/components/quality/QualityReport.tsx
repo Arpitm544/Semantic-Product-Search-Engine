@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { API_BASE } from '@/lib/api';
-import { METRICS, SEGMENTS, type MetricKey, type QualityExample, type QualityReport, type QualityStage, type Segment } from '@/lib/quality';
+import { METRICS, SEGMENTS, type ConfidenceInterval, type MetricKey, type QualityExample, type QualityReport, type QualityStage, type Segment } from '@/lib/quality';
 import { Icon, PanelHeader, Skeleton, card, ghostButton, heading } from '@/components/dashboard/ui';
 
 const fmt = (value: number) => value.toFixed(3);
@@ -10,6 +10,10 @@ const ms = (value: number) => (value >= 100 ? `${Math.round(value)} ms` : `${val
 const relative = (value: number, base: number) => (base > 0 ? (value - base) / base : 0);
 const signed = (value: number) => `${value >= 0 ? '+' : '−'}${Math.abs(Math.round(value * 100))}%`;
 const niceMax = (value: number) => Math.min(1, Math.max(0.2, Math.ceil(value * 10 + 0.5) / 10));
+const formatBound = (value: number) => value !== 0 && Math.abs(value) < 0.0005 ? value.toPrecision(2) : fmt(value);
+const range = ([lower, upper]: ConfidenceInterval, format = formatBound) => `${format(lower)} to ${format(upper)}`;
+const intervalLabel = (interval: ConfidenceInterval | undefined, format = formatBound) => interval ? `95% CI ${range(interval, format)}` : '';
+const pValue = (value: number) => value.toPrecision(5);
 
 function useQualityReport() {
   const [report, setReport] = useState<QualityReport | null>(null);
@@ -73,43 +77,100 @@ function Axis({ max, labels }: { max: number; labels: boolean }) {
   </div>;
 }
 
+function ErrorBar({ interval, max, position = 'top-1/2' }: { interval?: ConfidenceInterval; max: number; position?: string }) {
+  if (!interval) return null;
+  const [lower, upper] = interval;
+  return <span aria-hidden="true" className={`pointer-events-none absolute ${position} h-2.5 min-w-px -translate-y-1/2 text-[var(--ink)] [filter:drop-shadow(0_0_1px_var(--paper))] before:absolute before:inset-x-0 before:top-1/2 before:border-t-2 before:border-current after:absolute after:inset-y-0 after:inset-x-0 after:border-x after:border-current`}
+    style={{ left: `${lower / max * 100}%`, width: `${(upper - lower) / max * 100}%` }} />;
+}
+
 function StageLadder({ stages, metric, segment }: { stages: QualityStage[]; metric: MetricKey; segment: Segment }) {
   const values = stages.map(stage => stage.metrics[segment][metric]);
-  const max = niceMax(Math.max(...values));
+  const max = niceMax(Math.max(...values, ...stages.map(stage => stage.metrics[segment].confidenceIntervals?.[metric][1] ?? 0)));
   const base = values[0];
   const metricLabel = METRICS.find(item => item.key === metric)!.name.toLowerCase();
   return <ol className="space-y-3 pb-6">
     {stages.map((stage, index) => {
       const value = values[index];
+      const summary = stage.metrics[segment];
+      const interval = summary.confidenceIntervals?.[metric];
       const served = stage.id === 'reranked';
-      return <li key={stage.id} className="grid grid-cols-[minmax(0,1fr)] items-center gap-x-4 gap-y-1.5 sm:grid-cols-[180px_minmax(0,1fr)_92px]">
+      return <li key={stage.id} className="grid grid-cols-[minmax(0,1fr)] items-center gap-x-4 gap-y-1.5 sm:grid-cols-[180px_minmax(0,1fr)_132px]">
         <span className="text-[13px] font-medium">{stage.label}{served && <span className="ml-2 rounded-full bg-[var(--sage)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent)]">served</span>}</span>
+        <span className="text-[13px] sm:order-1 sm:text-right">
+          <strong className="tabular-nums">{summary.queries ? fmt(value) : '—'}</strong>
+          {index > 0 && base > 0 && <span className="ml-2 text-[11.5px] tabular-nums text-[var(--muted)]">{signed(relative(value, base))}</span>}
+          {interval && <span className="block text-[11px] tabular-nums text-[var(--muted)]">{range(interval)}</span>}
+        </span>
         <span className="relative h-7">
           <Axis max={max} labels={index === stages.length - 1} />
-          <Tip label={`${stage.label}: ${metricLabel} ${fmt(value)}`} className="absolute inset-y-1 left-0" tip={<>
+          {summary.queries > 0 && <Tip label={`${stage.label}, ${metricLabel} ${fmt(value)}. ${intervalLabel(interval)}`} className="absolute inset-x-0 inset-y-1" tip={<>
             <strong className="block text-[13px]">{fmt(value)} {metricLabel}</strong>
-            <span className="block text-[var(--muted)]">{stage.label} · {stage.metrics[segment].queries} queries</span>
+            {interval && <span className="block">{intervalLabel(interval)}</span>}
+            <span className="block text-[var(--muted)]">{stage.label} · {summary.queries} queries</span>
             <span className="mt-1 block">{stage.description}</span>
           </>}>
             <span className="block h-5 rounded-r-[4px] bg-[var(--accent)] transition-[width] duration-500" style={{ width: `${Math.max(1, (value / max) * 100)}%`, minWidth: 4, opacity: served ? 1 : 0.55 }} />
-          </Tip>
-        </span>
-        <span className="flex items-baseline gap-2 text-[13px] sm:justify-end">
-          <strong className="tabular-nums">{fmt(value)}</strong>
-          {index > 0 && <span className="text-[11.5px] tabular-nums text-[var(--muted)]">{signed(relative(value, base))}</span>}
+            <ErrorBar interval={interval} max={max} />
+          </Tip>}
         </span>
       </li>;
     })}
   </ol>;
 }
 
+function StageComparisons({ report, metric, segment }: { report: QualityReport; metric: MetricKey; segment: Segment }) {
+  const statistics = report.statistics;
+  if (!statistics) return <p className="px-5 pb-4 text-[13px] text-[var(--muted)]">Run the evaluation again to add confidence intervals and significance tests.</p>;
+  const tests = statistics.comparisons[segment];
+  if (!tests.length) return <p className="px-5 pb-4 text-[13px] text-[var(--muted)]">Confidence intervals and significance tests require at least two query families.</p>;
+  const labels = Object.fromEntries(report.stages.map(stage => [stage.id, stage.label.replace(/^\+ /, '')]));
+  const families = report.stages[0].metrics[segment].families;
+
+  return <div className="border-t border-[var(--line)]">
+    <h3 className="px-5 pt-4 text-[14px] font-semibold">Paired stage comparisons</h3>
+    <p id="comparison-method" className="px-5 pb-3 pt-1 text-[12px] text-[var(--muted)]">
+      Two-sided randomization tests on {families?.toLocaleString()} query families with {statistics.randomizationSamples.toLocaleString()} random assignments.
+      {' '}Significant at adjusted p &lt; {statistics.alpha}. Holm adjustment covers all stage comparisons, ranking metrics, and search groups.
+    </p>
+    <div className="overflow-x-auto">
+      <table aria-describedby="comparison-method" className="w-full min-w-[610px] border-collapse text-[13px]">
+        <caption className="sr-only">Paired comparisons for {metric}</caption>
+        <thead><tr className="text-left text-[12px] text-[var(--muted)]">
+          <th scope="col" className="px-5 py-2 font-medium">Baseline → candidate</th>
+          <th scope="col" className="px-3 py-2 text-right font-medium">Change (95% CI)</th>
+          <th scope="col" className="px-3 py-2 text-right font-medium">Raw p</th>
+          <th scope="col" className="px-3 py-2 text-right font-medium">Adjusted p</th>
+          <th scope="col" className="px-5 py-2 font-medium">Result</th>
+        </tr></thead>
+        <tbody>{tests.map(({ baseline, candidate, metrics }) => {
+          const result = metrics[metric];
+          return <tr key={`${baseline}-${candidate}`} className="border-t border-[var(--line)]">
+            <th scope="row" className="px-5 py-2.5 text-left font-medium">{labels[baseline]} → {labels[candidate]}</th>
+            <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
+              <strong>{result.delta > 0 ? '+' : ''}{fmt(result.delta)}</strong>
+              <span className="block text-[11px] text-[var(--muted)]">{range(result.confidenceInterval)}</span>
+            </td>
+            <td className="px-3 py-2.5 text-right tabular-nums">{pValue(result.pValue)}</td>
+            <td className="px-3 py-2.5 text-right tabular-nums">{pValue(result.adjustedPValue)}</td>
+            <td className={`whitespace-nowrap px-5 py-2.5 ${result.significant ? 'font-semibold text-[var(--accent)]' : 'text-[var(--muted)]'}`}>
+              {result.significant ? 'Significant' : 'Not significant'}
+            </td>
+          </tr>;
+        })}</tbody>
+      </table>
+    </div>
+  </div>;
+}
+
 function CleanVsTypo({ stages, metric }: { stages: QualityStage[]; metric: MetricKey }) {
-  const max = niceMax(Math.max(...stages.flatMap(stage => [stage.metrics.clean[metric], stage.metrics.typo[metric]])));
   const metricLabel = METRICS.find(item => item.key === metric)!.name.toLowerCase();
   const series = [
     { key: 'clean' as const, label: 'Typed correctly', color: 'var(--series-clean)' },
     { key: 'typo' as const, label: 'With a typo', color: 'var(--series-typo)' },
   ];
+  const max = niceMax(Math.max(...stages.flatMap(stage => series.map(({ key }) =>
+    Math.max(stage.metrics[key][metric], stage.metrics[key].confidenceIntervals?.[metric][1] ?? 0)))));
   return <div className="quality-viz px-5 pb-5 pt-4">
     <ul aria-label="Legend" className="mb-4 flex flex-wrap gap-4 text-[12.5px] text-[var(--muted)]">
       {series.map(item => <li key={item.key} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: item.color }} />{item.label}</li>)}
@@ -118,16 +179,23 @@ function CleanVsTypo({ stages, metric }: { stages: QualityStage[]; metric: Metri
       {stages.map((stage, index) => <li key={stage.id} className="grid grid-cols-[minmax(0,1fr)] items-center gap-x-4 gap-y-1 sm:grid-cols-[180px_minmax(0,1fr)]">
         <span className="text-[13px] font-medium">{stage.label}</span>
         <span className="relative block">
-          <Axis max={max} labels={index === stages.length - 1} />
+          <span className="pointer-events-none absolute inset-y-0 left-0 right-14"><Axis max={max} labels={index === stages.length - 1} /></span>
           <span className="relative flex flex-col gap-[2px]">
             {series.map(item => {
-              const value = stage.metrics[item.key][metric];
-              return <Tip key={item.key} label={`${stage.label}, ${item.label}: ${metricLabel} ${fmt(value)}`} tip={<>
+              const summary = stage.metrics[item.key];
+              const value = summary[metric];
+              const interval = summary.confidenceIntervals?.[metric];
+              if (!summary.queries) return <span key={item.key} className="block h-5 text-right text-[11.5px] text-[var(--muted)]" aria-label={`${item.label}: no queries`}>—</span>;
+              return <Tip key={item.key} label={`${stage.label}, ${item.label}, ${metricLabel} ${fmt(value)}. ${intervalLabel(interval)}`} tip={<>
                 <strong className="block text-[13px]">{fmt(value)} {metricLabel}</strong>
+                {interval && <span className="block">{intervalLabel(interval)}</span>}
                 <span className="block text-[var(--muted)]">{item.label} · {stage.label}</span>
-              </>} className="flex items-center gap-2">
-                <span className="block h-3.5 rounded-r-[4px]" style={{ width: `${Math.max(0.5, (value / max) * 100)}%`, minWidth: 4, background: item.color }} />
-                <span className="text-[11.5px] tabular-nums text-[var(--muted)]">{fmt(value)}</span>
+              </>} className="grid grid-cols-[minmax(0,1fr)_56px] items-center">
+                <span className="relative block">
+                  <span className="block h-3.5 rounded-r-[4px]" style={{ width: `${Math.max(0.5, (value / max) * 100)}%`, minWidth: 4, background: item.color }} />
+                  <ErrorBar interval={interval} max={max} />
+                </span>
+                <span className="text-right text-[11.5px] tabular-nums text-[var(--muted)]">{fmt(value)}</span>
               </Tip>;
             })}
           </span>
@@ -138,7 +206,8 @@ function CleanVsTypo({ stages, metric }: { stages: QualityStage[]; metric: Metri
 }
 
 function Latency({ stages }: { stages: QualityStage[] }) {
-  const max = Math.max(...stages.map(stage => stage.latencyMs.p95)) || 1;
+  const max = Math.max(...stages.flatMap(stage => [stage.latencyMs.p50, stage.latencyMs.p95,
+    stage.latencyConfidenceIntervals?.p50[1] ?? 0, stage.latencyConfidenceIntervals?.p95[1] ?? 0])) || 1;
   return <div className="px-5 pb-5 pt-4">
     <ul aria-label="Legend" className="mb-4 flex flex-wrap gap-4 text-[12.5px] text-[var(--muted)]">
       <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[2px] bg-[var(--accent)]" />Typical (median)</li>
@@ -147,13 +216,17 @@ function Latency({ stages }: { stages: QualityStage[] }) {
     <ol className="space-y-3">
       {stages.map(stage => <li key={stage.id} className="grid grid-cols-[minmax(0,1fr)] items-center gap-x-4 gap-y-1 sm:grid-cols-[180px_minmax(0,1fr)_120px]">
         <span className="text-[13px] font-medium">{stage.label}</span>
-        <Tip label={`${stage.label}: median ${ms(stage.latencyMs.p50)}, p95 ${ms(stage.latencyMs.p95)}`} tip={<>
+        <Tip label={`${stage.label}, median ${ms(stage.latencyMs.p50)} ${intervalLabel(stage.latencyConfidenceIntervals?.p50, ms)}, p95 ${ms(stage.latencyMs.p95)} ${intervalLabel(stage.latencyConfidenceIntervals?.p95, ms)}, mean ${ms(stage.latencyMs.mean)} ${intervalLabel(stage.latencyConfidenceIntervals?.mean, ms)}`} tip={<>
           <strong className="block text-[13px]">{ms(stage.latencyMs.p50)} median</strong>
-          <span className="block">{ms(stage.latencyMs.p95)} p95 · {ms(stage.latencyMs.mean)} mean</span>
+          <span className="block">{intervalLabel(stage.latencyConfidenceIntervals?.p50, ms)}</span>
+          <span className="block">{ms(stage.latencyMs.p95)} p95 {intervalLabel(stage.latencyConfidenceIntervals?.p95, ms)}</span>
+          <span className="block">{ms(stage.latencyMs.mean)} mean {intervalLabel(stage.latencyConfidenceIntervals?.mean, ms)}</span>
           <span className="block text-[var(--muted)]">{stage.id === 'reranked' ? 'Hybrid retrieval plus cross-encoder rescoring.' : 'Time for this stage alone.'}</span>
-        </>} className="relative h-5">
-          <span className="absolute inset-y-0 left-0 rounded-r-[4px] bg-[var(--accent)] opacity-30" style={{ width: `${(stage.latencyMs.p95 / max) * 100}%`, minWidth: 4 }} />
-          <span className="absolute inset-y-0 left-0 rounded-r-[4px] bg-[var(--accent)]" style={{ width: `${(stage.latencyMs.p50 / max) * 100}%`, minWidth: 4 }} />
+        </>} className="relative h-7">
+          <span className="absolute bottom-0 left-0 h-3.5 rounded-r-[4px] bg-[var(--accent)] opacity-30" style={{ width: `${(stage.latencyMs.p95 / max) * 100}%`, minWidth: 4 }} />
+          <span className="absolute left-0 top-0 h-3.5 rounded-r-[4px] bg-[var(--accent)]" style={{ width: `${(stage.latencyMs.p50 / max) * 100}%`, minWidth: 4 }} />
+          <ErrorBar interval={stage.latencyConfidenceIntervals?.p50} max={max} position="top-1/4" />
+          <ErrorBar interval={stage.latencyConfidenceIntervals?.p95} max={max} position="top-3/4" />
         </Tip>
         <span className="text-[12.5px] tabular-nums sm:text-right"><strong>{ms(stage.latencyMs.p50)}</strong> <span className="text-[var(--muted)]">/ {ms(stage.latencyMs.p95)}</span></span>
       </li>)}
@@ -174,13 +247,21 @@ function TypoKinds({ stages }: { stages: QualityStage[] }) {
       </tr></thead>
       <tbody>
         <tr className="border-t border-[var(--line)] bg-[var(--sage)]/40"><td className="px-5 py-2.5 font-medium">Typed correctly</td>
-          {shown.map(stage => <td key={stage.id} className="px-3 py-2.5 text-right tabular-nums">{fmt(clean[stage.id])}</td>)}</tr>
+          {shown.map(stage => <td key={stage.id} className="px-3 py-2.5 text-right tabular-nums">
+            {stage.metrics.clean.queries ? fmt(clean[stage.id]) : '—'}
+            <span className="block text-[11px] text-[var(--muted)]">{intervalLabel(stage.metrics.clean.confidenceIntervals?.['ndcg@10'])}</span>
+          </td>)}</tr>
         {kinds.map(kind => <tr key={kind} className="border-t border-[var(--line)]">
           <td className="px-5 py-2.5 capitalize">{kind}</td>
           {shown.map(stage => {
-            const value = stage.byTypoKind[kind]?.['ndcg@10'] ?? 0;
+            const summary = stage.byTypoKind[kind];
+            if (!summary) return <td key={stage.id} className="px-3 py-2.5 text-right">—</td>;
+            const value = summary['ndcg@10'];
             const kept = clean[stage.id] > 0 ? value / clean[stage.id] : 0;
-            return <td key={stage.id} className="px-3 py-2.5 text-right tabular-nums">{fmt(value)} <span className="text-[11px] text-[var(--muted)]">({pct(kept)} kept)</span></td>;
+            return <td key={stage.id} className="px-3 py-2.5 text-right tabular-nums">
+              {fmt(value)} {clean[stage.id] > 0 && <span className="text-[11px] text-[var(--muted)]">({pct(kept)} kept)</span>}
+              <span className="block text-[11px] text-[var(--muted)]">{intervalLabel(summary.confidenceIntervals?.['ndcg@10'])}</span>
+            </td>;
           })}
         </tr>)}
       </tbody>
@@ -196,13 +277,19 @@ function FullTable({ stages }: { stages: QualityStage[] }) {
         <th className="px-5 py-2.5 font-medium">Stage</th>
         {METRICS.map(metric => <th key={metric.key} className="px-3 py-2.5 text-right font-medium" title={metric.help}>{metric.name}<span className="block text-[11px] font-normal">{metric.label}</span></th>)}
         <th className="px-3 py-2.5 text-right font-medium">Typical time<span className="block text-[11px] font-normal">p50</span></th>
-        <th className="px-5 py-2.5 text-right font-medium">Slowest 5%<span className="block text-[11px] font-normal">p95</span></th>
+        <th className="px-3 py-2.5 text-right font-medium">Slowest 5%<span className="block text-[11px] font-normal">p95</span></th>
+        <th className="px-5 py-2.5 text-right font-medium">Mean time</th>
       </tr></thead>
       <tbody>{stages.map(stage => <tr key={stage.id} className={`border-t border-[var(--line)] ${stage.id === 'reranked' ? 'font-semibold' : ''}`}>
         <td className="px-5 py-2.5">{stage.label}</td>
-        {METRICS.map(metric => <td key={metric.key} className="px-3 py-2.5 text-right tabular-nums">{fmt(stage.metrics.all[metric.key])}</td>)}
-        <td className="px-3 py-2.5 text-right tabular-nums">{ms(stage.latencyMs.p50)}</td>
-        <td className="px-5 py-2.5 text-right tabular-nums">{ms(stage.latencyMs.p95)}</td>
+        {METRICS.map(metric => <td key={metric.key} className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
+          {fmt(stage.metrics.all[metric.key])}
+          <span className="block text-[11px] font-normal text-[var(--muted)]">{intervalLabel(stage.metrics.all.confidenceIntervals?.[metric.key])}</span>
+        </td>)}
+        {(['p50', 'p95', 'mean'] as const).map(key => <td key={key} className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums last:pr-5">
+          {ms(stage.latencyMs[key])}
+          <span className="block text-[11px] font-normal text-[var(--muted)]">{intervalLabel(stage.latencyConfidenceIntervals?.[key], ms)}</span>
+        </td>)}
       </tr>)}</tbody>
     </table>
   </div>;
@@ -240,7 +327,7 @@ function Examples({ examples }: { examples: QualityExample[] }) {
       </ul>
     </div>
     <ol className="divide-y divide-[var(--line)]">
-      {examples.map(example => <li key={example.query} className="px-5 py-5">
+      {examples.map((example, index) => <li key={`${example.query}:${index}`} className="px-5 py-5">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <p className="min-w-0">
             <strong className="text-[14px]">“{example.query}”</strong>
@@ -355,10 +442,15 @@ export default function QualityReportView() {
   </div>;
 
   const stages = report.stages;
+  if (!stages.length) return <div role="alert" className={`${card} flex flex-col items-start gap-3 p-6`}>
+    <strong className={`${heading} text-lg`}>The quality report has no evaluation stages yet</strong>
+    <button type="button" onClick={() => void load()} className={ghostButton}><Icon name="refresh" size={14} />Try again</button>
+  </div>;
   const keyword = stages.find(stage => stage.id === 'keyword') ?? stages[0];
   const hybrid = stages.find(stage => stage.id === 'hybrid') ?? stages[stages.length - 2] ?? keyword;
   const served = stages.find(stage => stage.id === 'reranked') ?? stages[stages.length - 1];
   const metricInfo = METRICS.find(item => item.key === metric)!;
+  const overallTest = report.statistics?.comparisons.all.find(test => test.baseline === keyword.id && test.candidate === served.id)?.metrics['ndcg@10'];
   const typoKept = (stage: QualityStage) => relative(stage.metrics.typo['ndcg@10'], stage.metrics.clean['ndcg@10']) + 1;
   const outOf100 = (value: number) => Math.round(value * 100);
   const sectionClass = 'scroll-mt-32 space-y-6';
@@ -397,7 +489,8 @@ export default function QualityReportView() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Headline label="Overall quality" value={fmt(served.metrics.all['ndcg@10'])} note={`Keyword search: ${fmt(keyword.metrics.all['ndcg@10'])}`}
           info={`A 0 to 1 score for the whole top 10 (NDCG@10). ${METRICS[0].help}`} />
-        <Headline label="Better than keyword search" value={signed(relative(served.metrics.all['ndcg@10'], keyword.metrics.all['ndcg@10']))} note="Gain in overall quality" />
+        <Headline label="NDCG change vs. keyword" value={signed(relative(served.metrics.all['ndcg@10'], keyword.metrics.all['ndcg@10']))}
+          note={overallTest ? `${overallTest.significant ? 'Significant' : 'Not significant'} · adjusted p = ${pValue(overallTest.adjustedPValue)}` : 'Relative change in overall quality'} />
         <Headline label="Good result in the top 5" value={pct(served.metrics.all['hit@5'])} note={`of searches (keyword: ${pct(keyword.metrics.all['hit@5'])})`}
           info="Hit@5: the share of searches where at least one product people marked as a good match is in the first five results." />
         <Headline label="Typical search time" value={ms(served.latencyMs.p50)} note={`Slowest 5%: ${ms(served.latencyMs.p95)}`}
@@ -406,7 +499,7 @@ export default function QualityReportView() {
     </section>
 
     <section id="stages" aria-labelledby="ladder-title" className={`${card} scroll-mt-32`}>
-      <PanelHeader id="ladder-title" title="Quality at each stage" description="Each step adds to the one before it. The last one is what the site serves." />
+      <PanelHeader id="ladder-title" title="Quality at each stage" description="Hybrid retrieval combines keyword, spelling, and semantic search. The site serves the reranked results." />
       <div className="flex flex-col gap-2 border-b border-[var(--line)] px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Segmented label="Measure" value={metric} options={METRICS.map(item => ({ key: item.key, label: item.name }))} onChange={setMetric} />
         <Segmented label="Searches" value={segment} options={SEGMENTS} onChange={setSegment} />
@@ -416,7 +509,11 @@ export default function QualityReportView() {
         <span><strong className="font-semibold text-[var(--ink)]">{metricInfo.name}</strong> ({metricInfo.label}): {metricInfo.help}</span>
       </p>
       <div className="px-5 pt-4"><StageLadder stages={stages} metric={metric} segment={segment} /></div>
-      <p className="border-t border-[var(--line)] px-5 py-3 text-[12px] text-[var(--muted)]">Percentages compare each stage with keyword search. Hover or focus a bar for details.</p>
+      <p className="border-t border-[var(--line)] px-5 py-3 text-[12px] text-[var(--muted)]">
+        {report.statistics && `Error bars show ${pct(report.statistics.confidenceLevel)} confidence intervals from ${report.statistics.bootstrapSamples.toLocaleString()} bootstrap resamples of query families. `}
+        Percentages compare each stage with keyword search. Hover or focus a bar for details.
+      </p>
+      <StageComparisons report={report} metric={metric} segment={segment} />
     </section>
 
     <section id="typos" aria-label="Typos" className={sectionClass}>
