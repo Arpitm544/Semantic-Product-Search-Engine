@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ResourceStatus } from '@/components/AccountControls';
 import { useAccountResource, type Preferences } from '@/lib/account';
+import { SOURCE_LABELS, type SearchSource } from '@/lib/types';
 
 const inputClass = 'mt-2 w-full min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface-fff)] px-3 py-2.5 text-sm text-[var(--ink)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--sage)]';
 
@@ -32,12 +33,20 @@ export default function SearchFilters({
     event.preventDefault();
     if (!form) return;
     const tags = (value: string) => value.split(',').map(item => item.trim()).filter(Boolean);
-    const filters = { ...form, applyByDefault: true, categories: tags(categories), brands: tags(brands) };
+    const filters = { ...form, categories: tags(categories), brands: tags(brands) };
     const saved = await resource.mutate(() => resource.api<Preferences>('/api/preferences', {
       method: 'PUT',
       body: JSON.stringify(filters),
     }), 'Filters applied.');
     if (saved) onApplied(saved);
+  }
+
+  async function clearFilters() {
+    const saved = await resource.mutate(
+      () => resource.api<Preferences>('/api/preferences/filters', { method: 'DELETE' }),
+      'Filters cleared.',
+    );
+    if (saved) onCleared();
   }
 
   return <details id="filters" open className="group scroll-mt-24 rounded-2xl border border-[var(--line)] bg-[var(--surface-fff)] lg:sticky lg:top-24 lg:self-start">
@@ -49,6 +58,16 @@ export default function SearchFilters({
       {form && <form onSubmit={submit}>
         <fieldset disabled={resource.busy} className="m-0 min-w-0 space-y-5 border-0 p-0">
           <div>
+            <label htmlFor="filter-default-source" className="text-xs text-[var(--muted)]">Default search source</label>
+            <select id="filter-default-source" className={inputClass} value={form.defaultSource} onChange={event => setForm({ ...form, defaultSource: event.target.value as SearchSource })}>
+              {Object.entries(SOURCE_LABELS).map(([source, label]) => <option key={source} value={source}>{label}</option>)}
+            </select>
+            <label className="mt-3 flex items-start gap-3 text-sm">
+              <input type="checkbox" className="mt-1 accent-[var(--accent)]" checked={form.applyByDefault} onChange={event => setForm({ ...form, applyByDefault: event.target.checked })} />
+              Apply saved filters by default
+            </label>
+          </div>
+          <div className="border-t border-[var(--line)] pt-5">
             <h3 className="mb-3 text-sm font-semibold">Price range</h3>
             <label htmlFor="filter-currency" className="text-xs text-[var(--muted)]">Currency</label>
             <select id="filter-currency" className={inputClass} value={form.currency} onChange={event => setForm({ ...form, currency: event.target.value })}>
@@ -74,7 +93,7 @@ export default function SearchFilters({
             <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1 accent-[var(--accent)]" checked={form.inStockOnly} onChange={event => setForm({ ...form, inStockOnly: event.target.checked })} />In stock only</label>
           </div>
           <button type="submit" className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-[var(--accent-ink)] hover:opacity-90">Apply filters</button>
-          <button type="button" className="w-full text-sm font-medium text-[var(--muted)] underline underline-offset-4" onClick={async () => { const reset = await resource.mutate(() => resource.api('/api/preferences', { method: 'DELETE' }), 'Filters cleared.'); if (reset) onCleared(); }}>Clear all filters</button>
+          <button type="button" className="w-full text-sm font-medium text-[var(--muted)] underline underline-offset-4" onClick={clearFilters}>Clear all filters</button>
           <p className="text-xs leading-relaxed text-[var(--muted)]">Catalog results support brand and category filters. Shopping results support price filters. Filters use the selected currency without conversion.</p>
         </fieldset>
       </form>}

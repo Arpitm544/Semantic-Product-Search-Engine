@@ -21,14 +21,15 @@ from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 import uvicorn
 
+from api.suggestions import router as suggestions_router, warm_up as warm_up_suggestions
 from api.saved_products import router as saved_products_router
 from api.search_history import router as history_router, remember_search, SearchContext
 from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
 from api.quality import router as quality_router
-from api.product_prices import apply_preferences, has_supported_preferences
+from api.product_prices import SOURCE_FILTERS, apply_preferences, has_supported_preferences, matches_preferences
 from api.query_understanding import (
-    FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, understand,
+    FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, matches, understand,
 )
 from api.search_limits import check_search_rate
 from api.observability import instrument_engines, observe_requests, record_search_outcome
@@ -64,8 +65,9 @@ def initialize_search(max_attempts=150, retry_delay=2):
     _search_error = None
     for attempt in range(max_attempts):
         try:
-            get_search_engine()
+            engine = get_search_engine()
             _search_ready.set()
+            warm_up_suggestions(engine)
             print("Search is ready.", flush=True)
             return
         except Exception as error:
@@ -101,6 +103,7 @@ async def lifespan(app):
 app = FastAPI(title="Semantic Product Search", lifespan=lifespan)
 app.include_router(saved_products_router)
 app.include_router(history_router)
+app.include_router(suggestions_router)
 app.include_router(account_router)
 app.include_router(alerts_router)
 app.include_router(quality_router)
@@ -275,9 +278,18 @@ def catalog_search(context, preferences, understanding):
         return search_unavailable()
     instrument_engines(engine, ranking_service._ranker)
     try:
-        # Rank every candidate when a chip or saved filter narrows results, then keep the top 20.
-        limit = CATALOG_FILTER_LIMIT if needs_candidate_pool(understanding, preferences, "mongo") else DISPLAY_LIMIT
-        payload = engine.search(search_text(context, understanding), limit=limit, fuzzy=context.fuzzy)
+        search_options = {}
+        limit = DISPLAY_LIMIT
+        if needs_candidate_pool(understanding, preferences, "mongo"):
+            limit = CATALOG_FILTER_LIMIT
+            def matches_filters(product):
+                return matches(product, understanding) and (
+                    preferences is None or matches_preferences(product, preferences, SOURCE_FILTERS["mongo"])
+                )
+
+            search_options = {"candidate_filter": matches_filters, "candidate_limit": CATALOG_FILTER_LIMIT}
+        payload = engine.search(search_text(context, understanding), limit=limit,
+                                fuzzy=context.fuzzy, **search_options)
         payload = apply_query_filters(payload, understanding)
         return with_product_links(finish_search(context, payload, preferences))
     except (ValueError, RuntimeError, OSError, PyMongoError):

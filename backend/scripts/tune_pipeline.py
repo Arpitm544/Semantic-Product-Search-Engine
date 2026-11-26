@@ -10,17 +10,14 @@
 """
 
 import argparse
+from hashlib import sha256
 import json
 from pathlib import Path
 import pickle
 import sys
 import time
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
-import optuna
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.evaluate_quality import load_product_vectors, model_path, weights_signature
@@ -68,6 +65,12 @@ def parse_arguments():
     parser.add_argument("--val-limit", type=int, default=None)
     parser.add_argument("--test-limit", type=int, default=None)
     return parser.parse_args()
+
+
+def validation_cache_key(catalog_hash, encoder_path, reranker_path, queries, max_stage_k, max_rerank_precompute):
+    query_hash = sha256(json.dumps(queries, sort_keys=True).encode()).hexdigest()
+    return (f"v2-{catalog_hash[:12]}-{weights_signature(encoder_path)}-{weights_signature(reranker_path)}-"
+            f"{query_hash}-k{max_stage_k}-r{max_rerank_precompute}")
 
 
 def load_or_build_validation_cache(
@@ -212,11 +215,10 @@ def compare_test_runs(baseline_rows, tuned_rows):
     np.add.at(base_sums, families, base_scores)
     np.add.at(tuned_sums, families, tuned_scores)
 
-    base_samples, _ = bootstrap(base_sums, counts, rng)
-    tuned_samples, _ = bootstrap(tuned_sums, counts, rng)
     diffs = tuned_sums - base_sums
+    difference_samples, _ = bootstrap(diffs, counts, rng)
     deltas = diffs.sum(axis=0) / len(baseline_rows)
-    bounds = intervals(tuned_samples - base_samples).tolist()
+    bounds = intervals(difference_samples).tolist()
     p_vals = paired_p_values(diffs, rng)
     return {
         metric: {"delta": float(delta), "confidenceInterval": ci, "pValue": float(p)}
@@ -237,6 +239,10 @@ def evaluate_on_test(label, params, products, semantic, reranker, test_queries):
 
 
 def save_pareto_plot(trials, pareto_trials, baseline_val, balanced_trial, quality_trial, output_path):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=(8.2, 5.2))
     xs = [t.values[1] for t in trials if t.values is not None]
     ys = [t.values[0] for t in trials if t.values is not None]
@@ -290,6 +296,8 @@ def save_pareto_plot(trials, pareto_trials, baseline_val, balanced_trial, qualit
 
 
 def main():
+    import optuna
+
     args = parse_arguments()
     import torch
     from sentence_transformers import SentenceTransformer
@@ -312,10 +320,8 @@ def main():
     vectors = load_product_vectors(encoder, products, catalog_hash, encoder_path)
     semantic = ExactSemanticSearch(products, encoder, vectors, model_name=encoder_path.name)
 
-    cache_key = (
-        f"{catalog_hash[:12]}-{weights_signature(encoder_path)[:8]}-"
-        f"{weights_signature(reranker_path)[:8]}-n{len(val_queries)}-k{args.max_stage_k}"
-    )
+    cache_key = validation_cache_key(catalog_hash, encoder_path, reranker_path, val_queries,
+                                     args.max_stage_k, args.max_rerank_precompute)
     cache_path = args.cache_dir / f"val_cache-{cache_key}.pkl"
     cache_data = load_or_build_validation_cache(
         cache_path,

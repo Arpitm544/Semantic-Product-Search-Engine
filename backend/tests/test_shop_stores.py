@@ -207,3 +207,19 @@ def test_shopify_pagination_stops_when_page_adds_no_new_products():
     with robots(), patch.object(base.requests, 'get', return_value=response(payload={'products': repeated})) as get:
         provider.search('cotton', 5)
     assert get.call_count == 2
+
+
+
+def test_shopify_price_uses_an_available_variant():
+    from api.shop_providers.stores import StoreConfig, shopify_product
+
+    product = shopify_product(StoreConfig("shopify", "store.example.com", "USD"), {
+        "id": 42, "title": "Headphones", "handle": "headphones",
+        "variants": [
+            {"price": "10.00", "available": False},
+            {"price": "30.00", "available": True},
+            {"price": "nan", "available": True},
+        ],
+    })
+    assert product["inStock"] is True
+    assert product["price"] == 30
