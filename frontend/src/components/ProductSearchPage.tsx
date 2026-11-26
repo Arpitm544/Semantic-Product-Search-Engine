@@ -1,16 +1,19 @@
 'use client';
 import SearchFilters from '@/components/SearchFilters';
-import { useAccountResource, type Preferences } from '@/lib/account';
+import { productPrice, useAccountResource, type Preferences } from '@/lib/account';
 import SaveProductButton from '@/components/SaveProductButton';
 import QueryFilterChips from '@/components/QueryFilterChips';
+import GuidedSearchFilters from '@/components/GuidedSearchFilters';
 import ResultExplanation from '@/components/ResultExplanation';
 import ProductArtwork from '@/components/ProductArtwork';
+import { CompareProductButton, ProductComparison, comparisonKey, useProductComparison } from '@/components/ProductComparison';
 import DashboardShell from '@/components/dashboard/DashboardShell';
 import { SuggestionList, useSearchSuggestions } from '@/components/SearchSuggestions';
 import { classes } from '@/lib/classes';
+import { listedCategory, listedColors, listedFeatures, matchesListingText, suggestedRefinements, type Refinement } from '@/lib/guidedSearch';
 
-import { useEffect, useRef, useState } from 'react';
-import type { QueryFilterChip, QueryFilters, SearchProduct, SearchSource, SmartFilterChoice } from '@/lib/types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { productSourceLabel, type QueryFilterChip, type QueryFilters, type SearchProduct, type SearchSource, type SmartFilterChoice } from '@/lib/types';
 import type { FormEvent } from 'react';
 import { API_BASE, useAuthenticatedFetch } from '@/lib/api';
 import { useAuth } from '@clerk/nextjs';
@@ -146,6 +149,20 @@ function webUrl(value: string | undefined) {
   }
 }
 
+const comparisonRows = [
+  { label: 'Price', value: (product: SearchProduct) => product.priceLabel || (numericSearchPrice(product.price) === null ? null : productPrice(product)) },
+  { label: 'Brand', value: (product: SearchProduct) => product.brand || null },
+  { label: 'Seller or source', value: (product: SearchProduct, source?: string) => source ? productSourceLabel(source, product) : null },
+  { label: 'Rating', value: (product: SearchProduct) => product.rating ?? null },
+  { label: 'Category', value: (product: SearchProduct) => listedCategory(product) || null },
+  { label: 'Color', value: (product: SearchProduct) => listedColors(product).join(' · ') || null },
+  { label: 'Features mentioned', value: (product: SearchProduct) => product.attributes?.slice(0, 8).join(' · ') || listedFeatures(product).slice(0, 8).join(' · ') || null },
+  { label: 'Listing', value: (product: SearchProduct) => {
+    const url = webUrl(product.url);
+    return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">Open listing <span aria-hidden="true">↗</span></a> : null;
+  } },
+];
+
 function ProductImage({ product, index }: { product: SearchProduct; index: number }) {
   const [failed, setFailed] = useState(false);
   const url = webUrl(product.imageUrl);
@@ -183,6 +200,14 @@ export default function ProductSearchPage({
   const [searched, setSearched] = useState('');
   const [lastFuzzy, setLastFuzzy] = useState(true);
   const [results, setResults] = useState<SearchProduct[]>([]);
+  const comparison = useProductComparison<SearchProduct>();
+  const [refinements, setRefinements] = useState<Refinement[]>([]);
+  const [featureText, setFeatureText] = useState('');
+  const refinementGroups = useMemo(() => suggestedRefinements(results, searched), [results, searched]);
+  const hasRefinements = refinements.length > 0 || featureText.trim().length > 0;
+  const visibleResults = hasRefinements
+    ? results.filter(product => refinements.every(option => option.matches(product)) && matchesListingText(product, featureText))
+    : results;
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -214,7 +239,14 @@ export default function ProductSearchPage({
   // Google Shopping and online shops both return external offers with a merchant.
   const shopping = source !== 'mongo';
 
-  useEffect(() => () => pending.current?.abort(), []);
+  useEffect(() => () => {
+    const request = pending.current;
+    if (request) {
+      pending.current = null;
+      initialSearchRan.current = false;
+      request.abort();
+    }
+  }, []);
 
   useEffect(() => {
     // Wait for saved defaults when the URL omitted `source` or `preferences` (e.g. dashboard links).
@@ -244,7 +276,21 @@ export default function ProductSearchPage({
     source,
   ]);
 
+  function clearRefinements() {
+    setRefinements([]);
+    setFeatureText('');
+  }
+
+  function toggleRefinement(option: Refinement) {
+    setRefinements(current => {
+      if (current.some(item => item.id === option.id)) return current.filter(item => item.id !== option.id);
+      const other = option.facet === 'feature' ? current : current.filter(item => item.facet !== option.facet);
+      return [...other, option];
+    });
+  }
+
   function changeSource(value: keyof typeof SOURCES) {
+    clearRefinements();
     sourceOverridden.current = true;
     pending.current?.abort();
     pending.current = null;
@@ -277,6 +323,7 @@ export default function ProductSearchPage({
   async function runSearch(query: string, fuzzy = true, filtersEnabled = usePreferences, smartOptions: { choice?: SmartFilterChoice; source?: SearchSource } = {}) {
     const { choice = smart, source: searchSource = source } = smartOptions;
     if (!query) return;
+    if (query !== searched) clearRefinements();
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
@@ -403,7 +450,7 @@ export default function ProductSearchPage({
         </div>}
         {!loading && !error && !searched && <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:var(--text-677567)] text-[13px] [&_small]:text-[11px] [&_small]:[color:var(--text-929c91)] search-empty-start [&>span]:w-[32px] [&>span]:h-[32px] [&>span]:rounded-[10px] [&>span]:[background:var(--surface-edf3e9)] [&>span]:[color:var(--text-759272)] [&>span]:grid [&>span]:place-items-center [&>span]:mb-[4px] [&_strong]:text-[13px] [&_strong]:font-semibold"}><span>✳</span><strong>Start with a product or a need</strong><small>Enter a product, brand, or category to search {SOURCES[source]}.</small></div>}
         {!loading && !error && searched && <>
-          <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_var(--border-e7ebe5)] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:var(--text-344035)] [&>span]:text-[11px] [&>span]:[color:var(--text-8b958a)] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span>{shopping ? `${results.length} products shown` : `${results.length} products shown from ${total} ranked candidates`}</span></div>
+          <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_var(--border-e7ebe5)] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:var(--text-344035)] [&>span]:text-[11px] [&>span]:[color:var(--text-8b958a)] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span role="status">{hasRefinements ? `${visibleResults.length} of ${results.length} results match your refinements` : shopping ? `${results.length} products shown` : `${results.length} products shown from ${total} ranked candidates`}</span></div>
           {queryFilters && <QueryFilterChips filters={queryFilters}
             onPrice={(price: boolean) => void runSearch(searched, lastFuzzy, usePreferences, { choice: { ...smart, price } })}
             onRemove={(item: QueryFilterChip) => void runSearch(searched, lastFuzzy, usePreferences, { choice: { ...smart, [item.type]: '' } })}
@@ -411,8 +458,21 @@ export default function ProductSearchPage({
             onSearchShops={() => { const query = searched; changeSource('shops'); void runSearch(query, lastFuzzy, usePreferences, { source: 'shops', choice: { ...smart, price: true } }); }} />}
           {warning && <div className={"search-ranking-warning mt-[15px] mr-[0] mb-[15px] ml-[0] pt-[12px] pr-[14px] pb-[12px] pl-[14px] [border:1px_solid_var(--border-e5d9b5)] rounded-[8px] [background:var(--surface-fffaf0)] [color:var(--text-796338)] text-[12px] leading-[1.5]"} role="status">{warning}</div>}
           {correctedQuery && <div className={"search-spelling-note flex items-center justify-between gap-[12px] mt-[15px] mr-[0] mb-[15px] ml-[0] pt-[12px] pr-[14px] pb-[12px] pl-[14px] [border:1px_solid_var(--border-dce4d9)] rounded-[8px] [background:var(--surface-edf3e9)] [color:var(--text-455b48)] text-[12px] leading-[1.5] [&_button]:[border:0] [&_button]:[background:transparent] [&_button]:[color:var(--text-4f7857)] [&_button]:[font-style:normal] [&_button]:font-semibold [&_button]:text-[11px] [&_button]:leading-[normal] [&_button]:[font-family:'DM_Sans',sans-serif] [&_button]:underline [&_button]:cursor-pointer [&_button]:shrink-[0] [&_button:focus-visible]:[outline:2px_solid_var(--focus-ring)] [&_button:focus-visible]:[outline-offset:4px] max-[600.01px]:items-start max-[600.01px]:flex-col"}><span>Also searching for <strong>“{correctedQuery}”</strong>.</span><button type="button" onClick={() => runSearch(searched, false)}>Use original spelling</button></div>}
-          {results.length ? <div className={"search-result-list grid"}>{results.map((product, index) => {
+          {(results.length > 0 || hasRefinements) && <GuidedSearchFilters
+            groups={refinementGroups}
+            selected={refinements}
+            featureText={featureText}
+            onFeatureText={setFeatureText}
+            onToggle={toggleRefinement}
+            onClear={clearRefinements}
+          />}
+        </>}
+        {(visibleResults.length > 0 || comparison.items.length > 0) && <ProductComparison items={comparison.items} rows={comparisonRows} onRemove={comparison.toggle} onClear={comparison.clear} />}
+        {!loading && !error && searched && (
+          visibleResults.length ? <div className={"search-result-list grid"}>{visibleResults.map(product => {
+            const index = results.indexOf(product);
             const url = webUrl(product.url);
+            const comparisonId = comparisonKey(product, source);
             return <article className={"search-result-card flex items-center gap-[18px] pt-[17px] pr-[4px] pb-[17px] pl-[4px] [border-bottom:1px_solid_var(--border-e9ede7)] max-[600.01px]:gap-[11px] max-[600.01px]:pt-[14px] max-[600.01px]:pr-[0] max-[600.01px]:pb-[14px] max-[600.01px]:pl-[0] max-[600.01px]:flex-wrap"} key={product.id || index}>
               <SaveProductButton key={`${source}:${product.id ?? product.url ?? product.title}`} product={product} source={source} />
               <ProductImage key={`${product.id}:${product.imageUrl}`} product={product} index={index} />
@@ -421,12 +481,23 @@ export default function ProductSearchPage({
                 <h3>{url ? <a href={url} target="_blank" rel="noopener noreferrer">{product.title} <span aria-hidden="true">↗</span></a> : product.title}</h3>
                 {product.description && <p>{product.description}</p>}
                 <div className={"search-result-meta flex items-center gap-[13px] mt-[7px] text-[10px] [color:var(--text-828d81)] [&_strong]:text-[11px] [&_strong]:[color:var(--text-455b48)] max-[600.01px]:gap-[8px] max-[600.01px]:text-[9px] max-[600.01px]:flex-wrap"}><strong>{money(product)}</strong>{product.rating != null && <span>★ {Number(product.rating).toFixed(1)}{product.reviews != null ? ` (${Number(product.reviews).toLocaleString()} reviews)` : ''}</span>}{product.stock != null && <span>{product.stock} in stock</span>}{product.inStock === false && <span>Out of stock</span>}{!shopping && url && <a href={url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">View on Amazon ↗</a>}</div>
+                <div className="mt-2">
+                  <CompareProductButton
+                    title={product.title}
+                    selected={comparison.items.some(item => item.key === comparisonId)}
+                    count={comparison.items.length}
+                    onToggle={() => comparison.toggle(product, source)}
+                  />
+                </div>
                 {product.explanation && <ResultExplanation explanation={product.explanation} position={index + 1} />}
               </div>
               <span className={"relevance-score self-start mt-[3px] mr-[3px] mb-[0] ml-[0] rounded-[14px] pt-[5px] pr-[8px] pb-[5px] pl-[8px] [background:var(--surface-f0f4ee)] [color:var(--text-577658)] text-[10px] font-bold whitespace-nowrap [&_small]:text-[8px] [&_small]:font-medium [&_small]:ml-[4px] [&_small]:[color:var(--text-82927f)] max-[600.01px]:text-[9px] max-[600.01px]:pt-[4px] max-[600.01px]:pr-[6px] max-[600.01px]:pb-[4px] max-[600.01px]:pl-[6px] max-[600.01px]:ml-[66px] max-[600.01px]:[&_small]:hidden"}>{shopping ? product.matchSources?.includes('reranker') ? 'Engine ranked' : source === 'shops' ? 'Shop order' : 'Google ranked' : product.matchSources?.some((source) => source === 'fuzzy' || source === 'semantic-corrected') ? 'Spelling match' : product.matchSources?.includes('keyword') ? 'Product match' : 'Related match'}</span>
             </article>;
-          })}</div> : <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:var(--text-677567)] text-[13px] [&_small]:text-[11px] [&_small]:[color:var(--text-929c91)] search-no-results [&_strong]:text-[13px] [&_strong]:font-semibold"}><strong>No matching products found.</strong><small>Try a shorter query or choose another search source.</small></div>}
-        </>}
+          })}</div> : hasRefinements ? <div className="rounded-xl border border-[var(--line)] px-4 py-7 text-center">
+            <p className="m-0 text-sm font-semibold">No listings match these refinements.</p>
+            <button type="button" onClick={clearRefinements} className="mt-2 cursor-pointer border-0 bg-transparent text-sm underline underline-offset-4">Show all results</button>
+          </div> : <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:var(--text-677567)] text-[13px] [&_small]:text-[11px] [&_small]:[color:var(--text-929c91)] search-no-results [&_strong]:text-[13px] [&_strong]:font-semibold"}><strong>No matching products found.</strong><small>Try a shorter query or choose another search source.</small></div>
+        )}
       </section>
       </div>
       </div>

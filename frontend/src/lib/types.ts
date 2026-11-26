@@ -30,6 +30,7 @@ export interface SearchProduct {
   description?: string;
   price?: number | string | null;
   priceLabel?: string;
+  confirmedPrice?: { amount: number; currency: string };
   currency?: string;
   imageUrl?: string;
   url?: string;
@@ -41,6 +42,7 @@ export interface SearchProduct {
   tags?: string[];
   provider?: string;
   matchSources?: string[];
+  representation_text?: string;
   relevanceProbability?: number | null;
   explanation?: ResultExplanation;
 }
