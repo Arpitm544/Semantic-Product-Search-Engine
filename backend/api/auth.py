@@ -29,21 +29,34 @@ def publishable_key_issuer():
 
 
 def issuer_url():
-    issuer = os.environ.get("CLERK_ISSUER_URL", "").rstrip("/")
-    if not issuer:
-        issuer = publishable_key_issuer()
-    parsed = urlparse(issuer)
-    forbidden_parts = (parsed.path, parsed.query, parsed.fragment, parsed.username, parsed.password)
-    if parsed.scheme != "https" or not parsed.hostname:
-        raise HTTPException(503, "Configure CLERK_ISSUER_URL before using the API.")
-    if any(forbidden_parts):
-        raise HTTPException(503, "Configure CLERK_ISSUER_URL before using the API.")
-    return issuer
+    issuer = os.environ.get("CLERK_ISSUER_URL", "").strip() or publishable_key_issuer()
+    try:
+        parsed = urlparse(issuer)
+        forbidden = (parsed.params, parsed.query, parsed.fragment, parsed.username, parsed.password)
+        if parsed.scheme == "https" and parsed.hostname and not any(forbidden):
+            return issuer if parsed.path not in ("", "/") else issuer.rstrip("/")
+    except ValueError:
+        pass
+    raise HTTPException(503, "Configure CLERK_ISSUER_URL before using the API.")
+
+
+def jwks_url(issuer):
+    url = os.environ.get("CLERK_JWKS_URL", "").strip()
+    if not url:
+        return issuer.rstrip("/") + "/.well-known/jwks.json"
+    try:
+        parsed = urlparse(url)
+        if (parsed.scheme == "https" and parsed.hostname and parsed.path
+                and not any((parsed.username, parsed.password, parsed.query, parsed.fragment))):
+            return url
+    except ValueError:
+        pass
+    raise HTTPException(503, "Configure a valid HTTPS CLERK_JWKS_URL before using the API.")
 
 
 @lru_cache(maxsize=4)
-def jwks_client(issuer):
-    return jwt.PyJWKClient(issuer + "/.well-known/jwks.json", timeout=5, lifespan=300,
+def jwks_client(url):
+    return jwt.PyJWKClient(url, timeout=5, lifespan=300,
                            ssl_context=ssl.create_default_context(cafile=certifi.where()))
 
 
@@ -69,7 +82,7 @@ def require_session(credentials: HTTPAuthorizationCredentials = Depends(bearer))
     issuer = issuer_url()
     origins = frontend_origins()
     try:
-        key = jwks_client(issuer).get_signing_key_from_jwt(credentials.credentials)
+        key = jwks_client(jwks_url(issuer)).get_signing_key_from_jwt(credentials.credentials)
         claims = jwt.decode(credentials.credentials, key.key, algorithms=["RS256"], issuer=issuer,
                             options={"require": ["exp", "nbf", "iat", "iss", "sub", "sid"], "verify_aud": False})
         validate_session_claims(claims, origins)

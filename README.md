@@ -79,6 +79,8 @@ restoring the preparation script.
 - [Google Colab training](docs/colab-training.md)
 - [Command reference](docs/commands.md)
 - [Spelling and fine-tuning experiments](docs/typo-search.md)
+- [Error analysis: where and why search fails](docs/error-analysis.md)
+- [Learning to rank (LambdaMART) experiment](docs/learning-to-rank.md)
 - [Study notes](docs/study-notes.md)
 
 ## Data and evaluation

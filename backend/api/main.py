@@ -21,12 +21,12 @@ from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 import uvicorn
 
-from api.suggestions import router as suggestions_router, warm_up as warm_up_suggestions
 from api.saved_products import router as saved_products_router
 from api.search_history import router as history_router, remember_search, SearchContext
 from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
 from api.quality import router as quality_router
+from api.suggestions import router as suggestions_router, warm_up as warm_up_suggestions
 from api.product_prices import SOURCE_FILTERS, apply_preferences, has_supported_preferences, matches_preferences
 from api.query_understanding import (
     FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, matches, understand,
@@ -67,8 +67,8 @@ def initialize_search(max_attempts=150, retry_delay=2):
         try:
             engine = get_search_engine()
             _search_ready.set()
-            warm_up_suggestions(engine)
             print("Search is ready.", flush=True)
+            warm_up_suggestions(engine)
             return
         except Exception as error:
             if isinstance(error, CatalogUpdatingError) and attempt + 1 < max_attempts:
@@ -103,10 +103,10 @@ async def lifespan(app):
 app = FastAPI(title="Semantic Product Search", lifespan=lifespan)
 app.include_router(saved_products_router)
 app.include_router(history_router)
-app.include_router(suggestions_router)
 app.include_router(account_router)
 app.include_router(alerts_router)
 app.include_router(quality_router)
+app.include_router(suggestions_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,

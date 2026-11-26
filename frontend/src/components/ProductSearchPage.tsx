@@ -340,7 +340,7 @@ export default function ProductSearchPage({
           <input autoFocus maxLength={512} value={input} onChange={(event) => { setInput(event.target.value); suggestions.setOpen(true); }}
             onKeyDown={event => suggestions.onKeyDown(event, chooseSuggestion)} onBlur={() => suggestions.setOpen(false)} onFocus={() => suggestions.setOpen(true)}
             autoComplete="off" {...suggestions.comboboxProps} placeholder="Try ‘wireless headphones’ or ‘mascara’" aria-label="Search products" />
-          <button type="submit" disabled={!input.trim() || loading || preferences.busy}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
+          <button type="submit" disabled={!input.trim() || loading}>{loading ? 'Searching…' : 'Search'} <span>→</span></button>
         </form>
         <SuggestionList open={suggestions.open} items={suggestions.items} active={suggestions.active} typed={input} onChoose={chooseSuggestion} onHover={suggestions.setActive} />
         </div>

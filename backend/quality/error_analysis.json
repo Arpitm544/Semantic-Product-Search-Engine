@@ -1,0 +1,570 @@
+{
+  "generatedAt": "2026-11-25T16:23:38+00:00",
+  "split": "validation",
+  "commit": "466b4eb",
+  "definition": {
+    "failure": "no Exact product in the top 5 (the prepared files count only Exact as relevant)",
+    "lenientFailure": "not even a Substitute (or Exact) in the top 5",
+    "interval": "95% bootstrap over query families, 5,000 resamples",
+    "tags": "from the correctly typed query, so typo variants share them"
+  },
+  "overall": {
+    "queries": 1000,
+    "families": 200,
+    "ndcg": 0.5725030791342961,
+    "interval95": [
+      0.5355141917183688,
+      0.6096877412308012
+    ],
+    "failRate": 0.209,
+    "lenientFailRate": 0.1,
+    "relevantInCandidates": 0.953
+  },
+  "segments": [
+    {
+      "tag": "length:1-2",
+      "queries": 180,
+      "families": 36,
+      "ndcg": 0.4542105973570457,
+      "interval95": [
+        0.3580425078458706,
+        0.5473660583113842
+      ],
+      "mrr@10": 0.5324691358024691,
+      "recall@10": 0.4696048511673512,
+      "hit@5": 0.6444444444444445,
+      "failRate": 0.35555555555555557,
+      "differenceVsRest": -0.14425912411859798,
+      "differenceInterval95": [
+        -0.2508752034590718,
+        -0.03910424746367148
+      ],
+      "significantlyWorse": true,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "accessory-or-for",
+      "queries": 230,
+      "families": 46,
+      "ndcg": 0.5010562298339856,
+      "interval95": [
+        0.420307531348274,
+        0.5795412740395791
+      ],
+      "mrr@10": 0.6022239475500345,
+      "recall@10": 0.4236136380669629,
+      "hit@5": 0.7956521739130434,
+      "failRate": 0.20434782608695654,
+      "differenceVsRest": -0.09278811597442915,
+      "differenceInterval95": [
+        -0.18307656323623162,
+        -0.002926395497479609
+      ],
+      "significantlyWorse": true,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "negation",
+      "queries": 95,
+      "families": 19,
+      "ndcg": 0.5076034650415948,
+      "interval95": [
+        0.42257151694245204,
+        0.5923955732491196
+      ],
+      "mrr@10": 0.6956265664160401,
+      "recall@10": 0.37254643962848305,
+      "hit@5": 0.8421052631578947,
+      "failRate": 0.15789473684210525,
+      "differenceVsRest": -0.07171228076541569,
+      "differenceInterval95": [
+        -0.16731839986446953,
+        0.022566362926504487
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "audience",
+      "queries": 150,
+      "families": 30,
+      "ndcg": 0.5144137318959383,
+      "interval95": [
+        0.42625088923326865,
+        0.5981475059229818
+      ],
+      "mrr@10": 0.624505291005291,
+      "recall@10": 0.43206990754086944,
+      "hit@5": 0.8133333333333334,
+      "failRate": 0.18666666666666668,
+      "differenceVsRest": -0.06834040851571488,
+      "differenceInterval95": [
+        -0.16687993270030754,
+        0.02594153168591231
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "typo:deletion",
+      "queries": 200,
+      "families": 200,
+      "ndcg": 0.5190734355061101,
+      "interval95": [
+        0.47595750270300413,
+        0.5606485848580874
+      ],
+      "mrr@10": 0.5995833333333332,
+      "recall@10": 0.45767739945823327,
+      "hit@5": 0.73,
+      "failRate": 0.27,
+      "differenceVsRest": -0.06678705453523237,
+      "differenceInterval95": [
+        -0.12417498543773353,
+        -0.010301167821849068
+      ],
+      "significantlyWorse": true,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "typo:substitution",
+      "queries": 200,
+      "families": 200,
+      "ndcg": 0.56690694604495,
+      "interval95": [
+        0.5271789082295841,
+        0.6073930630591772
+      ],
+      "mrr@10": 0.6434623015873016,
+      "recall@10": 0.5059257748456709,
+      "hit@5": 0.785,
+      "failRate": 0.215,
+      "differenceVsRest": -0.006995166361682514,
+      "differenceInterval95": [
+        -0.06049489235873567,
+        0.04738055663836744
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "typo:transposition",
+      "queries": 200,
+      "families": 200,
+      "ndcg": 0.5790312847098368,
+      "interval95": [
+        0.5389407997566954,
+        0.6173697018943837
+      ],
+      "mrr@10": 0.6779424603174603,
+      "recall@10": 0.5254193715267677,
+      "hit@5": 0.805,
+      "failRate": 0.195,
+      "differenceVsRest": 0.008160256969426016,
+      "differenceInterval95": [
+        -0.04575073557620037,
+        0.06218520715357872
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "length:5-7",
+      "queries": 275,
+      "families": 55,
+      "ndcg": 0.5884867494597277,
+      "interval95": [
+        0.5210206275933166,
+        0.6533141056867783
+      ],
+      "mrr@10": 0.6709163059163059,
+      "recall@10": 0.518239769737096,
+      "hit@5": 0.8327272727272728,
+      "failRate": 0.16727272727272727,
+      "differenceVsRest": 0.022046441828181718,
+      "differenceInterval95": [
+        -0.05637541382623663,
+        0.09986318930491814
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "typo:repetition",
+      "queries": 200,
+      "families": 200,
+      "ndcg": 0.5918340334260404,
+      "interval95": [
+        0.5526745337106425,
+        0.6305010617495186
+      ],
+      "mrr@10": 0.6845059523809525,
+      "recall@10": 0.537511597831165,
+      "hit@5": 0.805,
+      "failRate": 0.195,
+      "differenceVsRest": 0.024163692864680564,
+      "differenceInterval95": [
+        -0.02876390431003324,
+        0.07723027898986377
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "length:3-4",
+      "queries": 510,
+      "families": 102,
+      "ndcg": 0.6007770014451633,
+      "interval95": [
+        0.5480033381387637,
+        0.6506982036565228
+      ],
+      "mrr@10": 0.6795323685029567,
+      "recall@10": 0.5200989071516348,
+      "hit@5": 0.8058823529411765,
+      "failRate": 0.19411764705882353,
+      "differenceVsRest": 0.05770188226707629,
+      "differenceInterval95": [
+        -0.016210272058639452,
+        0.13233527551274565
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "number-or-size",
+      "queries": 220,
+      "families": 44,
+      "ndcg": 0.6014926443588539,
+      "interval95": [
+        0.5320864962910066,
+        0.6714497356111014
+      ],
+      "mrr@10": 0.6871771284271285,
+      "recall@10": 0.5467691959703992,
+      "hit@5": 0.8409090909090909,
+      "failRate": 0.1590909090909091,
+      "differenceVsRest": 0.03716610926225361,
+      "differenceInterval95": [
+        -0.04312259439500607,
+        0.11901948564693529
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "clean",
+      "queries": 200,
+      "families": 200,
+      "ndcg": 0.6056696959845427,
+      "interval95": [
+        0.5679065427978746,
+        0.6437033735561042
+      ],
+      "mrr@10": 0.6965456349206349,
+      "recall@10": 0.5446683094901452,
+      "hit@5": 0.83,
+      "failRate": 0.17,
+      "differenceVsRest": 0.041458271062808416,
+      "differenceInterval95": [
+        -0.012554628061771817,
+        0.09309453163442133
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "length:8+",
+      "queries": 35,
+      "families": 7,
+      "ndcg": 0.6432869934734091,
+      "interval95": [
+        0.5483285641760293,
+        0.7440844875198555
+      ],
+      "mrr@10": 0.9571428571428572,
+      "recall@10": 0.6270068027210883,
+      "hit@5": 1.0,
+      "failRate": 0.0,
+      "differenceVsRest": 0.07335120656902916,
+      "differenceInterval95": [
+        -0.03311364774469922,
+        0.17905807803772472
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": false
+    },
+    {
+      "tag": "brand",
+      "queries": 135,
+      "families": 27,
+      "ndcg": 0.6902838402033439,
+      "interval95": [
+        0.6011985972135984,
+        0.7702452631431663
+      ],
+      "mrr@10": 0.677798353909465,
+      "recall@10": 0.5969346840971554,
+      "hit@5": 0.8222222222222222,
+      "failRate": 0.17777777777777778,
+      "differenceVsRest": 0.13616272955959297,
+      "differenceInterval95": [
+        0.03999886824891549,
+        0.22699852402328924
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": true
+    },
+    {
+      "tag": "color",
+      "queries": 80,
+      "families": 16,
+      "ndcg": 0.7007782118342583,
+      "interval95": [
+        0.5820516827626702,
+        0.8061807694225969
+      ],
+      "mrr@10": 0.7519940476190476,
+      "recall@10": 0.657514880952381,
+      "hit@5": 0.85,
+      "failRate": 0.15,
+      "differenceVsRest": 0.1394294920651764,
+      "differenceInterval95": [
+        0.01622714941659434,
+        0.25635746449542074
+      ],
+      "significantlyWorse": false,
+      "significantlyBetter": true
+    }
+  ],
+  "failures": {
+    "total": 209,
+    "causes": [
+      {
+        "cause": "ranking:unjudged-first",
+        "count": 64,
+        "share": 0.3062200956937799
+      },
+      {
+        "cause": "retrieval-miss",
+        "count": 47,
+        "share": 0.22488038277511962
+      },
+      {
+        "cause": "ranking:substitute-first",
+        "count": 36,
+        "share": 0.1722488038277512
+      },
+      {
+        "cause": "ranking:other",
+        "count": 21,
+        "share": 0.10047846889952153
+      },
+      {
+        "cause": "ranking:wrong-product-type",
+        "count": 14,
+        "share": 0.06698564593301436
+      },
+      {
+        "cause": "ranking:negation-ignored",
+        "count": 14,
+        "share": 0.06698564593301436
+      },
+      {
+        "cause": "ranking:number-or-size",
+        "count": 10,
+        "share": 0.04784688995215311
+      },
+      {
+        "cause": "ranking:wrong-brand",
+        "count": 3,
+        "share": 0.014354066985645933
+      }
+    ],
+    "rankingMissPositions": {
+      "11-20": 39,
+      "21+": 25,
+      "6-10": 98
+    },
+    "rankingMissTopLabels": {
+      "none judged": 40,
+      "all judged": 32,
+      "some unjudged": 90
+    },
+    "clean": {
+      "ranking:negation-ignored": 3,
+      "ranking:unjudged-first": 11,
+      "ranking:substitute-first": 6,
+      "ranking:other": 5,
+      "retrieval-miss": 7,
+      "ranking:number-or-size": 2
+    },
+    "typo": {
+      "ranking:wrong-product-type": 14,
+      "ranking:negation-ignored": 11,
+      "ranking:unjudged-first": 53,
+      "ranking:other": 16,
+      "ranking:substitute-first": 30,
+      "retrieval-miss": 40,
+      "ranking:wrong-brand": 3,
+      "ranking:number-or-size": 8
+    },
+    "examples": {
+      "ranking:wrong-product-type": [],
+      "ranking:negation-ignored": [
+        {
+          "query": "$50 visa gift cards without fees",
+          "topResult": "$50 Visa Gift Card (plus $4.95 Purchase Fee)",
+          "bestRelevant": "Amazon.com $1000 Gift Card in a Mini Amazon Shipping Box (Classic White Card Design)",
+          "bestRelevantPosition": 12
+        },
+        {
+          "query": "face masks without ear loops",
+          "topResult": "Linton Floral Print Cotton Face Mask With Triple Layer and Without Adjustable Ear loop -Set of 3 (Pattern-02)",
+          "bestRelevant": "Face Mask 3 Layers Washable & Reusable Over the Head Comfort No Ear Pulling Large",
+          "bestRelevantPosition": 6
+        },
+        {
+          "query": "non high waisted bikini",
+          "topResult": "Angerella Green High Waisted Bikini Two Piece Flounce Ruffled Swimsuits Beach Retro Swimwear,M",
+          "bestRelevant": "Adisputent Womens High Waisted Bathing Suits Push Up Halter Top Ruched Bottoms Bikini Sexy Tummy Control Two Piece Swims",
+          "bestRelevantPosition": 6
+        }
+      ],
+      "ranking:unjudged-first": [
+        {
+          "query": "athletica leggings for women",
+          "topResult": "Reebok Women's Leggings Full Length Performance Compression Pants - Athletic Workout Leggings for Women for Gym & Sports",
+          "bestRelevant": "Mint Lilac Women's High Waist Floral Printed Pocket Yoga Leggings Athletic Tummy Control Casual Pants with Mesh Panels N",
+          "bestRelevantPosition": 17
+        },
+        {
+          "query": "carbon fiber glue",
+          "topResult": "Trunk Spoiler for BMW 3 Series Sedan F30 2012-17 328i 335i 320i 316i 318i 318d 340i 330e M Style Carbon Fiber Rear Tail ",
+          "bestRelevant": "VViViD Black True R Carbon Fiber Vinyl Wrap Roll with Air Release Technology (20 Foot by 5 Foot)",
+          "bestRelevantPosition": 10
+        },
+        {
+          "query": "ipad 8",
+          "topResult": "BMOUO iPad 9th Generation Case, iPad 8th/7th Generation Case, iPad 10.2 Case,Hybrid Shockproof [360 Rotating Stand] [Han",
+          "bestRelevant": "Fire HD 8 Tablet (8\" HD Display, 32 GB) - Yellow (Previous Generation - 8th)",
+          "bestRelevantPosition": 37
+        },
+        {
+          "query": "laptop nvidia ssd 16",
+          "topResult": "HP OMEN 15 Gaming Laptop PC: AMD Ryzen 9 5900HX, NVIDIA GeForce RTX 3070 Graphics Card, 15.6\" QHD 165Hz Display, Windows",
+          "bestRelevant": "Acer C810 NX.G14AA.001; C810-T7ZT 13.3-Inch Laptop",
+          "bestRelevantPosition": 8
+        }
+      ],
+      "ranking:other": [
+        {
+          "query": "briarwood door mat tray",
+          "topResult": "Briarwood Lane Pumpkin Farm Fall Doormat Cart Autumn Indoor/Outdoor 18\" x 30\"",
+          "bestRelevant": "Briarwood Lane The Ultimate Seasonal Doormat Gift Set - 4 Inserts and Rubber Mat Tray",
+          "bestRelevantPosition": 6
+        },
+        {
+          "query": "brown stocking hat",
+          "topResult": "Top of the World Brown Bears Men's Relaxed Fit Adjustable Hat Team Color Primary Icon, Adjustable",
+          "bestRelevant": "Carhartt Men's Fleece Hat,Dark Brown,One Size",
+          "bestRelevantPosition": 7
+        },
+        {
+          "query": "disposable lunch box napkins",
+          "topResult": "C.R. Gibson TW7-18717 Lenox Butterfly Meadow Disposable Lunch Napkins, 6.5'' W x 6.5'' L, 20pcs",
+          "bestRelevant": "Plaid Napkins | Orange Checks - Disposable Linen-Feel Guest Towels Rustic Cottage Styling Perfect for Everyday Use, Lunc",
+          "bestRelevantPosition": 6
+        },
+        {
+          "query": "ford excursion car seat cover",
+          "topResult": "Black Panther Luxury PU Leather Car Seat Cover Protector for Front Seat Bottom,Compatible with 90% Vehicles (Sedan SUV P",
+          "bestRelevant": "Premium Waterproof Universal Car Seat Cover, Neoprene Rubber Seat Protector, Non-Slip Fit, Best Protection for Sports, G",
+          "bestRelevantPosition": 7
+        }
+      ],
+      "ranking:substitute-first": [
+        {
+          "query": "black and pink women's wedding band",
+          "topResult": "Danielle Bridal Set Black Purple Pink or Blue Cubic Zirconia Black Plated Wedding Band Engagement Ring for Women by Ging",
+          "bestRelevant": "Jude Jewelers 8mm Stainless Steel Matte Black Grooved Classic Wedding Band Ring (Black Pink, 9)",
+          "bestRelevantPosition": 6
+        },
+        {
+          "query": "bulk kit kat",
+          "topResult": "KIT KAT Miniatures Assorted Chocolate and White Creme Wafer Candy Bars, Holiday, 32.1 oz Bulk Party Pack",
+          "bestRelevant": "KITKAT Milk Chocolate Candy Bars, Crisp Miniature Wafers in Red Wrap, 2 Pound Bag",
+          "bestRelevantPosition": 14
+        },
+        {
+          "query": "dr bonners lavender castile soap",
+          "topResult": "Dr. Woods Pure Lavender Castile Soap with Organic Shea Butter, 32 Ounce (Pack of 3)",
+          "bestRelevant": "Dr. Bronner\u2019s - Pure-Castile Liquid Soap (Lavender, 32 ounce) - Made with Organic Oils, 18-in-1 Uses: Face, Body, Hair, ",
+          "bestRelevantPosition": 6
+        },
+        {
+          "query": "fully rugged laptop with dvd drive",
+          "topResult": "ASUS Chromebook-Laptop- 11.6\" Ruggedized and Spill Resistant Design-with 180 Degree-Hinge, Intel N3060 Celeron 4GB DDR3,",
+          "bestRelevant": "Lenovo Thinkpad T430 Built Business Laptop Computer (Intel Dual Core i5 Up to 3.3 Ghz Processor, 8GB Memory, 320GB HDD, ",
+          "bestRelevantPosition": 7
+        }
+      ],
+      "retrieval-miss": [
+        {
+          "query": "dutch oven cleaner",
+          "topResult": "Amagabeli 8\"x6\" Cast Iron Cleaner 316 Premium Stainless Steel Cast Iron Chainmail Scrubber for Cast Iron Pans Dutch Oven",
+          "bestRelevant": "Caron & Doucet - Cast Iron Cleaning & Conditioning Set: Seasoning Oil & Cleaning Soap | 100% Plant-Based & Best for Clea",
+          "bestRelevantPosition": null
+        },
+        {
+          "query": "game cart ds",
+          "topResult": "Goplus Folding Deer Game Cart Larger Capacity 500lbs Hauler Utility Gear Dolly Cart Hunting Accessories",
+          "bestRelevant": "Wizard Card Game",
+          "bestRelevantPosition": null
+        },
+        {
+          "query": "lv stickers",
+          "topResult": "IUGGAN Stickers for Water Bottles 110-Pack,Cute Pink Teen Girl Decal Waterproof,Aesthetic,Trendy Stickers for hydroflask",
+          "bestRelevant": "Louis Vuitton: Art, Fashion and Architecture",
+          "bestRelevantPosition": null
+        },
+        {
+          "query": "modern housewife",
+          "topResult": "The Naked Truth: The Real Story Behind the Real Housewife of New Jersey--In Her Own Words",
+          "bestRelevant": "It's Not Me, It's You",
+          "bestRelevantPosition": null
+        }
+      ],
+      "ranking:wrong-brand": [],
+      "ranking:number-or-size": [
+        {
+          "query": "kenwood kdc x300",
+          "topResult": "Kenwood Excelon KDC-X304 CD Receiver with Bluetooth | Amazon Alexa Ready",
+          "bestRelevant": "Kenwood KMM-BT325U Single Din Bluetooth SiriusXM Ready in-Dash Digital Media Car Stereo Receiver W/Spotify Control + Emb",
+          "bestRelevantPosition": 11
+        },
+        {
+          "query": "stage 1 baby food banana",
+          "topResult": "Earth's Best Organic Stage 2 Breakfast Baby Food, Blueberry Banana Flax & Oat, 4 Oz Pouch (Pack of 12)",
+          "bestRelevant": "Gerber 1st Foods, Banana Pureed Baby Food, 2 Ounce Tubs, 2 Count (Pack of 8)",
+          "bestRelevantPosition": 9
+        }
+      ]
+    }
+  },
+  "meaningGap": {
+    "found": {
+      "searches": 791,
+      "median": 0.6053948998451233
+    },
+    "missed": {
+      "searches": 209,
+      "median": 0.4485478401184082
+    }
+  },
+  "figures": {
+    "qualityByType": "docs/images/error-analysis/quality-by-type.png",
+    "similarityGap": "docs/images/error-analysis/similarity-gap.png",
+    "embeddingMap": "docs/images/error-analysis/embedding-map.png"
+  }
+}
