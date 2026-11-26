@@ -190,6 +190,36 @@ function removePreferenceFilter(current: Preferences, key: keyof Preferences, la
   }
 }
 
+function preferenceChips(filters: Preferences): [string, keyof Preferences][] {
+  const chips: [string, keyof Preferences][] = [];
+  if (filters.minBudget != null) chips.push([`From ${filters.currency} ${filters.minBudget}`, 'minBudget']);
+  if (filters.maxBudget != null) chips.push([`Up to ${filters.currency} ${filters.maxBudget}`, 'maxBudget']);
+  for (const category of filters.categories) chips.push([category, 'categories']);
+  for (const brand of filters.brands) chips.push([brand, 'brands']);
+  if (filters.inStockOnly) chips.push(['In stock', 'inStockOnly']);
+  return chips;
+}
+
+function ActiveSearchPreferences({ filters, busy, onRemove }: {
+  filters: Preferences;
+  busy: boolean;
+  onRemove: (key: keyof Preferences, label: string) => void;
+}) {
+  return <div aria-label="Active filters" className="flex flex-wrap items-center gap-2 px-6 pb-3">
+    <span className="text-xs font-semibold text-[var(--muted)]">Active filters</span>
+    {preferenceChips(filters).map(([label, key]) => <button key={`${key}:${label}`} type="button" disabled={busy}
+      className="rounded-full border border-[var(--line)] bg-[var(--surface-fff)] px-3 py-1.5 text-xs hover:bg-[var(--sage)] disabled:opacity-50"
+      aria-label={`Remove ${label} filter`} onClick={() => onRemove(key, label)}>
+      {label} <span aria-hidden="true">×</span>
+    </button>)}
+  </div>;
+}
+
+function resultSummary(visibleCount: number, count: number, total: number, refined: boolean, shopping: boolean) {
+  if (refined) return `${visibleCount} of ${count} results match your refinements`;
+  return shopping ? `${count} products shown` : `${count} products shown from ${total} ranked candidates`;
+}
+
 export default function ProductSearchPage({
   initialQuery = '',
   initialSource = 'mongo',
@@ -357,6 +387,20 @@ export default function ProductSearchPage({
     }
   }
 
+  async function removeActiveFilter(filters: Preferences, key: keyof Preferences, label: string) {
+    const next = removePreferenceFilter(filters, key, label);
+    const saved = await preferences.mutate(
+      () => preferences.api<Preferences>('/api/preferences', { method: 'PUT', body: JSON.stringify(next) }),
+      'Filter removed.',
+    );
+    if (!saved) return;
+    setAppliedFilters(saved);
+    const target = searched || input.trim();
+    if (target) void runSearch(target, searched ? lastFuzzy : true, true);
+  }
+
+  const activePreferences = usePreferences ? appliedFilters ?? preferences.data : null;
+
   return (
     <DashboardShell>
       <div className="product-search-page [color:var(--text-263127)] [font-family:DM_Sans,sans-serif]">
@@ -405,27 +449,8 @@ export default function ProductSearchPage({
           }}
         />
       <div className="min-w-0">
-        {usePreferences && (appliedFilters || preferences.data) && <div aria-label="Active filters" className="flex flex-wrap items-center gap-2 px-6 pb-3">
-          <span className="text-xs font-semibold text-[var(--muted)]">Active filters</span>
-          {([
-            ...((appliedFilters || preferences.data)!.minBudget != null ? [[`From ${(appliedFilters || preferences.data)!.currency} ${(appliedFilters || preferences.data)!.minBudget}`, 'minBudget']] : []),
-            ...((appliedFilters || preferences.data)!.maxBudget != null ? [[`Up to ${(appliedFilters || preferences.data)!.currency} ${(appliedFilters || preferences.data)!.maxBudget}`, 'maxBudget']] : []),
-            ...((appliedFilters || preferences.data)!.categories.map(value => [value, 'categories'])),
-            ...((appliedFilters || preferences.data)!.brands.map(value => [value, 'brands'])),
-            ...((appliedFilters || preferences.data)!.inStockOnly ? [['In stock', 'inStockOnly']] : []),
-          ] as [string, keyof Preferences][]).map(([label, key]) => <button key={`${key}:${label}`} type="button" disabled={preferences.busy} className="rounded-full border border-[var(--line)] bg-[var(--surface-fff)] px-3 py-1.5 text-xs hover:bg-[var(--sage)] disabled:opacity-50" aria-label={`Remove ${label} filter`} onClick={async () => {
-            const next = removePreferenceFilter(appliedFilters || preferences.data!, key, label);
-            const saved = await preferences.mutate(
-              () => preferences.api<Preferences>('/api/preferences', { method: 'PUT', body: JSON.stringify(next) }),
-              'Filter removed.',
-            );
-            if (saved) {
-              setAppliedFilters(saved);
-              const target = searched || input.trim();
-              if (target) void runSearch(target, searched ? lastFuzzy : true, true);
-            }
-          }}>{label} <span aria-hidden="true">×</span></button>)}
-        </div>}
+        {activePreferences && <ActiveSearchPreferences filters={activePreferences} busy={preferences.busy}
+          onRemove={(key, label) => void removeActiveFilter(activePreferences, key, label)} />}
       <section className={"search-results-section max-w-[990px] min-h-[170px] mt-[0] mr-[auto] mb-[0] ml-[auto] pt-[0] pr-[24px] pb-[50px] pl-[24px] max-[600.01px]:pl-[17px] max-[600.01px]:pr-[17px]"} aria-live="polite" aria-busy={loading}>
         {error && <div className={"search-error flex items-center justify-between gap-[12px] mt-[20px] mr-[0] mb-[20px] ml-[0] pt-[13px] pr-[13px] pb-[13px] pl-[13px] [border:1px_solid_var(--border-f0d5c8)] rounded-[8px] [background:var(--surface-fff9f5)] [color:var(--text-945d45)] text-[12px] [&_button]:shrink-[0] [&_button]:pt-[8px] [&_button]:pr-[10px] [&_button]:pb-[8px] [&_button]:pl-[10px] [&_button]:[background:var(--surface-fff)] [&_button]:[border:1px_solid_var(--border-dcbda9)] [&_button]:rounded-[5px] [&_button]:[color:var(--text-804e36)] [&_button]:cursor-pointer [&_button]:[font:inherit] max-[600.01px]:items-start max-[600.01px]:flex-col"} role="alert"><span>{error}</span><button type="button" onClick={() => runSearch(searched, lastFuzzy)}>Try again</button></div>}
         {loading && <div className="flex min-h-[190px] flex-col items-center justify-center gap-4 text-center text-sm text-[var(--muted)]" role="status" aria-live="polite">
@@ -438,7 +463,7 @@ export default function ProductSearchPage({
         </div>}
         {!loading && !error && !searched && <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:var(--text-677567)] text-[13px] [&_small]:text-[11px] [&_small]:[color:var(--text-929c91)] search-empty-start [&>span]:w-[32px] [&>span]:h-[32px] [&>span]:rounded-[10px] [&>span]:[background:var(--surface-edf3e9)] [&>span]:[color:var(--text-759272)] [&>span]:grid [&>span]:place-items-center [&>span]:mb-[4px] [&_strong]:text-[13px] [&_strong]:font-semibold"}><span>✳</span><strong>Start with a product or a need</strong><small>Enter a product, brand, or category to search {SOURCES[source]}.</small></div>}
         {!loading && !error && searched && <>
-          <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_var(--border-e7ebe5)] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:var(--text-344035)] [&>span]:text-[11px] [&>span]:[color:var(--text-8b958a)] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span role="status">{guided.refined ? `${visibleResults.length} of ${results.length} results match your refinements` : shopping ? `${results.length} products shown` : `${results.length} products shown from ${total} ranked candidates`}</span></div>
+          <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_var(--border-e7ebe5)] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:var(--text-344035)] [&>span]:text-[11px] [&>span]:[color:var(--text-8b958a)] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span role="status">{resultSummary(visibleResults.length, results.length, total, guided.refined, shopping)}</span></div>
           {queryFilters && <QueryFilterChips filters={queryFilters}
             onPrice={(price: boolean) => void runSearch(searched, lastFuzzy, usePreferences, { choice: { ...smart, price } })}
             onRemove={(item: QueryFilterChip) => void runSearch(searched, lastFuzzy, usePreferences, { choice: { ...smart, [item.type]: '' } })}
