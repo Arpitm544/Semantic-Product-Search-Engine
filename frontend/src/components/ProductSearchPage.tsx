@@ -215,7 +215,13 @@ function ActiveSearchPreferences({ filters, busy, onRemove }: {
   </div>;
 }
 
-function resultSummary(visibleCount: number, count: number, total: number, refined: boolean, shopping: boolean) {
+function resultSummary({ visibleCount, count, total, refined, shopping }: {
+  visibleCount: number;
+  count: number;
+  total: number;
+  refined: boolean;
+  shopping: boolean;
+}) {
   if (refined) return `${visibleCount} of ${count} results match your refinements`;
   return shopping ? `${count} products shown` : `${count} products shown from ${total} ranked candidates`;
 }
@@ -463,7 +469,7 @@ export default function ProductSearchPage({
         </div>}
         {!loading && !error && !searched && <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:var(--text-677567)] text-[13px] [&_small]:text-[11px] [&_small]:[color:var(--text-929c91)] search-empty-start [&>span]:w-[32px] [&>span]:h-[32px] [&>span]:rounded-[10px] [&>span]:[background:var(--surface-edf3e9)] [&>span]:[color:var(--text-759272)] [&>span]:grid [&>span]:place-items-center [&>span]:mb-[4px] [&_strong]:text-[13px] [&_strong]:font-semibold"}><span>✳</span><strong>Start with a product or a need</strong><small>Enter a product, brand, or category to search {SOURCES[source]}.</small></div>}
         {!loading && !error && searched && <>
-          <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_var(--border-e7ebe5)] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:var(--text-344035)] [&>span]:text-[11px] [&>span]:[color:var(--text-8b958a)] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span role="status">{resultSummary(visibleResults.length, results.length, total, guided.refined, shopping)}</span></div>
+          <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_var(--border-e7ebe5)] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:var(--text-344035)] [&>span]:text-[11px] [&>span]:[color:var(--text-8b958a)] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span role="status">{resultSummary({ visibleCount: visibleResults.length, count: results.length, total, refined: guided.refined, shopping })}</span></div>
           {queryFilters && <QueryFilterChips filters={queryFilters}
             onPrice={(price: boolean) => void runSearch(searched, lastFuzzy, usePreferences, { choice: { ...smart, price } })}
             onRemove={(item: QueryFilterChip) => void runSearch(searched, lastFuzzy, usePreferences, { choice: { ...smart, [item.type]: '' } })}
