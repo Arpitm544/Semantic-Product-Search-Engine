@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.10.8",
-    "@next/env": "^16.4.3",
-    "next": "^16.4.3",
+    "@next/env": "^16.4.6",
+    "next": "^16.4.6",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "three": "^0.186.0"
