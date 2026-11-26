@@ -16,6 +16,7 @@ products mention apples without being Apple products.
 """
 
 from collections import Counter, defaultdict
+from math import isfinite
 import re
 
 # ------------------------------------------------------------------ price
@@ -27,8 +28,8 @@ CURRENCY_WORDS = {
     "£": "GBP", "gbp": "GBP", "pound": "GBP", "pounds": "GBP",
 }
 _CURRENCY = r"(?:\$|₹|€|£|rs\.?|usd|inr|eur|gbp|dollars?|bucks|rupees?|euros?|pounds?)"
-# 1,299 · 49.99 · 2k
-_AMOUNT = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?k?"
+# 1,299 · 1,00,000 · 49.99 · 2k
+_AMOUNT = r"(?:\d{1,3}(?:,\d{3})+|\d{1,2}(?:,\d{2})+,\d{3})(?:\.\d+)?|\d+(?:\.\d+)?k?"
 _MONEY = rf"(?:(?P<@pre>{_CURRENCY})\s*)?(?P<@num>{_AMOUNT})(?:\s*(?P<@post>{_CURRENCY}))?"
 
 
@@ -66,15 +67,13 @@ def _next_word(text, end):
 def _amount(text):
     text = text.lower().replace(",", "")
     multiplier = 1000 if text.endswith("k") else 1
-    return float(text.rstrip("k")) * multiplier
+    value = float(text.rstrip("k")) * multiplier
+    return value if isfinite(value) and value <= 1e12 else None
 
 
-def _currency(match, prefix):
-    for part in ("pre", "post"):
-        word = match.group(f"{prefix}{part}")
-        if word:
-            return CURRENCY_WORDS.get(word.lower())
-    return None
+def _currencies(match, prefix):
+    return {CURRENCY_WORDS[word.lower()] for part in ("pre", "post")
+            if (word := match.group(f"{prefix}{part}"))}
 
 
 def _without(text, start, end):
@@ -85,11 +84,16 @@ def _without(text, start, end):
 def _range_price(match):
     # A bare "1-2" or "2 to 4" is often a size or count ("2 to 4 years").
     # Ranges need a currency or the word "between" to count as prices.
-    currencies = {_currency(match, "a"), _currency(match, "b")} - {None}
+    currencies = _currencies(match, "a") | _currencies(match, "b")
+    if len(currencies) > 1:
+        return None
     if not currencies and not match.group(0).lower().startswith("between"):
         return None
-    low, high = sorted((_amount(match.group("anum")), _amount(match.group("bnum"))))
-    return {"min": low, "max": high, "currency": currencies.pop() if len(currencies) == 1 else None}
+    amounts = [_amount(match.group(f"{prefix}num")) for prefix in ("a", "b")]
+    if None in amounts:
+        return None
+    low, high = sorted(amounts)
+    return {"min": low, "max": high, "currency": next(iter(currencies), None)}
 
 
 def _price_from_match(kind, match):
@@ -97,9 +101,12 @@ def _price_from_match(kind, match):
     if kind == "range":
         return _range_price(match)
     amount = _amount(match.group("anum"))
+    currencies = _currencies(match, "a")
+    if amount is None or len(currencies) > 1:
+        return None
     return {"min": amount if kind == "min" else None,
             "max": amount if kind == "max" else None,
-            "currency": _currency(match, "a")}
+            "currency": next(iter(currencies), None)}
 
 
 def _price_matches(text):

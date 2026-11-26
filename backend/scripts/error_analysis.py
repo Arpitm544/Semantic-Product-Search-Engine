@@ -8,10 +8,10 @@ final numbers: looking at its failures and then fixing them would make its
 results optimistic.
 
 Inputs: the served ranking of every candidate for each validation query.
-By default this reuses backend/indexes/ltr/validation.{npz,json} when present
-(written by the learning-to-rank feature script, same pipeline). With --run, or
-without that file, it runs the served pipeline itself (about 30 minutes on CPU)
-and caches the result in backend/indexes/errors/.
+By default this reuses rankings whose catalog, validation rows and model inputs
+match the current run. With --run, or without a matching cache, it runs the
+pipeline itself (about 30 minutes on CPU) and caches the result in
+backend/indexes/errors/.
 
 Outputs:
 - backend/quality/error_analysis.json   every number and example
@@ -22,14 +22,17 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 import re
 import subprocess
 import sys
+from zipfile import BadZipFile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import numpy as np
 
 from src.config import DATASET_DIR, INDEXES_DIR, PROJECT_ROOT
+from src.evaluation.cache_identity import ranking_cache_identity
 from src.evaluation.metrics import METRIC_NAMES, query_metrics
 from src.keyword_search.bm25 import tokenize
 from src.search.query_filters import ACCESSORY_WORDS, BrandIndex, normalize_brand, parse_color
@@ -55,12 +58,13 @@ AUDIENCE_WORDS = {"men", "mens", "man", "women", "womens", "woman", "womans", "k
 
 # ------------------------------------------------------------------ inputs
 
-def load_from_ltr_cache(prefix):
+def load_from_ltr_cache(prefix, meta):
     """Per-query served rankings from the learning-to-rank feature files."""
     # Read each array once: indexing an .npz file decompresses the array every time.
-    with np.load(f"{prefix}.npz", allow_pickle=True) as stored:
+    with np.load(prefix.with_suffix(".npz")) as stored:
+        if stored["ranking_identity"].item() != json.dumps(meta["rankingIdentity"], sort_keys=True):
+            return None
         arrays = {name: stored[name] for name in ("X", "query", "ids")}
-    meta = json.loads(Path(f"{prefix}.json").read_text())
     names = list(meta["features"])
     column = {name: names.index(name) for name in ("keyword_rank", "semantic_rank", "semantic_similarity", "reranker_score")}
     rows = defaultdict(list)
@@ -83,21 +87,18 @@ def _clean(value):
     return None if np.isnan(value) or value >= 200 else value
 
 
-def run_pipeline(rows):
+def run_pipeline(rows, products, encoder_path, reranker_path):
     """Served ranking of every candidate, straight from ProductSearch.search()."""
-    from scripts.evaluate_quality import load_product_vectors, model_path
+    from scripts.evaluate_quality import load_product_vectors
     from sentence_transformers import CrossEncoder, SentenceTransformer
     import torch
     from src.evaluation.pipeline import ExactSemanticSearch
     from src.search.product_search import ProductSearch
-    from src.semantic.dataset import catalog_fingerprint, load_catalog
+    from src.semantic.dataset import catalog_fingerprint
 
     torch.set_num_threads(4)
-    products = load_catalog(DATASET_DIR / "prepared" / "products.json")
-    encoder_path = model_path("SEMANTIC_MODEL_PATH", "models/colab-export/esci-minilm-20k")
     encoder = SentenceTransformer(str(encoder_path), local_files_only=True, device="cpu")
-    reranker = CrossEncoder(str(model_path("RERANKER_MODEL_PATH", "models/ms-marco-MiniLM-L6-v2")),
-                            local_files_only=True, device="cpu", max_length=256)
+    reranker = CrossEncoder(str(reranker_path), local_files_only=True, device="cpu", max_length=256)
     vectors = load_product_vectors(encoder, products, catalog_fingerprint(products), encoder_path)
     engine = ProductSearch(products, ExactSemanticSearch(products, encoder, vectors), reranker)
     records = []
@@ -329,6 +330,44 @@ def plot_embedding_map(coordinates, types, highlight, path):
 
 # ------------------------------------------------------------------ main
 
+def read_matching_cache(path, identity):
+    try:
+        cached = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    return cached if isinstance(cached, dict) and cached.get("rankingIdentity") == identity else None
+
+
+def load_rankings(rows, products, encoder_path, reranker_path, *, force=False):
+    identity = ranking_cache_identity(products, rows, encoder_path, reranker_path)
+    if not force:
+        cached = read_matching_cache(OWN_CACHE, identity)
+        if cached is not None and isinstance(cached.get("records"), list):
+            return cached["records"]
+        meta = read_matching_cache(LTR_CACHE.with_suffix(".json"), identity)
+        if meta is not None and LTR_CACHE.with_suffix(".npz").is_file():
+            try:
+                records = load_from_ltr_cache(LTR_CACHE, meta)
+            except (OSError, ValueError, KeyError, BadZipFile):
+                records = None
+            if records is not None:
+                print(f"Reusing rankings from {LTR_CACHE}.npz", flush=True)
+                return records
+
+    print(f"Running the baseline pipeline on {len(rows)} validation queries...", flush=True)
+    records = run_pipeline(rows, products, encoder_path, reranker_path)
+    OWN_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(mode="w", dir=OWN_CACHE.parent, delete=False) as output:
+        temporary_path = Path(output.name)
+        try:
+            json.dump({"rankingIdentity": identity, "records": records}, output)
+            output.close()
+            temporary_path.replace(OWN_CACHE)
+        finally:
+            temporary_path.unlink(missing_ok=True)
+    return records
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--run", action="store_true", help="Rerun the served pipeline instead of reusing a cache.")
@@ -336,22 +375,16 @@ def main():
     args = parser.parse_args()
     rng = np.random.default_rng(SEED)
 
+    from scripts.evaluate_quality import model_path
     from src.semantic.dataset import load_catalog, read_jsonl
     products = load_catalog(DATASET_DIR / "prepared" / "products.json")
     by_id = {p["id"]: p for p in products}
     rows = read_jsonl(DATASET_DIR / "prepared" / "validation.jsonl")
     clean_text = {row["query_family"]: row["clean_query"] for row in rows}
 
-    if not args.run and Path(f"{LTR_CACHE}.npz").exists():
-        print(f"Reusing served rankings from {LTR_CACHE}.npz", flush=True)
-        records = load_from_ltr_cache(LTR_CACHE)
-    elif not args.run and OWN_CACHE.exists():
-        records = json.loads(OWN_CACHE.read_text())
-    else:
-        print(f"Running the served pipeline on {len(rows)} validation queries...", flush=True)
-        records = run_pipeline(rows)
-        OWN_CACHE.parent.mkdir(parents=True, exist_ok=True)
-        OWN_CACHE.write_text(json.dumps(records))
+    encoder_path = model_path("SEMANTIC_MODEL_PATH", "models/colab-export/esci-minilm-20k")
+    reranker_path = model_path("RERANKER_MODEL_PATH", "models/ms-marco-MiniLM-L6-v2")
+    records = load_rankings(rows, products, encoder_path, reranker_path, force=args.run)
 
     brands = BrandIndex(products)
     for record in records:

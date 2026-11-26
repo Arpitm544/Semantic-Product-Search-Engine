@@ -144,10 +144,11 @@ weak product category.
 ```sh
 cd backend
 .venv/bin/python -m pip install "umap-learn>=0.5.9" matplotlib   # analysis only
-.venv/bin/python scripts/error_analysis.py                        # about 1 minute
+.venv/bin/python scripts/error_analysis.py                        # about 1 minute with matching cached rankings
 ```
 
-It reuses the served rankings saved by the learning-to-rank feature script
-(`backend/indexes/ltr/validation.npz`) when present. Pass `--run` to rerun the
-pipeline instead (about 30 minutes on CPU), for example after tuning changes the
-pipeline. Outputs: `backend/quality/error_analysis.json` and the figures above.
+It reuses cached rankings, including those saved by the learning-to-rank feature
+script, when their catalog, validation data, model files and pipeline version match
+the current run. A cache miss runs the pipeline (about 30 minutes on CPU). Pass
+`--run` to force a fresh run. The script updates
+`backend/quality/error_analysis.json` and the figures above.

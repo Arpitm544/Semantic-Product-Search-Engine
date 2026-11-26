@@ -27,9 +27,9 @@ from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
 from api.quality import router as quality_router
 from api.suggestions import router as suggestions_router, warm_up as warm_up_suggestions
-from api.product_prices import apply_preferences
+from api.product_prices import SOURCE_FILTERS, apply_preferences, has_supported_preferences, matches_preferences
 from api.query_understanding import (
-    FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, understand,
+    FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, matches, understand,
 )
 from api.search_limits import check_search_rate
 from api.observability import instrument_engines, observe_requests, record_search_outcome
@@ -254,19 +254,28 @@ def catalog_search(context, preferences, understanding):
         logging.getLogger(__name__).exception("Search initialization failed")
         return search_unavailable()
     try:
-        # Rank every candidate when a chip narrows results, then keep the top 20.
-        limit = 500 if filtering(understanding) else 20
-        payload = engine.search(search_text(context, understanding), limit=limit, fuzzy=context.fuzzy)
-        payload = with_product_links(apply_query_filters(payload, understanding, limit=20))
-        return finish_search(context, payload, preferences)
+        search_options = {}
+        if filtering(understanding) or has_supported_preferences(preferences, "mongo"):
+            def matches_filters(product):
+                return matches(product, understanding) and (
+                    preferences is None or matches_preferences(product, preferences, SOURCE_FILTERS["mongo"])
+                )
+
+            search_options = {"candidate_filter": matches_filters, "candidate_limit": 500}
+        payload = engine.search(search_text(context, understanding), limit=500 if search_options else 20,
+                                fuzzy=context.fuzzy, **search_options)
+        payload = apply_query_filters(payload, understanding)
+        return with_product_links(finish_search(context, payload, preferences, limit=20))
     except (ValueError, RuntimeError, OSError, PyMongoError):
         logging.getLogger(__name__).exception("Search request failed")
         return search_unavailable()
 
 
-def finish_search(context, payload, preferences):
+def finish_search(context, payload, preferences, limit=None):
     if preferences is not None:
         payload = apply_preferences(payload, preferences, context.source)
+    if limit is not None:
+        payload = {**payload, "results": payload.get("results", [])[:limit]}
     record_search_outcome(context.source, payload, context.query)
     return remember_search(context, payload)
 

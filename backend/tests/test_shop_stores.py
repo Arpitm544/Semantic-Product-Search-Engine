@@ -199,3 +199,19 @@ def test_filler_words_do_not_match_unrelated_store_products():
     with robots(), patch.object(base.requests, 'get', return_value=response(payload={'products': [sunscreen, earbuds]})):
         titles = [p['title'] for p in provider.search('earbuds with noise cancellation', 10)]
     assert titles == ['Wireless Earbuds']
+
+
+
+def test_shopify_price_uses_an_available_variant():
+    from api.shop_providers.stores import StoreConfig, shopify_product
+
+    product = shopify_product(StoreConfig("shopify", "store.example.com", "USD"), {
+        "id": 42, "title": "Headphones", "handle": "headphones",
+        "variants": [
+            {"price": "10.00", "available": False},
+            {"price": "30.00", "available": True},
+            {"price": "nan", "available": True},
+        ],
+    })
+    assert product["inStock"] is True
+    assert product["price"] == 30

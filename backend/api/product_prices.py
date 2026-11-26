@@ -99,6 +99,14 @@ def active_filters(preferences):
     return [name for name in FILTERS if active[name]]
 
 
+def has_supported_preferences(preferences, source=None):
+    """True when at least one active preference applies to `source`."""
+    if not preferences:
+        return False
+    supported = SOURCE_FILTERS.get(source, set(FILTERS)) if source else set(FILTERS)
+    return any(name in supported for name in active_filters(preferences))
+
+
 def matches_preferences(product, preferences, filters=tuple(FILTERS)):
     return all(FILTERS[name](product, preferences) for name in filters)
 
