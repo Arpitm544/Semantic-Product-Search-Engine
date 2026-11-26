@@ -12,13 +12,30 @@ const examples = [
   'something to keep coffee hot',
 ];
 
+function isProductList(value: unknown): boolean {
+  return Array.isArray(value) && value.every(product =>
+    typeof product?.id === 'string' && typeof product.title === 'string');
+}
+
 function isLabReport(value: unknown): value is LabReport {
-  if (value === null || typeof value !== 'object') return false;
-  const report = value as Partial<LabReport>;
-  const { rankings } = report;
-  return typeof report.query === 'string' && typeof report.limit === 'number' && !!rankings &&
-    methods.every(({ id }) => Array.isArray(rankings[id]) &&
-      rankings[id].every(product => typeof product?.id === 'string' && typeof product.title === 'string'));
+  if (!value || typeof value !== 'object') return false;
+  const { query, limit, rankings } = value as Partial<LabReport>;
+  return typeof query === 'string' && typeof limit === 'number' &&
+    methods.every(({ id }) => isProductList(rankings?.[id]));
+}
+
+async function readRankings(response: Response): Promise<LabReport> {
+  const body = await response.json().catch(() => null);
+  if (response.status === 404) throw new Error('Search Lab is unavailable on the connected search service.');
+  if (!response.ok) throw new Error(body?.error || body?.detail || 'The search comparison could not be completed.');
+  if (!isLabReport(body)) throw new Error('The search service returned invalid rankings.');
+  return body;
+}
+
+function comparisonError(reason: unknown, timedOut: boolean) {
+  if (timedOut) return 'The search comparison took too long. Try again.';
+  if (reason instanceof TypeError) return 'The search service could not be reached. Check that the backend is running.';
+  return reason instanceof Error ? reason.message : 'The search comparison could not be completed.';
 }
 
 export default function SearchLab() {
@@ -38,7 +55,7 @@ export default function SearchLab() {
 
   async function run(value: string) {
     const text = value.trim();
-    if (!isSignedIn || !text || pending.current) return;
+    if (!text || pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
     const timeout = setTimeout(() => controller.abort(), 45000);
@@ -47,16 +64,10 @@ export default function SearchLab() {
     setLoading(true);
     try {
       const response = await request(`${API_BASE}/api/search-lab?${new URLSearchParams({ q: text })}`, { signal: controller.signal });
-      const body = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(body?.error || body?.detail || 'The search comparison could not be completed.');
-      if (!isLabReport(body)) throw new Error('The search service returned invalid rankings.');
-      if (pending.current === controller) setReport(body);
+      const rankings = await readRankings(response);
+      if (pending.current === controller) setReport(rankings);
     } catch (reason) {
-      if (pending.current === controller) {
-        if (controller.signal.aborted) setError('The search comparison took too long. Try again.');
-        else if (reason instanceof TypeError) setError('The search service could not be reached. Check that the backend is running.');
-        else setError(reason instanceof Error ? reason.message : 'The search comparison could not be completed.');
-      }
+      if (pending.current === controller) setError(comparisonError(reason, controller.signal.aborted));
     } finally {
       clearTimeout(timeout);
       if (pending.current === controller) {
@@ -68,7 +79,7 @@ export default function SearchLab() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void run(query);
+    if (isSignedIn) void run(query);
   }
 
   return <div className="space-y-6">
