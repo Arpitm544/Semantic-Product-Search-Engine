@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import numpy as np
 
 from src.config import DATASET_DIR, INDEXES_DIR
+from src.evaluation.cache_identity import ranking_cache_identity
 from src.ranking.features import FEATURE_NAMES, candidate_features
 from src.semantic.dataset import catalog_fingerprint, load_catalog, read_jsonl
 
@@ -91,9 +92,12 @@ def main():
         print(f"Building {split} features for {len(rows)} queries...", flush=True)
         data = build_split(engine, rows, split)
         suffix = f"-limit{args.limit}" if args.limit else ""
-        np.savez_compressed(OUTPUT_DIR / f"{split}{suffix}.npz", X=data["X"], y=data["y"], query=data["query"], ids=data["ids"])
+        identity = ranking_cache_identity(products, rows, encoder_path, reranker_path)
+        np.savez_compressed(OUTPUT_DIR / f"{split}{suffix}.npz", X=data["X"], y=data["y"], query=data["query"],
+                            ids=data["ids"], ranking_identity=json.dumps(identity, sort_keys=True))
         (OUTPUT_DIR / f"{split}{suffix}.json").write_text(json.dumps({
             "catalogSha256": catalog_hash, "features": FEATURE_NAMES, "queries": data["queries"],
+            "rankingIdentity": identity,
         }))
         print(f"  saved {len(data['y']):,} candidate rows ({int((data['y'] > 0).sum()):,} relevant)", flush=True)
 

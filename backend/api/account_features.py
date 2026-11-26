@@ -3,6 +3,7 @@ from typing import Annotated, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pymongo import ReturnDocument
 
 from api.product_prices import CURRENCIES
 from api.auth import require_session
@@ -78,6 +79,18 @@ def put_preferences(body: Preferences, session=Depends(require_session)):
     store('user_preferences').update_one({'_id': user, 'user_id': user},
         {'$set': {'preferences': value, 'updated_at': now()}}, upsert=True)
     return value
+
+
+@router.delete('/api/preferences/filters')
+def clear_preference_filters(session=Depends(require_session)):
+    user = session['sub']
+    filters = ('minBudget', 'maxBudget', 'categories', 'brands', 'inStockOnly')
+    row = store('user_preferences').find_one_and_update(
+        {'_id': user, 'user_id': user},
+        {'$unset': {f'preferences.{name}': '' for name in filters}, '$set': {'updated_at': now()}},
+        return_document=ReturnDocument.AFTER,
+    )
+    return Preferences.model_validate(row['preferences'] if row else {}).model_dump()
 
 
 @router.delete('/api/preferences')

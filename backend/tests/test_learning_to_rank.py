@@ -182,3 +182,15 @@ def test_significance_tests_behave():
     assert randomization_p_value(better, rng, rounds=2000) < 0.01
     low, high = bootstrap_interval(better, rng, rounds=2000)
     assert low < better.mean() < high and low > 0
+
+
+
+def test_incomplete_ranker_artifact_falls_back_to_the_blend(monkeypatch, tmp_path):
+    import json
+    from api import search_service
+    from src.ranking import learned
+
+    model_path = tmp_path / "model.json"
+    model_path.write_text(json.dumps({"feature_names": list(FEATURE_NAMES)}))
+    monkeypatch.setattr(learned, "MODEL_PATH", model_path)
+    assert search_service.load_learned_ranker("learned") is None

@@ -56,7 +56,7 @@ class ProductSearch:
         self.spelling = FrequencySpelling(word_counts)
         self.hybrid.spelling = self.spelling
 
-    def search(self, query, limit=20, fuzzy=True):
+    def search(self, query, limit=20, fuzzy=True, *, candidate_filter=None, candidate_limit=None):
         """Prepare the query, retrieve candidates, rank them, and return results."""
         # 1. Correct spelling and choose the query variations to search.
         query = query.strip()
@@ -86,10 +86,12 @@ class ProductSearch:
         # semantic search (Atlas) locks just its encoding so other requests are
         # not blocked while it waits on the database.
         if getattr(self.semantic, "manages_model_lock", False) is True:
-            candidate_ids, match_sources, signals = self.find_candidates_detailed(query_variations, query)
+            candidate_ids, match_sources, signals = self.find_candidates_detailed(query_variations, query, candidate_limit=candidate_limit)
         else:
             with self.lock:
-                candidate_ids, match_sources, signals = self.find_candidates_detailed(query_variations, query)
+                candidate_ids, match_sources, signals = self.find_candidates_detailed(query_variations, query, candidate_limit=candidate_limit)
+        if candidate_filter is not None:
+            candidate_ids = [product_id for product_id in candidate_ids if candidate_filter(self.by_id[product_id])][:candidate_limit]
         if not candidate_ids:
             return response
 
@@ -140,13 +142,14 @@ class ProductSearch:
         candidate_ids, match_sources, _ = self.find_candidates_detailed(query_variations, original_query)
         return candidate_ids, match_sources
 
-    def find_candidates_detailed(self, query_variations, original_query):
+    def find_candidates_detailed(self, query_variations, original_query, *, candidate_limit=None):
         """find_candidates(), plus each product's best keyword and semantic rank."""
         scores = defaultdict(float)
         match_sources = defaultdict(set)
         signals = defaultdict(lambda: {"keyword_rank": None, "semantic_rank": None, "semantic_similarity": None})
+        depth = max(50, candidate_limit or 0)
         for query in query_variations:
-            matches = self.hybrid.search(query, 50, fuzzy=False)
+            matches = self.hybrid.search(query, depth, fuzzy=False)
             for position, product in enumerate(matches["results"], start=1):
                 product_id = product["id"]
                 # Earlier matches earn more points. Repeated matches add up.

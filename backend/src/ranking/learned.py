@@ -37,9 +37,14 @@ class TreeModel:
     """A sum of regression trees from LightGBM's dump_model() output."""
 
     def __init__(self, dump):
-        if tuple(dump.get("feature_names", ())) != FEATURE_NAMES:
+        if not isinstance(dump, dict) or dump.get("feature_names") not in (list(FEATURE_NAMES), FEATURE_NAMES):
             raise ValueError("The ranking model was trained with different features.")
-        self.trees = [info["tree_structure"] for info in dump["tree_info"]]
+        trees = dump.get("tree_info")
+        if not isinstance(trees, list) or not trees:
+            raise ValueError("The ranking model contains no trees.")
+        if any(not isinstance(info, dict) or not isinstance(info.get("tree_structure"), dict) for info in trees):
+            raise ValueError("The ranking model contains an invalid tree.")
+        self.trees = [info["tree_structure"] for info in trees]
 
     def predict_row(self, row):
         total = 0.0

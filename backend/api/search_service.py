@@ -67,8 +67,9 @@ def build_search_engine():
     reranker = load_reranker(reranker_path)
 
     # ProductSearch combines spelling correction, retrieval, and ranking.
-    _search_engine = ProductSearch(products, semantic, reranker, model_lock=get_candidate_ranker().lock)
-    _search_engine.learned_ranker = load_learned_ranker(ranker_choice())
+    engine = ProductSearch(products, semantic, reranker, model_lock=get_candidate_ranker().lock)
+    engine.learned_ranker = load_learned_ranker(ranker_choice())
+    _search_engine = engine
     _search_signature = signature
     return _search_engine
 

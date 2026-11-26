@@ -198,7 +198,7 @@ def test_search_api_sends_clean_text_and_applies_chips(authenticated_api):
         assert {item["type"] for item in body["queryFilters"]["suggestions"]} == {"brand", "color"}
 
         body = client.get("/api/search", params={"q": "black nike shoes", "brand": "nike"}).json()
-        assert engine.search.call_args.kwargs["limit"] == 500  # rank everything, then narrow
+        assert engine.search.call_args.kwargs["limit"] == 500  # keep enough candidates to narrow
         assert [item["id"] for item in body["results"]] == ["n1"]
         assert body["queryFilters"]["active"] == [{"type": "brand", "value": "nike", "label": "Nike"}]
 
@@ -210,3 +210,44 @@ def test_the_price_chip_is_sent_as_a_query_parameter():
     assert qu.filter_choice().price is False
     assert qu.filter_choice(price="1").price is True
     assert qu.filter_choice(price="yes").price is False
+
+
+
+@pytest.mark.parametrize("params", [{"brand": "Sony"}, {"preferences": "1"}])
+def test_catalog_filters_allow_matches_beyond_the_normal_retrieval_depth(authenticated_api, params):
+    from fastapi.testclient import TestClient
+    from api import main
+    from api.account_features import Preferences
+    from src.search.product_search import ProductSearch
+
+    items = [{"id": f"p{i:03}", "title": "Wireless headphones",
+              "brand": "Other" if i < 60 else "Sony"} for i in range(65)]
+    meaning = Mock(model_name="test-encoder")
+    meaning.search.side_effect = lambda query, top_k: [(item, 0.9) for item in items[:top_k]]
+    reranker = Mock()
+    reranker.predict.side_effect = lambda pairs, **kwargs: [0.0] * len(pairs)
+    engine = ProductSearch(items, meaning, reranker)
+    prefs = Preferences(brands=["Sony"]).model_dump()
+    with patch.object(main.search_service, "_search_engine", engine), \
+            patch.object(main, "get_search_engine", return_value=engine), \
+            patch.object(main, "load_preferences", return_value=prefs), \
+            patch.object(main, "with_product_links", side_effect=lambda payload: payload):
+        response = TestClient(main.app).get("/api/search", params={"q": "wireless headphones", "fuzzy": "0", **params})
+    assert response.status_code == 200
+    found = response.json()["results"]
+    assert found and all(item["brand"] == "Sony" for item in found)
+    assert len(found) == 5
+    assert len(reranker.predict.call_args.args[0]) == len(found)
+
+
+def test_indian_price_grouping_and_conflicting_currency_ranges():
+    price, remaining = parse_price("shoes under 1,00,000 INR")
+    assert (price["max"], price["currency"], remaining) == (100000, "INR", "shoes")
+    for query in ("phone between $100 and €200", "phone under $100 EUR"):
+        assert parse_price(query) == (None, query)
+
+
+def test_price_bounds_reject_non_finite_values():
+    from src.search.query_filters import _amount
+
+    assert _amount("1e309") is None

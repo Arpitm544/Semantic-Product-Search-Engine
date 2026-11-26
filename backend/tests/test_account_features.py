@@ -113,6 +113,24 @@ def test_preferences_defaults_save_and_reset_are_private(client, mockdb):
     db['user_preferences'].delete_one.assert_called_with({'_id': 'alice', 'user_id': 'alice'})
 
 
+
+def test_clearing_filters_preserves_search_defaults(client, mockdb):
+    db, _ = mockdb
+    preferences = db['user_preferences']
+    update = preferences.find_one_and_update
+    update.return_value = {'preferences': {'defaultSource': 'shops', 'applyByDefault': True, 'currency': 'USD'}}
+    response = client.delete('/api/preferences/filters')
+    assert response.status_code == 200
+    assert response.json() == features.Preferences(defaultSource='shops', applyByDefault=True, currency='USD').model_dump()
+    owner, changes = update.call_args.args
+    assert owner == {'_id': 'alice', 'user_id': 'alice'}
+    assert set(changes['$unset']) == {
+        'preferences.minBudget', 'preferences.maxBudget', 'preferences.categories',
+        'preferences.brands', 'preferences.inStockOnly',
+    }
+    preferences.delete_one.assert_not_called()
+
+
 @pytest.mark.parametrize('body', [{'minBudget': 50, 'maxBudget': 10}, {'currency': 'XXX'}, {'brands': ['x'] * 21}, {'user_id': 'bob'}, {'minBudget': -1}])
 def test_preferences_validate_inputs(client, body):
     assert client.put('/api/preferences', json=body).status_code == 422
