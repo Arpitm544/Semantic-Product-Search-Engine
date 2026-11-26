@@ -50,6 +50,20 @@ class HybridSearch:
         payload["results"] = results
         return payload
 
+    def compare_retrieval(self, query, limit):
+        """Compare both retrievers and fuse the exact same candidate lists."""
+        if self.semantic is None:
+            raise RuntimeError("Semantic retrieval unavailable.")
+        if not tokenize(query):
+            return {method: [] for method in ("keyword", "semantic", "hybrid")}
+        rankings = self.collect_rankings(query, query, [], limit)
+        _, hybrid_results = self.combine_rankings(rankings, limit)
+        results = {
+            method: [product for product, _ in ranked[:limit]]
+            for method, _, ranked in rankings
+        }
+        return {**results, "hybrid": hybrid_results}
+
     def collect_rankings(self, query, corrected_query, corrections, limit):
         """Keep the results of each search method with its scoring weight."""
         bm25_k = max(self.params.bm25_k, limit)

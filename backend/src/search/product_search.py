@@ -128,6 +128,13 @@ class ProductSearch:
             })
         return response
 
+    def compare_retrieval(self, query, limit):
+        """Compare the retrieval methods under the same locking as search."""
+        if getattr(self.semantic, "manages_model_lock", False) is True:
+            return self.hybrid.compare_retrieval(query, limit)
+        with self.lock:
+            return self.hybrid.compare_retrieval(query, limit)
+
     def learned_order(self, context, ranking, signals, match_sources):
         """Reorder candidates with the learned ranker, or None to keep the blend.
 

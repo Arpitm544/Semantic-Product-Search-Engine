@@ -44,6 +44,7 @@ from api.shopping_service import ShoppingError, search_shopping, rank_shopping_r
 from api.shops_service import MAX_CANDIDATES as MAX_SHOPS_CANDIDATES, search_shops, rank_shops_response
 
 DISPLAY_LIMIT = 20
+LAB_LIMIT = 10
 SHOPPING_FILTER_LIMIT = 100
 CATALOG_FILTER_LIMIT = 500
 
@@ -208,6 +209,39 @@ def search_products(q: str = "", options: SearchOptions = Depends(SearchOptions)
     if options.source == "shops":
         return shops_search(context, values, understanding)
     return catalog_search(context, values, understanding)
+
+
+@app.get("/api/search-lab")
+def search_lab(q: str = "", session=Depends(require_session)):
+    """Compare keyword, semantic, and hybrid retrieval on the same query."""
+    query = q.strip()
+    if not query:
+        return JSONResponse(status_code=400, content={"error": "Enter a query to compare search methods."})
+    invalid = search_validation(query, "mongo")
+    if invalid is not None:
+        return invalid
+    check_search_rate(session["sub"], "mongo")
+    if search_initializing():
+        return JSONResponse(status_code=503, content={"error": "Search is initializing. Wait for indexing to finish."})
+    try:
+        engine = get_search_engine()
+    except Exception:
+        logging.getLogger(__name__).exception("Search initialization failed")
+        return search_unavailable()
+    instrument_engines(engine, ranking_service._ranker)
+    try:
+        rankings = engine.compare_retrieval(query, LAB_LIMIT)
+        return {
+            "query": query,
+            "limit": LAB_LIMIT,
+            "rankings": {
+                method: [{"id": product["id"], "title": product["title"]} for product in products]
+                for method, products in rankings.items()
+            },
+        }
+    except (ValueError, RuntimeError, OSError, PyMongoError):
+        logging.getLogger(__name__).exception("Search Lab request failed")
+        return search_unavailable()
 
 
 def search_text(context, understanding):
