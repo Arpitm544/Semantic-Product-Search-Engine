@@ -161,7 +161,9 @@ def test_preference_search_filters_before_recording_and_keeps_query_options(clie
         response = client.get(f'/api/search?q=%20headphones%20&source={source}&fuzzy=0&preferences=true')
     # Google Shopping has prices, so the budget applies. The catalog has no
     # prices, so its budget filter is skipped (and named) instead of emptying results.
-    expected = payload['results'][:1] if source == 'serpapi' else payload['results']
+    expected = payload['results']
+    if source == 'serpapi':
+        expected = [{**expected[0], 'confirmedPrice': {'amount': 20, 'currency': 'USD'}}]
     assert response.status_code == 200
     assert response.json()['results'] == expected
     assert response.json()['preferencesApplied'] is True
