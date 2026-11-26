@@ -24,12 +24,16 @@ function isLabReport(value: unknown): value is LabReport {
     methods.every(({ id }) => isProductList(rankings?.[id]));
 }
 
+function searchServiceError(response: Response, body: { error?: string; detail?: string } | null) {
+  if (response.status === 404) return 'Search Lab is unavailable on the connected search service.';
+  return body?.error || body?.detail || 'The search comparison could not be completed.';
+}
+
 async function readRankings(response: Response): Promise<LabReport> {
   const body = await response.json().catch(() => null);
-  if (response.status === 404) throw new Error('Search Lab is unavailable on the connected search service.');
-  if (!response.ok) throw new Error(body?.error || body?.detail || 'The search comparison could not be completed.');
-  if (!isLabReport(body)) throw new Error('The search service returned invalid rankings.');
-  return body;
+  if (!response.ok) throw new Error(searchServiceError(response, body));
+  if (isLabReport(body)) return body;
+  throw new Error('The search service returned invalid rankings.');
 }
 
 function comparisonError(reason: unknown, timedOut: boolean) {
