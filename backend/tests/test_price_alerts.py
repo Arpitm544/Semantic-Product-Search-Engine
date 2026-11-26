@@ -229,3 +229,23 @@ def test_daily_slot_is_atomic_and_bounded():
         assert store.find_one_and_update.call_args.kwargs['upsert'] is True
         store.find_one_and_update.side_effect = DuplicateKeyError('full')
         assert search_limits.take_daily_slot('scope', 5) is False
+
+
+
+def test_cached_shopping_search_retains_the_alert_merchants_offer(monkeypatch):
+    from api import shopping_service as shopping
+
+    monkeypatch.setenv("SERPAPI_API_KEY", "local-test")
+    monkeypatch.setattr(shopping, "_cache", shopping.OrderedDict())
+    row = {"product_id": "1234567", "title": "Headphones"}
+    provider = {"shopping_results": [
+        {**row, "source": "Another Store", "extracted_price": 40, "price": "US$40"},
+        *[{"title": f"Other product {i}", "product_id": f"900{i}"} for i in range(25)],
+        {**row, "source": "STORE", "extracted_price": 80, "price": "US$80"},
+    ]}
+    with patch.object(shopping, "fetch_products", return_value=provider) as fetch:
+        shown = shopping.search_shopping("Headphones")["results"]
+        assert len(shown) == 20 and shown[0]["merchant"] == "Another Store"
+        assert shopping.search_shopping("Headphones", limit=100)["total"] == 26
+        assert alerts.observe_price(shopping_alert()) == 80
+    fetch.assert_called_once()

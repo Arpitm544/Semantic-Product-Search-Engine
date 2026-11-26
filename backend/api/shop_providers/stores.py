@@ -28,6 +28,7 @@ from urllib.robotparser import RobotFileParser
 import requests
 
 from api.shop_providers.base import DailyBudget, ProviderError, TIMEOUT, get_json, product
+from api.shopping_service import number
 from src.keyword_search.bm25 import fit_bm25, search_bm25, tokenize
 from src.search.typos import STOP_WORDS
 
@@ -138,13 +139,9 @@ def shopify_product(store, row):
     if not isinstance(row, dict) or not row.get('handle'):
         return None
     variants = [v for v in row.get('variants') or [] if isinstance(v, dict)]
-    prices = []
-    for variant in variants:
-        try:
-            prices.append(float(variant.get('price')))
-        except (TypeError, ValueError):
-            pass
     available = [v.get('available') for v in variants if isinstance(v.get('available'), bool)]
+    priced_variants = [v for v in variants if v.get('available') is True] if any(available) else variants
+    prices = [price for variant in priced_variants if (price := number(variant.get('price'))) is not None]
     images = [image.get('src') for image in row.get('images') or [] if isinstance(image, dict)]
     tags = row.get('tags')
     tags = tags if isinstance(tags, list) else [tag.strip() for tag in str(tags or '').split(',')]

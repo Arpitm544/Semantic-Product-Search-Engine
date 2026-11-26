@@ -186,7 +186,9 @@ def shopping_offer(alert):
     if alert['market'] != market_settings():
         raise ValueError('Shopping region settings changed. Recreate this alert for the new region.')
     reserve_shopping_check(alert['user_id'])
-    candidates = search_shopping(alert['product']['title'])['results']
+    candidates = search_shopping(
+        alert['product']['title'], limit=1, offer=(alert['identity'], alert['product']['merchant'])
+    )['results']
     product = next((item for item in candidates if same_offer(item, alert)), None)
     if product is None:
         raise ValueError('The same product and merchant could not be verified. A later check will retry.')

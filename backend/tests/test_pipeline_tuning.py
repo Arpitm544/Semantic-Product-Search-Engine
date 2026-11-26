@@ -143,3 +143,24 @@ def test_configured_pipeline_params_env_override_and_fallback(tmp_path, monkeypa
     monkeypatch.setenv("PIPELINE_PARAMS_PATH", str(tmp_path / "missing.json"))
     fallback = configured_pipeline_params()
     assert fallback == PipelineParams()
+
+
+
+def test_paired_tuning_interval_is_zero_for_identical_runs():
+    from scripts.tune_pipeline import METRIC_NAMES, compare_test_runs
+
+    rows = [{"family": family, "stages": {"reranked": dict.fromkeys(METRIC_NAMES, score)}}
+            for family, score in enumerate((0.0, 0.2, 0.8, 1.0))]
+    result = compare_test_runs(rows, rows)["ndcg@10"]
+    assert result == {"delta": 0.0, "confidenceInterval": [0.0, 0.0], "pValue": 1.0}
+
+
+def test_tuning_cache_key_changes_with_relevance_labels(tmp_path):
+    from scripts.tune_pipeline import validation_cache_key
+
+    original = [{"query": "running shoes", "grades": {"shoe": 3}}]
+    modified = [{"query": "running shoes", "grades": {"shoe": 0}}]
+    encoder, reranker = tmp_path / "encoder", tmp_path / "reranker"
+    assert validation_cache_key("catalog", encoder, reranker, original, 50, 30) != (
+        validation_cache_key("catalog", encoder, reranker, modified, 50, 30)
+    )

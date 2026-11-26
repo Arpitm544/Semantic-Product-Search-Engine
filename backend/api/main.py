@@ -27,9 +27,9 @@ from api.account_features import router as account_router, load_preferences
 from api.price_alerts import router as alerts_router, worker_loop
 from api.quality import router as quality_router
 from api.suggestions import router as suggestions_router, warm_up as warm_up_suggestions
-from api.product_prices import apply_preferences, has_supported_preferences
+from api.product_prices import SOURCE_FILTERS, apply_preferences, has_supported_preferences, matches_preferences
 from api.query_understanding import (
-    FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, understand,
+    FilterChoice, apply as apply_query_filters, brand_index, filter_choice, filtering, matches, understand,
 )
 from api.search_limits import check_search_rate
 from api.observability import instrument_engines, observe_requests, record_search_outcome
@@ -278,9 +278,18 @@ def catalog_search(context, preferences, understanding):
         return search_unavailable()
     instrument_engines(engine, ranking_service._ranker)
     try:
-        # Rank every candidate when a chip or saved filter narrows results, then keep the top 20.
-        limit = CATALOG_FILTER_LIMIT if needs_candidate_pool(understanding, preferences, "mongo") else DISPLAY_LIMIT
-        payload = engine.search(search_text(context, understanding), limit=limit, fuzzy=context.fuzzy)
+        search_options = {}
+        limit = DISPLAY_LIMIT
+        if needs_candidate_pool(understanding, preferences, "mongo"):
+            limit = CATALOG_FILTER_LIMIT
+            def matches_filters(product):
+                return matches(product, understanding) and (
+                    preferences is None or matches_preferences(product, preferences, SOURCE_FILTERS["mongo"])
+                )
+
+            search_options = {"candidate_filter": matches_filters, "candidate_limit": CATALOG_FILTER_LIMIT}
+        payload = engine.search(search_text(context, understanding), limit=limit,
+                                fuzzy=context.fuzzy, **search_options)
         payload = apply_query_filters(payload, understanding)
         return with_product_links(finish_search(context, payload, preferences))
     except (ValueError, RuntimeError, OSError, PyMongoError):
