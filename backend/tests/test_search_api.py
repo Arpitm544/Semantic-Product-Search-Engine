@@ -157,6 +157,19 @@ class TestSearchAPI(unittest.TestCase):
                 search_service.get_search_engine()
             self.assertFalse(ready.is_set())
 
+    def test_transient_db_error_during_reload_keeps_serving_existing_engine(self):
+        from threading import Event
+        from pymongo.errors import PyMongoError
+        engine, ready = Mock(), Event()
+        ready.set()
+        with patch.object(search_service, "version", return_value={"sha256": "new", "updated_at": "2"}), \
+                patch.object(search_service, "_search_engine", engine), \
+                patch.object(search_service, "_search_signature", ("old", "1", "model", "reranker", "product_vectors")), \
+                patch.object(search_service, "_search_ready", ready), \
+                patch.object(search_service, "load_products", side_effect=PyMongoError("timeout")):
+            self.assertIs(search_service.get_search_engine(), engine)
+            self.assertTrue(ready.is_set())
+
     def test_catalog_indexes_are_reused_and_refreshed_after_a_change(self):
         manifest = {"sha256": "first", "updated_at": "1"}
         with patch.object(search_service, "version", side_effect=lambda: dict(manifest)), \

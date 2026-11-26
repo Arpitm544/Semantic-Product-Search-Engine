@@ -1,5 +1,7 @@
 'use client';
-import type { ReactNode } from 'react';
+import { useClerk } from '@clerk/nextjs';
+import { useState, useTransition, type ReactNode } from 'react';
+import { SESSION_RENEWAL_MESSAGE } from '@/lib/api';
 
 export type IconName = 'grid' | 'search' | 'box' | 'heart' | 'folder' | 'columns' | 'bell' | 'clock' | 'sliders' | 'arrow' | 'trash' | 'refresh' | 'tag' | 'chart' | 'info' | 'pulse';
 
@@ -75,17 +77,46 @@ function details(problems: Problem[]) {
   return messages.filter((message, index) => messages.indexOf(message) === index).join(' ');
 }
 
-/** One banner for every section that failed, instead of a different alert per section. */
+const bannerAction = 'inline-flex items-center gap-1.5 rounded-full border border-current bg-transparent px-3 py-1.5 text-xs font-semibold disabled:opacity-50';
+
 export function ProblemBanner({ problems, busy }: { problems: Problem[]; busy: boolean }) {
+  const clerk = useClerk();
+  const [signingIn, startSignIn] = useTransition();
+  const [signInError, setSignInError] = useState(false);
   if (!problems.length) return null;
+
+  const needsSignIn = problems.some(problem => problem.message === SESSION_RENEWAL_MESSAGE);
+  const multiple = problems.length > 1;
   const unreachable = problems.every(problem => /reach|fetch|network|unavailable/i.test(problem.message));
+  const title = multiple ? 'Some sections could not load.' : `${problems[0].label} could not load.`;
+  const description = multiple && unreachable ? 'The server is not responding right now.' : details(problems);
+
+  function signInAgain() {
+    const sessionId = clerk.session?.id;
+    if (!sessionId) {
+      window.location.assign('/sign-in');
+      return;
+    }
+    setSignInError(false);
+    startSignIn(async () => {
+      try {
+        await clerk.signOut({ sessionId, redirectUrl: '/sign-in' });
+      } catch {
+        setSignInError(true);
+      }
+    });
+  }
+
   return <div role="alert" className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#e6c9b8] bg-[#fbf1ea] px-4 py-3 text-sm text-[#7c4a33] dark:border-[#6b4636] dark:bg-[#2c1f19] dark:text-[#f0c9b4]">
     <span className="min-w-0 flex-1">
-      <strong className="font-semibold">{problems.length > 1 ? 'Some sections could not load.' : `${problems[0].label} could not load.`}</strong>{' '}
-      <span className="opacity-85">{unreachable && problems.length > 1 ? 'The server is not responding right now.' : details(problems)}</span>
+      <strong className="font-semibold">{needsSignIn ? 'Sign-in required.' : title}</strong>{' '}
+      <span className="opacity-85">{needsSignIn ? 'Your session could not be verified.' : description}</span>
+      {needsSignIn && signInError && <span className="mt-1 block">Could not reopen sign-in. Try the button again.</span>}
     </span>
-    <button type="button" disabled={busy} onClick={() => problems.forEach(problem => problem.retry())} className="inline-flex items-center gap-1.5 rounded-full border border-current bg-transparent px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
-      <Icon name="refresh" size={14} /> {busy ? 'Loading…' : 'Try again'}
-    </button>
+    {needsSignIn
+      ? <button type="button" disabled={signingIn} onClick={signInAgain} className={bannerAction}>{signingIn ? 'Opening sign-in…' : 'Sign in again'} <Icon name="arrow" size={14} /></button>
+      : <button type="button" disabled={busy} onClick={() => problems.forEach(problem => problem.retry())} className={bannerAction}>
+          <Icon name="refresh" size={14} /> {busy ? 'Loading…' : 'Try again'}
+        </button>}
   </div>;
 }

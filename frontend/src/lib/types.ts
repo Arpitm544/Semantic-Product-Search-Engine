@@ -41,6 +41,7 @@ export interface SearchProduct {
   tags?: string[];
   provider?: string;
   matchSources?: string[];
+  relevanceProbability?: number | null;
   explanation?: ResultExplanation;
 }
 

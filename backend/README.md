@@ -111,11 +111,12 @@ How it behaves:
   and a `warning` names it; results from the other shops are still returned. If
   every configured shop fails, the API returns HTTP 503 with `code=shops_unavailable`.
 - Each shop contributes up to 10 candidates (at most 100 in all, merged
-  round-robin). Our models rank the whole pool, results the cross-encoder scores
-  as clearly unrelated (below -5) are dropped, and the top 20 are returned, so a
-  shop with many good matches is not limited to a few slots. Store keyword search
-  ignores filler words such as "with". If nothing clears the relevance floor, the
-  nearest products are kept with `warningCode=shops_no_close_match` and a notice.
+  round-robin). Our models rank the whole pool and return up to 20 products.
+  With the calibrated ESCI reranker, products with less than 20% estimated
+  relevance are dropped when at least one product clears the threshold. If all
+  probabilities are below 20%, the closest products stay visible with
+  `warningCode=shops_no_close_match` and a notice. Store keyword search ignores
+  filler words such as "with".
   `candidateCount` is the size of the ranked pool. If the models are unavailable,
   the shops' own order is kept (top 20) with `rankingStatus=unavailable`.
 - Results are cached per shop and query for five minutes. eBay application

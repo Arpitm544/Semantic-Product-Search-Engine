@@ -1,6 +1,7 @@
 # Start the 40,000-example run in Google Colab
 
 > Commands and artifact paths in this guide are relative to `backend/`, unless stated otherwise.
+> The shopping cross-encoder has a separate [reranker workflow](#fine-tune-and-calibrate-the-reranker).
 
 ## Prepare the bundle from a fresh checkout
 
@@ -112,6 +113,46 @@ this experiment uses a 42,617-product sampled Amazon corpus.
 The final cell downloads `esci_minilm_model.zip` and saves a copy in Drive.
 That download includes deployable weights and reports, excluding the large
 optimizer checkpoints.
+
+## Fine-tune and calibrate the reranker
+
+From the same backend environment, download Amazon ESCI if needed, then prepare
+the reranker bundle from the original judgments.
+
+```bash
+python -m src.semantic.download_esci
+python scripts/create_reranker_bundle.py
+```
+
+Open `notebooks/03_colab_esci_reranker.ipynb` in Colab, select a T4 GPU runtime,
+and run the cells in order. When prompted, upload
+`colab/reranker/esci_reranker_bundle.zip`. You can also upload the ZIP through
+Colab's Files sidebar before running the upload cell. Training starts from MS MARCO
+MiniLM-L6-v2 and processes approximately 40,000 judged pairs from complete
+query groups. Exact, Substitute, Complement, and Irrelevant training targets
+are 1.0, 0.85, 0.65, and 0.0.
+
+Platt scaling fits the single reranker logit on 400 separate calibration query
+families. Its event is a judge labeling the pair Exact, Substitute, or
+Complement. Another 400 families from the official test split supply the
+reliability diagram, before/after Brier score, log loss, calibration error,
+and the base versus fine-tuned nDCG@10 comparison. The report also shows
+how many test pairs fall below 20% and how many of those actually were relevant.
+These estimates describe judged English ESCI pairs. Live shopping traffic can
+have a different mix of items and relevance.
+
+Extract `esci-reranker` from the downloaded `esci_reranker_export.zip` to
+`models/colab-export/esci-reranker` and restart the backend. Remove any existing
+`RERANKER_MODEL_PATH` override or point it at that directory. The probability
+mapping is stored in `calibration.json` beside the exact weights it was fitted
+on. The deployment model exporter includes both. The encoder and Atlas
+vector index do not need rebuilding.
+
+Search exposes `relevanceProbability` between 0 and 1. Online shops keep
+products at or above 20% when at least one clears the threshold. If every
+product falls below 20%, the closest products stay visible with a notice.
+System health uses the same threshold on the displayed results. With the
+original reranker, the probability is null and a scored miss is unknown.
 
 To use a selected model later, extract the `esci-minilm-20k` folder into this
 project's `models/` directory, then start the API with:
