@@ -10,9 +10,10 @@ import { CompareProductButton, ProductComparison, comparisonKey, useProductCompa
 import DashboardShell from '@/components/dashboard/DashboardShell';
 import { SuggestionList, useSearchSuggestions } from '@/components/SearchSuggestions';
 import { classes } from '@/lib/classes';
-import { listedCategory, listedColors, listedFeatures, matchesListingText, suggestedRefinements, type Refinement } from '@/lib/guidedSearch';
+import { listedCategory, listedColors, listedFeatures } from '@/lib/guidedSearch';
+import { useGuidedSearch } from '@/lib/useGuidedSearch';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { productSourceLabel, type QueryFilterChip, type QueryFilters, type SearchProduct, type SearchSource, type SmartFilterChoice } from '@/lib/types';
 import type { FormEvent } from 'react';
 import { API_BASE, useAuthenticatedFetch } from '@/lib/api';
@@ -178,6 +179,17 @@ function ProductImage({ product, index }: { product: SearchProduct; index: numbe
   );
 }
 
+function removePreferenceFilter(current: Preferences, key: keyof Preferences, label: string): Preferences {
+  switch (key) {
+    case 'categories': return { ...current, categories: current.categories.filter(value => value !== label) };
+    case 'brands': return { ...current, brands: current.brands.filter(value => value !== label) };
+    case 'minBudget':
+    case 'maxBudget': return { ...current, [key]: null };
+    case 'inStockOnly': return { ...current, inStockOnly: false };
+    default: return current;
+  }
+}
+
 export default function ProductSearchPage({
   initialQuery = '',
   initialSource = 'mongo',
@@ -201,13 +213,8 @@ export default function ProductSearchPage({
   const [lastFuzzy, setLastFuzzy] = useState(true);
   const [results, setResults] = useState<SearchProduct[]>([]);
   const comparison = useProductComparison<SearchProduct>();
-  const [refinements, setRefinements] = useState<Refinement[]>([]);
-  const [featureText, setFeatureText] = useState('');
-  const refinementGroups = useMemo(() => suggestedRefinements(results, searched), [results, searched]);
-  const hasRefinements = refinements.length > 0 || featureText.trim().length > 0;
-  const visibleResults = hasRefinements
-    ? results.filter(product => refinements.every(option => option.matches(product)) && matchesListingText(product, featureText))
-    : results;
+  const guided = useGuidedSearch(results, searched);
+  const { visibleResults } = guided;
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -276,21 +283,8 @@ export default function ProductSearchPage({
     source,
   ]);
 
-  function clearRefinements() {
-    setRefinements([]);
-    setFeatureText('');
-  }
-
-  function toggleRefinement(option: Refinement) {
-    setRefinements(current => {
-      if (current.some(item => item.id === option.id)) return current.filter(item => item.id !== option.id);
-      const other = option.facet === 'feature' ? current : current.filter(item => item.facet !== option.facet);
-      return [...other, option];
-    });
-  }
-
   function changeSource(value: keyof typeof SOURCES) {
-    clearRefinements();
+    guided.clear();
     sourceOverridden.current = true;
     pending.current?.abort();
     pending.current = null;
@@ -323,7 +317,7 @@ export default function ProductSearchPage({
   async function runSearch(query: string, fuzzy = true, filtersEnabled = usePreferences, smartOptions: { choice?: SmartFilterChoice; source?: SearchSource } = {}) {
     const { choice = smart, source: searchSource = source } = smartOptions;
     if (!query) return;
-    if (query !== searched) clearRefinements();
+    if (query !== searched) guided.clear();
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
@@ -420,13 +414,7 @@ export default function ProductSearchPage({
             ...((appliedFilters || preferences.data)!.brands.map(value => [value, 'brands'])),
             ...((appliedFilters || preferences.data)!.inStockOnly ? [['In stock', 'inStockOnly']] : []),
           ] as [string, keyof Preferences][]).map(([label, key]) => <button key={`${key}:${label}`} type="button" disabled={preferences.busy} className="rounded-full border border-[var(--line)] bg-[var(--surface-fff)] px-3 py-1.5 text-xs hover:bg-[var(--sage)] disabled:opacity-50" aria-label={`Remove ${label} filter`} onClick={async () => {
-            const current = appliedFilters || preferences.data!;
-            const next = { ...current };
-            if (key === 'categories') next.categories = current.categories.filter(value => value !== label);
-            else if (key === 'brands') next.brands = current.brands.filter(value => value !== label);
-            else if (key === 'minBudget') next.minBudget = null;
-            else if (key === 'maxBudget') next.maxBudget = null;
-            else if (key === 'inStockOnly') next.inStockOnly = false;
+            const next = removePreferenceFilter(appliedFilters || preferences.data!, key, label);
             const saved = await preferences.mutate(
               () => preferences.api<Preferences>('/api/preferences', { method: 'PUT', body: JSON.stringify(next) }),
               'Filter removed.',
@@ -450,7 +438,7 @@ export default function ProductSearchPage({
         </div>}
         {!loading && !error && !searched && <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:var(--text-677567)] text-[13px] [&_small]:text-[11px] [&_small]:[color:var(--text-929c91)] search-empty-start [&>span]:w-[32px] [&>span]:h-[32px] [&>span]:rounded-[10px] [&>span]:[background:var(--surface-edf3e9)] [&>span]:[color:var(--text-759272)] [&>span]:grid [&>span]:place-items-center [&>span]:mb-[4px] [&_strong]:text-[13px] [&_strong]:font-semibold"}><span>✳</span><strong>Start with a product or a need</strong><small>Enter a product, brand, or category to search {SOURCES[source]}.</small></div>}
         {!loading && !error && searched && <>
-          <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_var(--border-e7ebe5)] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:var(--text-344035)] [&>span]:text-[11px] [&>span]:[color:var(--text-8b958a)] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span role="status">{hasRefinements ? `${visibleResults.length} of ${results.length} results match your refinements` : shopping ? `${results.length} products shown` : `${results.length} products shown from ${total} ranked candidates`}</span></div>
+          <div className={"search-results-heading flex items-end justify-between pt-[20px] pr-[0] pb-[14px] pl-[0] [border-bottom:1px_solid_var(--border-e7ebe5)] [&_h2]:[font-style:normal] [&_h2]:font-semibold [&_h2]:text-[22px] [&_h2]:leading-[normal] [&_h2]:[font-family:Manrope,sans-serif] [&_h2]:tracking-[-.6px] [&_h2]:mt-[5px] [&_h2]:mr-[0] [&_h2]:mb-[0] [&_h2]:ml-[0] [&_h2]:[color:var(--text-344035)] [&>span]:text-[11px] [&>span]:[color:var(--text-8b958a)] [&>span]:pb-[4px] max-[600.01px]:items-start max-[600.01px]:gap-[8px] max-[600.01px]:flex-col max-[600.01px]:[&_h2]:text-[19px]"}><div><span className={"search-page-eyebrow text-[10px] font-bold tracking-[1.3px] [color:var(--text-859482)]"}>{SOURCES[source]} · RESULTS FOR</span><h2>“{searched}”</h2></div><span role="status">{guided.refined ? `${visibleResults.length} of ${results.length} results match your refinements` : shopping ? `${results.length} products shown` : `${results.length} products shown from ${total} ranked candidates`}</span></div>
           {queryFilters && <QueryFilterChips filters={queryFilters}
             onPrice={(price: boolean) => void runSearch(searched, lastFuzzy, usePreferences, { choice: { ...smart, price } })}
             onRemove={(item: QueryFilterChip) => void runSearch(searched, lastFuzzy, usePreferences, { choice: { ...smart, [item.type]: '' } })}
@@ -458,13 +446,13 @@ export default function ProductSearchPage({
             onSearchShops={() => { const query = searched; changeSource('shops'); void runSearch(query, lastFuzzy, usePreferences, { source: 'shops', choice: { ...smart, price: true } }); }} />}
           {warning && <div className={"search-ranking-warning mt-[15px] mr-[0] mb-[15px] ml-[0] pt-[12px] pr-[14px] pb-[12px] pl-[14px] [border:1px_solid_var(--border-e5d9b5)] rounded-[8px] [background:var(--surface-fffaf0)] [color:var(--text-796338)] text-[12px] leading-[1.5]"} role="status">{warning}</div>}
           {correctedQuery && <div className={"search-spelling-note flex items-center justify-between gap-[12px] mt-[15px] mr-[0] mb-[15px] ml-[0] pt-[12px] pr-[14px] pb-[12px] pl-[14px] [border:1px_solid_var(--border-dce4d9)] rounded-[8px] [background:var(--surface-edf3e9)] [color:var(--text-455b48)] text-[12px] leading-[1.5] [&_button]:[border:0] [&_button]:[background:transparent] [&_button]:[color:var(--text-4f7857)] [&_button]:[font-style:normal] [&_button]:font-semibold [&_button]:text-[11px] [&_button]:leading-[normal] [&_button]:[font-family:'DM_Sans',sans-serif] [&_button]:underline [&_button]:cursor-pointer [&_button]:shrink-[0] [&_button:focus-visible]:[outline:2px_solid_var(--focus-ring)] [&_button:focus-visible]:[outline-offset:4px] max-[600.01px]:items-start max-[600.01px]:flex-col"}><span>Also searching for <strong>“{correctedQuery}”</strong>.</span><button type="button" onClick={() => runSearch(searched, false)}>Use original spelling</button></div>}
-          {(results.length > 0 || hasRefinements) && <GuidedSearchFilters
-            groups={refinementGroups}
-            selected={refinements}
-            featureText={featureText}
-            onFeatureText={setFeatureText}
-            onToggle={toggleRefinement}
-            onClear={clearRefinements}
+          {(results.length > 0 || guided.refined) && <GuidedSearchFilters
+            groups={guided.groups}
+            selected={guided.selected}
+            featureText={guided.featureText}
+            onFeatureText={guided.setFeatureText}
+            onToggle={guided.toggle}
+            onClear={guided.clear}
           />}
         </>}
         {(visibleResults.length > 0 || comparison.items.length > 0) && <ProductComparison items={comparison.items} rows={comparisonRows} onRemove={comparison.toggle} onClear={comparison.clear} />}
@@ -493,9 +481,9 @@ export default function ProductSearchPage({
               </div>
               <span className={"relevance-score self-start mt-[3px] mr-[3px] mb-[0] ml-[0] rounded-[14px] pt-[5px] pr-[8px] pb-[5px] pl-[8px] [background:var(--surface-f0f4ee)] [color:var(--text-577658)] text-[10px] font-bold whitespace-nowrap [&_small]:text-[8px] [&_small]:font-medium [&_small]:ml-[4px] [&_small]:[color:var(--text-82927f)] max-[600.01px]:text-[9px] max-[600.01px]:pt-[4px] max-[600.01px]:pr-[6px] max-[600.01px]:pb-[4px] max-[600.01px]:pl-[6px] max-[600.01px]:ml-[66px] max-[600.01px]:[&_small]:hidden"}>{shopping ? product.matchSources?.includes('reranker') ? 'Engine ranked' : source === 'shops' ? 'Shop order' : 'Google ranked' : product.matchSources?.some((source) => source === 'fuzzy' || source === 'semantic-corrected') ? 'Spelling match' : product.matchSources?.includes('keyword') ? 'Product match' : 'Related match'}</span>
             </article>;
-          })}</div> : hasRefinements ? <div className="rounded-xl border border-[var(--line)] px-4 py-7 text-center">
+          })}</div> : guided.refined ? <div className="rounded-xl border border-[var(--line)] px-4 py-7 text-center">
             <p className="m-0 text-sm font-semibold">No listings match these refinements.</p>
-            <button type="button" onClick={clearRefinements} className="mt-2 cursor-pointer border-0 bg-transparent text-sm underline underline-offset-4">Show all results</button>
+            <button type="button" onClick={guided.clear} className="mt-2 cursor-pointer border-0 bg-transparent text-sm underline underline-offset-4">Show all results</button>
           </div> : <div className={"search-state min-h-[190px] flex flex-col items-center justify-center gap-[9px] text-center [color:var(--text-677567)] text-[13px] [&_small]:text-[11px] [&_small]:[color:var(--text-929c91)] search-no-results [&_strong]:text-[13px] [&_strong]:font-semibold"}><strong>No matching products found.</strong><small>Try a shorter query or choose another search source.</small></div>
         )}
       </section>

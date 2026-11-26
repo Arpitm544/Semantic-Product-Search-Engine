@@ -7,7 +7,7 @@ function confirmedPrice(product: SearchProduct) {
     /^[A-Z]{3}$/.test(price.currency) ? price : null;
 }
 
-export function budgetGroup(products: SearchProduct[]): RefinementGroup {
+function pricesByCurrency(products: SearchProduct[]) {
   const currencies = new Map<string, number[]>();
   for (const product of products) {
     const price = confirmedPrice(product);
@@ -16,21 +16,31 @@ export function budgetGroup(products: SearchProduct[]): RefinementGroup {
     amounts.push(price.amount);
     currencies.set(price.currency, amounts);
   }
-  const options: Refinement[] = [];
-  for (const [currency, amounts] of [...currencies].sort(([, a], [, b]) => b.length - a.length)) {
-    const prices = [...new Set(amounts)].sort((a, b) => a - b);
-    // Offer a cutoff from the lower half of actual prices, below the highest price.
-    if (prices.length < 2) continue;
-    const cutoff = prices[Math.floor((prices.length - 1) / 2)];
-    const display = new Intl.NumberFormat('en-US', { maximumFractionDigits: 12 }).format(cutoff);
-    options.push({
-      id: `budget:${currency}:${cutoff}`, facet: 'budget', label: `Up to ${currency} ${display}`,
-      matches: product => {
-        const price = confirmedPrice(product);
-        return price?.currency === currency && price.amount <= cutoff;
-      },
-    });
-    if (options.length === 3) break;
-  }
+  return currencies;
+}
+
+const cutoffFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 12 });
+
+function budgetOption(currency: string, amounts: number[]): Refinement | null {
+  const prices = [...new Set(amounts)].sort((a, b) => a - b);
+  if (prices.length < 2) return null;
+  const cutoff = prices[Math.floor((prices.length - 1) / 2)];
+  return {
+    id: `budget:${currency}:${cutoff}`,
+    facet: 'budget',
+    label: `Up to ${currency} ${cutoffFormat.format(cutoff)}`,
+    matches: product => {
+      const price = confirmedPrice(product);
+      return price?.currency === currency && price.amount <= cutoff;
+    },
+  };
+}
+
+export function budgetGroup(products: SearchProduct[]): RefinementGroup {
+  const options = [...pricesByCurrency(products)]
+    .sort(([, a], [, b]) => b.length - a.length)
+    .map(([currency, amounts]) => budgetOption(currency, amounts))
+    .filter(option => option !== null)
+    .slice(0, 3);
   return { facet: 'budget', label: 'Budget', options };
 }

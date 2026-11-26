@@ -71,9 +71,11 @@ function countValues(
 ) {
   const entries = new Map<string, { label: string; count: number }>();
   for (const product of products) {
-    const unique = new Map(values(product).map(value => [normalize(value), value]));
+    const unique = new Map(values(product)
+      .filter(value => value.length <= 70)
+      .map(value => [normalize(value), value]));
     for (const [key, value] of unique) {
-      if (!key || value.length > 70 || !include(key)) continue;
+      if (!key || !include(key)) continue;
       const existing = entries.get(key);
       entries.set(key, { label: existing?.label ?? value, count: (existing?.count ?? 0) + 1 });
     }
