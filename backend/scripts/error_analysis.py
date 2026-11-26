@@ -338,24 +338,24 @@ def read_matching_cache(path, identity):
     return cached if isinstance(cached, dict) and cached.get("rankingIdentity") == identity else None
 
 
-def load_rankings(rows, products, encoder_path, reranker_path, *, force=False):
-    identity = ranking_cache_identity(products, rows, encoder_path, reranker_path)
-    if not force:
-        cached = read_matching_cache(OWN_CACHE, identity)
-        if cached is not None and isinstance(cached.get("records"), list):
-            return cached["records"]
-        meta = read_matching_cache(LTR_CACHE.with_suffix(".json"), identity)
-        if meta is not None and LTR_CACHE.with_suffix(".npz").is_file():
-            try:
-                records = load_from_ltr_cache(LTR_CACHE, meta)
-            except (OSError, ValueError, KeyError, BadZipFile):
-                records = None
-            if records is not None:
-                print(f"Reusing rankings from {LTR_CACHE}.npz", flush=True)
-                return records
+def read_cached_rankings(identity):
+    cached = read_matching_cache(OWN_CACHE, identity)
+    if cached is not None and isinstance(cached.get("records"), list):
+        return cached["records"]
 
-    print(f"Running the baseline pipeline on {len(rows)} validation queries...", flush=True)
-    records = run_pipeline(rows, products, encoder_path, reranker_path)
+    meta = read_matching_cache(LTR_CACHE.with_suffix(".json"), identity)
+    if meta is None or not LTR_CACHE.with_suffix(".npz").is_file():
+        return None
+    try:
+        records = load_from_ltr_cache(LTR_CACHE, meta)
+    except (OSError, ValueError, KeyError, BadZipFile):
+        return None
+    if records is not None:
+        print(f"Reusing rankings from {LTR_CACHE}.npz", flush=True)
+    return records
+
+
+def write_ranking_cache(identity, records):
     OWN_CACHE.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile(mode="w", dir=OWN_CACHE.parent, delete=False) as output:
         temporary_path = Path(output.name)
@@ -365,6 +365,17 @@ def load_rankings(rows, products, encoder_path, reranker_path, *, force=False):
             temporary_path.replace(OWN_CACHE)
         finally:
             temporary_path.unlink(missing_ok=True)
+
+
+def load_rankings(rows, products, encoder_path, reranker_path, *, force=False):
+    identity = ranking_cache_identity(products, rows, encoder_path, reranker_path)
+    cached = None if force else read_cached_rankings(identity)
+    if cached is not None:
+        return cached
+
+    print(f"Running the baseline pipeline on {len(rows)} validation queries...", flush=True)
+    records = run_pipeline(rows, products, encoder_path, reranker_path)
+    write_ranking_cache(identity, records)
     return records
 
 

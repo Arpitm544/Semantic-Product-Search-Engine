@@ -79,7 +79,7 @@ def test_cached_rankings_are_rebuilt_when_data_or_model_changes(monkeypatch, tmp
     weights.write_bytes(b"first")
     monkeypatch.setattr(ea, "LTR_CACHE", tmp_path / "ltr")
     monkeypatch.setattr(ea, "OWN_CACHE", tmp_path / "errors" / "validation.json")
-    run = Mock(side_effect=[[{"run": 1}], [{"run": 2}], [{"run": 3}]])
+    run = Mock(side_effect=[[{"run": 1}], [{"run": 2}], [{"run": 3}], [{"run": 4}]])
     monkeypatch.setattr(ea, "run_pipeline", run)
 
     products = [{"id": "p1", "title": "Headphones"}]
@@ -90,7 +90,9 @@ def test_cached_rankings_are_rebuilt_when_data_or_model_changes(monkeypatch, tmp
     assert ea.load_rankings(rows, products, encoder, reranker) == [{"run": 2}]
     weights.write_bytes(b"second")
     assert ea.load_rankings(rows, products, encoder, reranker) == [{"run": 3}]
-    assert run.call_count == 3
+    assert ea.load_rankings(rows, products, encoder, reranker, force=True) == [{"run": 4}]
+    assert ea.load_rankings(rows, products, encoder, reranker) == [{"run": 4}]
+    assert run.call_count == 4
 
 
 
